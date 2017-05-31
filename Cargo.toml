@@ -13,3 +13,6 @@ regex = "0.2.2"
 [dependencies.clippy]
 optional = true
 version = "*"
+
+[profile.release]
+lto = true
