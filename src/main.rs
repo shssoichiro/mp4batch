@@ -112,7 +112,7 @@ fn process_file(input: &Path, profile: Profile, crf: u8) -> Result<(), String> {
 }
 
 fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
-    let command = Command::new(dotenv!("AVS2YUV_PATH"))
+    let command = cross_platform_command(dotenv!("AVS2YUV_PATH"))
         .arg(input)
         .arg("-o")
         .arg(if Path::new("/dev/null").exists() {
@@ -181,14 +181,14 @@ fn convert_video(input: &Path,
     };
     let colorspace = if hd { "bt709" } else { "smpte170m" };
 
-    let mut avs2yuv = Command::new(dotenv!("AVS2YUV_PATH"))
+    let mut avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
         .arg(input)
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("{}", e))?;
+        .unwrap();
 
-    let mut x264 = Command::new(dotenv!("X264_PATH"))
+    let mut x264 = cross_platform_command(dotenv!("X264_PATH"))
         .arg("--frames")
         .arg(format!("{}", frames))
         .arg("--crf")
@@ -282,7 +282,7 @@ fn convert_audio(input: &Path) -> Result<(), String> {
             }
             input_video = input.with_extension(TRY_EXTENSIONS[i]);
         }
-        let status = Command::new(dotenv!("FFMPEG_PATH"))
+        let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
             .arg("-y")
             .arg("-i")
             .arg(input_video)
@@ -303,14 +303,14 @@ fn convert_audio(input: &Path) -> Result<(), String> {
                    Err("Failed to execute ffmpeg".to_owned())
                };
     }
-    let mut wavi = Command::new(dotenv!("WAVI_PATH"))
+    let mut wavi = cross_platform_command(dotenv!("WAVI_PATH"))
         .arg(input)
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("{}", e))?;
 
-    let mut ffmpeg = Command::new(dotenv!("FFMPEG_PATH"))
+    let mut ffmpeg = cross_platform_command(dotenv!("FFMPEG_PATH"))
         .arg("-y")
         .arg("-i")
         .arg("-")
@@ -349,7 +349,7 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4"));
 
-    let status = Command::new(dotenv!("MP4BOX_PATH"))
+    let status = cross_platform_command(dotenv!("MP4BOX_PATH"))
         .arg("-add")
         .arg(input.with_extension("264#trackID=1"))
         .arg("-add")
@@ -368,11 +368,21 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
 }
 
 fn read_file(input: &Path) -> Result<String, String> {
-    let file = File::open(input).map_err(|e| format!("{}", e))?;
+    let file = File::open(input).unwrap();
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
     buf_reader
         .read_to_string(&mut contents)
-        .map_err(|e| format!("{}", e))?;
+        .unwrap();
     Ok(contents)
+}
+
+fn cross_platform_command(program: &str) -> Command {
+    if program.starts_with("wine ") {
+        let mut command = Command::new("wine");
+        command.arg(&program[5..]);
+        command
+    } else {
+        Command::new(program)
+    }
 }
