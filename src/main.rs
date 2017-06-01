@@ -12,6 +12,7 @@ use std::io::BufReader;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::os::unix::io::{FromRawFd, AsRawFd};
 use std::str::FromStr;
 
 use clap::{Arg, App};
@@ -181,14 +182,14 @@ fn convert_video(input: &Path,
     };
     let colorspace = if hd { "bt709" } else { "smpte170m" };
 
-    let mut avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
+    let avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
         .arg(input)
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
 
-    let mut x264 = cross_platform_command(dotenv!("X264_PATH"))
+    let status = cross_platform_command(dotenv!("X264_PATH"))
         .arg("--frames")
         .arg(format!("{}", frames))
         .arg("--crf")
@@ -247,20 +248,10 @@ fn convert_video(input: &Path,
         .arg("--output")
         .arg(input.with_extension("264"))
         .arg("-")
-        .stdin(Stdio::piped())
+        .stdin(unsafe { Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd()) })
         .stderr(Stdio::inherit())
-        .spawn()
+        .status()
         .map_err(|e| format!("{}", e))?;
-
-    if let Some(ref mut stdout) = avs2yuv.stdout {
-        if let Some(ref mut stdin) = x264.stdin {
-            let mut buf: Vec<u8> = Vec::new();
-            stdout.read_to_end(&mut buf).unwrap();
-            stdin.write_all(&buf).unwrap();
-        }
-    }
-
-    let status = x264.wait().map_err(|e| format!("{}", e))?;
 
     if status.success() {
         Ok(())
@@ -303,14 +294,14 @@ fn convert_audio(input: &Path) -> Result<(), String> {
                    Err("Failed to execute ffmpeg".to_owned())
                };
     }
-    let mut wavi = cross_platform_command(dotenv!("WAVI_PATH"))
+    let wavi = cross_platform_command(dotenv!("WAVI_PATH"))
         .arg(input)
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("{}", e))?;
 
-    let mut ffmpeg = cross_platform_command(dotenv!("FFMPEG_PATH"))
+    let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
         .arg("-y")
         .arg("-i")
         .arg("-")
@@ -323,20 +314,10 @@ fn convert_audio(input: &Path) -> Result<(), String> {
         .arg("-map_chapters")
         .arg("-1")
         .arg(input.with_extension("m4a"))
-        .stdin(Stdio::piped())
+        .stdin(unsafe { Stdio::from_raw_fd(wavi.stdout.unwrap().as_raw_fd()) })
         .stderr(Stdio::inherit())
-        .spawn()
+        .status()
         .map_err(|e| format!("{}", e))?;
-
-    if let Some(ref mut stdout) = wavi.stdout {
-        if let Some(ref mut stdin) = ffmpeg.stdin {
-            let mut buf: Vec<u8> = Vec::new();
-            stdout.read_to_end(&mut buf).unwrap();
-            stdin.write_all(&buf).unwrap();
-        }
-    }
-
-    let status = ffmpeg.wait().map_err(|e| format!("{}", e))?;
 
     if status.success() {
         Ok(())
@@ -372,9 +353,7 @@ fn read_file(input: &Path) -> Result<String, String> {
     let file = File::open(input).unwrap();
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
-    buf_reader
-        .read_to_string(&mut contents)
-        .unwrap();
+    buf_reader.read_to_string(&mut contents).unwrap();
     Ok(contents)
 }
 
