@@ -294,8 +294,13 @@ fn convert_audio(input: &Path) -> Result<(), String> {
                    Err("Failed to execute ffmpeg".to_owned())
                };
     }
+
     let wavi = cross_platform_command(dotenv!("WAVI_PATH"))
-        .arg(input)
+        .arg(if dotenv!("WAVI_PATH").starts_with("wine") {
+                 format!("Z:{}", input.canonicalize().unwrap().to_string_lossy())
+             } else {
+                 input.to_string_lossy().to_string()
+             })
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
@@ -322,13 +327,13 @@ fn convert_audio(input: &Path) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute x264".to_owned())
+        Err("Failed to execute ffmpeg".to_owned())
     }
 }
 
 fn mux_mp4(input: &Path) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
-    output_path.push(input.with_extension("mp4"));
+    output_path.push(input.with_extension("mp4").file_name().unwrap());
 
     let status = cross_platform_command(dotenv!("MP4BOX_PATH"))
         .arg("-add")
