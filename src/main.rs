@@ -248,7 +248,7 @@ fn convert_video(input: &Path,
         .arg(input.with_extension("264"))
         .arg("-")
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("{}", e))?;
 
@@ -324,7 +324,7 @@ fn convert_audio(input: &Path) -> Result<(), String> {
         .arg("-1")
         .arg(input.with_extension("m4a"))
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("{}", e))?;
 
@@ -358,6 +358,7 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
         .arg(dotenv!("TMP_PATH"))
         .arg("-new")
         .arg(output_path)
+        .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("{}", e))?;
     if status.success() {
