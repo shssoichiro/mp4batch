@@ -12,7 +12,10 @@ use std::io::BufReader;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+#[cfg(unix)]
 use std::os::unix::io::{FromRawFd, AsRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{FromRawHandle, AsRawHandle};
 use std::str::FromStr;
 
 use clap::{Arg, App};
@@ -248,7 +251,16 @@ fn convert_video(input: &Path,
         .arg("--output")
         .arg(input.with_extension("264"))
         .arg("-")
-        .stdin(unsafe { Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd()) })
+        .stdin(unsafe {
+            #[cfg(unix)]
+            {
+                Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd())
+            }
+            #[cfg(windows)]
+            {
+                Stdio::from_raw_handle(avs2yuv.stdout.unwrap().as_raw_handle())
+            }
+        })
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("{}", e))?;
@@ -319,7 +331,16 @@ fn convert_audio(input: &Path) -> Result<(), String> {
         .arg("-map_chapters")
         .arg("-1")
         .arg(input.with_extension("m4a"))
-        .stdin(unsafe { Stdio::from_raw_fd(wavi.stdout.unwrap().as_raw_fd()) })
+        .stdin(unsafe {
+            #[cfg(unix)]
+            {
+                Stdio::from_raw_fd(wavi.stdout.unwrap().as_raw_fd())
+            }
+            #[cfg(windows)]
+            {
+                Stdio::from_raw_handle(wavi.stdout.unwrap().as_raw_handle())
+            }
+        })
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("{}", e))?;
