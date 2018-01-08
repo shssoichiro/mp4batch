@@ -1,5 +1,5 @@
 #![feature(plugin)]
-#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
 #![plugin(dotenv_macros)]
 
 extern crate clap;
@@ -13,12 +13,12 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 #[cfg(unix)]
-use std::os::unix::io::{FromRawFd, AsRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
-use std::os::windows::io::{FromRawHandle, AsRawHandle};
+use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::str::FromStr;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
@@ -33,34 +33,45 @@ impl FromStr for Profile {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_ref() {
-               "film" => Profile::Film,
-               "anime" => Profile::Anime,
-               "120" => Profile::OneTwenty,
-               _ => {
-                   return Err("Invalid profile given".to_owned());
-               }
-           })
+            "film" => Profile::Film,
+            "anime" => Profile::Anime,
+            "120" => Profile::OneTwenty,
+            _ => {
+                return Err("Invalid profile given".to_owned());
+            }
+        })
     }
 }
 
 fn main() {
     let args = App::new("mp4batch")
-        .arg(Arg::with_name("profile")
-                 .short("p")
-                 .long("profile")
-                 .value_name("VALUE")
-                 .help("Sets a custom profile (default: film, available: film, anime, 120)")
-                 .takes_value(true))
-        .arg(Arg::with_name("crf")
-                 .short("c")
-                 .long("crf")
-                 .value_name("VALUE")
-                 .help("Sets a CRF value to use (default: 18)")
-                 .takes_value(true))
-        .arg(Arg::with_name("input")
-                 .help("Sets the input directory or file")
-                 .required(true)
-                 .index(1))
+        .arg(
+            Arg::with_name("profile")
+                .short("p")
+                .long("profile")
+                .value_name("VALUE")
+                .help("Sets a custom profile (default: film, available: film, anime, 120)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("crf")
+                .short("c")
+                .long("crf")
+                .value_name("VALUE")
+                .help("Sets a CRF value to use (default: 18)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("direct")
+                .short("d")
+                .help("remux mkv to mp4; will convert audio streams to aac without touching video"),
+        )
+        .arg(
+            Arg::with_name("input")
+                .help("Sets the input directory or file")
+                .required(true)
+                .index(1),
+        )
         .get_matches();
 
     const INPUT_PATH_ERROR: &str = "No input path provided";
@@ -78,30 +89,59 @@ fn main() {
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
 
+    if args.is_present("direct") {
+        if input.is_dir() {
+            let dir_entries = input.read_dir().unwrap();
+            for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
+                e.path()
+                    .extension()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default() == "mkv"
+            }) {
+                let result = process_direct(&entry.path());
+                if let Err(err) = result {
+                    println!("{}", err);
+                }
+            }
+        } else {
+            assert_eq!(
+                input
+                    .extension()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default(),
+                "mkv",
+                "Input file must be a matroska file"
+            );
+            process_direct(input).unwrap();
+        }
+    }
+
     if input.is_dir() {
         let dir_entries = input.read_dir().unwrap();
-        for entry in dir_entries
-                .map(|e| e.unwrap())
-                .filter(|e| {
-                            e.path()
-                                .extension()
-                                .unwrap_or_default()
-                                .to_str()
-                                .unwrap_or_default() == "avs"
-                        }) {
+        for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
+            e.path()
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default() == "avs"
+        }) {
             let result = process_file(&entry.path(), profile, crf);
             if let Err(err) = result {
                 println!("{}", err);
             }
         }
     } else {
-        assert_eq!(input
-                       .extension()
-                       .unwrap_or_default()
-                       .to_str()
-                       .unwrap_or_default(),
-                   "avs",
-                   "Input file must be an avisynth script");
+        assert_eq!(
+            input
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default(),
+            "avs",
+            "Input file must be an avisynth script"
+        );
         process_file(input, profile, crf).unwrap();
     }
 }
@@ -115,15 +155,21 @@ fn process_file(input: &Path, profile: Profile, crf: u8) -> Result<(), String> {
     Ok(())
 }
 
+fn process_direct(input: &Path) -> Result<(), String> {
+    mux_mp4_direct(input)?;
+    println!("Finished converting {}", input.to_string_lossy());
+    Ok(())
+}
+
 fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
     let command = cross_platform_command(dotenv!("AVS2YUV_PATH"))
         .arg(input)
         .arg("-o")
         .arg(if Path::new("/dev/null").exists() {
-                 "/dev/null"
-             } else {
-                 "nul"
-             })
+            "/dev/null"
+        } else {
+            "nul"
+        })
         .arg("-frames")
         .arg("1")
         .output()
@@ -139,9 +185,11 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
     let captures = DIMENSIONS_REGEX.captures(&output);
     if let Some(captures) = captures {
         if captures.len() >= 4 {
-            Ok((captures[1].parse().map_err(|e| format!("{}", e))?,
+            Ok((
+                captures[1].parse().map_err(|e| format!("{}", e))?,
                 captures[2].parse().map_err(|e| format!("{}", e))?,
-                captures[3].parse().map_err(|e| format!("{}", e))?))
+                captures[3].parse().map_err(|e| format!("{}", e))?,
+            ))
         } else {
             Err(REGEX_ERROR.to_owned())
         }
@@ -150,12 +198,13 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
     }
 }
 
-fn convert_video(input: &Path,
-                 profile: Profile,
-                 crf: u8,
-                 hd: bool,
-                 frames: u32)
-                 -> Result<(), String> {
+fn convert_video(
+    input: &Path,
+    profile: Profile,
+    crf: u8,
+    hd: bool,
+    frames: u32,
+) -> Result<(), String> {
     let ref_frames = match profile {
         Profile::Anime => "8",
         Profile::Film => "5",
@@ -301,18 +350,18 @@ fn convert_audio(input: &Path) -> Result<(), String> {
             .status()
             .map_err(|e| format!("{}", e))?;
         return if status.success() {
-                   Ok(())
-               } else {
-                   Err("Failed to execute ffmpeg".to_owned())
-               };
+            Ok(())
+        } else {
+            Err("Failed to execute ffmpeg".to_owned())
+        };
     }
 
     let wavi = cross_platform_command(dotenv!("WAVI_PATH"))
         .arg(if dotenv!("WAVI_PATH").starts_with("wine") {
-                 format!("Z:{}", input.canonicalize().unwrap().to_string_lossy())
-             } else {
-                 input.to_string_lossy().to_string()
-             })
+            format!("Z:{}", input.canonicalize().unwrap().to_string_lossy())
+        } else {
+            input.to_string_lossy().to_string()
+        })
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
@@ -372,6 +421,36 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err("Failed to execute mp4box".to_owned())
+    }
+}
+
+fn mux_mp4_direct(input: &Path) -> Result<(), String> {
+    let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
+    output_path.push(input.with_extension("mp4").file_name().unwrap());
+
+    let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
+        .arg("-i")
+        .arg(input)
+        .arg("-vcodec")
+        .arg("copy")
+        .arg("-acodec")
+        .arg("aac")
+        .arg("-q:a")
+        .arg("1")
+        .arg("-map")
+        .arg("0:v:0")
+        .arg("-map")
+        .arg("0:a:0")
+        .arg("-map_chapters")
+        .arg("-1")
+        .arg(output_path)
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| format!("{}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Failed to execute ffmpeg".to_owned())
     }
 }
 
