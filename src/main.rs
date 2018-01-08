@@ -64,6 +64,7 @@ fn main() {
         .arg(
             Arg::with_name("direct")
                 .short("d")
+                .long("direct")
                 .help("remux mkv to mp4; will convert audio streams to aac without touching video"),
         )
         .arg(
@@ -116,6 +117,7 @@ fn main() {
             );
             process_direct(input).unwrap();
         }
+        return;
     }
 
     if input.is_dir() {
