@@ -7,7 +7,7 @@ version = "0.1.0"
 clap = "2.24.2"
 dotenv = "0.10.0"
 dotenv_macros = "0.10.0"
-lazy_static = "0.2.8"
+lazy_static = "1.0.0"
 regex = "0.2.2"
 
 [dependencies.clippy]
