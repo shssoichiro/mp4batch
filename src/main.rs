@@ -65,7 +65,9 @@ fn main() {
             Arg::with_name("direct")
                 .short("d")
                 .long("direct")
-                .help("remux mkv to mp4; will convert audio streams to aac without touching video"),
+                .value_name("A_TRACK")
+                .help("remux mkv to mp4; will convert audio streams to aac without touching video")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("input")
@@ -91,6 +93,9 @@ fn main() {
     assert!(input.exists(), "Input path does not exist");
 
     if args.is_present("direct") {
+        let track: u32 = args.value_of("direct")
+            .map(|t| t.parse().unwrap())
+            .unwrap_or(0);
         if input.is_dir() {
             let dir_entries = input.read_dir().unwrap();
             for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
@@ -100,7 +105,7 @@ fn main() {
                     .to_str()
                     .unwrap_or_default() == "mkv"
             }) {
-                let result = process_direct(&entry.path());
+                let result = process_direct(&entry.path(), track);
                 if let Err(err) = result {
                     println!("{}", err);
                 }
@@ -115,7 +120,7 @@ fn main() {
                 "mkv",
                 "Input file must be a matroska file"
             );
-            process_direct(input).unwrap();
+            process_direct(input, track).unwrap();
         }
         return;
     }
@@ -157,8 +162,8 @@ fn process_file(input: &Path, profile: Profile, crf: u8) -> Result<(), String> {
     Ok(())
 }
 
-fn process_direct(input: &Path) -> Result<(), String> {
-    mux_mp4_direct(input)?;
+fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
+    mux_mp4_direct(input, audio_track)?;
     println!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
@@ -426,7 +431,7 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
     }
 }
 
-fn mux_mp4_direct(input: &Path) -> Result<(), String> {
+fn mux_mp4_direct(input: &Path, audio_track: u32) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
@@ -442,7 +447,7 @@ fn mux_mp4_direct(input: &Path) -> Result<(), String> {
         .arg("-map")
         .arg("0:v:0")
         .arg("-map")
-        .arg("0:a:0")
+        .arg(format!("0:a:{}", audio_track))
         .arg("-map_chapters")
         .arg("-1")
         .arg(output_path)
