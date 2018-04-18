@@ -304,8 +304,6 @@ fn convert_video(
         .arg(colorspace)
         .arg("--stdin")
         .arg("y4m")
-        .arg("--output-depth")
-        .arg("10")
         .arg("--output")
         .arg(input.with_extension("264"))
         .arg("-")
