@@ -1,8 +1,6 @@
-#![feature(plugin)]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
-#![plugin(dotenv_macros)]
-
 extern crate clap;
+#[macro_use]
+extern crate dotenv_codegen;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
@@ -70,6 +68,12 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("keep-audio")
+                .short("a")
+                .long("keep-audio")
+                .help("copy the audio without reencoding"),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -134,7 +138,7 @@ fn main() {
                 .to_str()
                 .unwrap_or_default() == "avs"
         }) {
-            let result = process_file(&entry.path(), profile, crf);
+            let result = process_file(&entry.path(), profile, crf, !args.is_present("keep-audio"));
             if let Err(err) = result {
                 println!("{}", err);
             }
@@ -149,14 +153,14 @@ fn main() {
             "avs",
             "Input file must be an avisynth script"
         );
-        process_file(input, profile, crf).unwrap();
+        process_file(input, profile, crf, args.is_present("keep-audio")).unwrap();
     }
 }
 
-fn process_file(input: &Path, profile: Profile, crf: u8) -> Result<(), String> {
+fn process_file(input: &Path, profile: Profile, crf: u8, keep_audio: bool) -> Result<(), String> {
     let (_, height, frames) = get_video_dimensions(input)?;
     convert_video(input, profile, crf, height >= 576, frames)?;
-    convert_audio(input)?;
+    convert_audio(input, !keep_audio)?;
     mux_mp4(input)?;
     println!("Finished converting {}", input.to_string_lossy());
     Ok(())
@@ -328,7 +332,7 @@ fn convert_video(
     }
 }
 
-fn convert_audio(input: &Path) -> Result<(), String> {
+fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
     let avs_contents = read_file(input)?;
     if !avs_contents.to_lowercase().contains("audiodub") {
         const TRY_EXTENSIONS: [&str; 8] = ["mkv", "avi", "mp4", "flv", "wav", "aac", "ac3", "dts"];
@@ -341,21 +345,23 @@ fn convert_audio(input: &Path) -> Result<(), String> {
             }
             input_video = input.with_extension(TRY_EXTENSIONS[i]);
         }
-        let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
+        let mut command = cross_platform_command(dotenv!("FFMPEG_PATH"));
+        command
             .arg("-y")
             .arg("-i")
             .arg(input_video)
             .arg("-acodec")
-            .arg("aac")
-            .arg("-q:a")
-            .arg("1")
+            .arg(if convert { "aac" } else { "copy" });
+        if !convert {
+            command.arg("-q:a").arg("1");
+        }
+        command
             .arg("-map")
             .arg("0:a:0")
             .arg("-map_chapters")
             .arg("-1")
-            .arg(input.with_extension("m4a"))
-            .status()
-            .map_err(|e| format!("{}", e))?;
+            .arg(input.with_extension("m4a"));
+        let status = command.status().map_err(|e| format!("{}", e))?;
         return if status.success() {
             Ok(())
         } else {
