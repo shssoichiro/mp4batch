@@ -138,7 +138,7 @@ fn main() {
                 .to_str()
                 .unwrap_or_default() == "avs"
         }) {
-            let result = process_file(&entry.path(), profile, crf, !args.is_present("keep-audio"));
+            let result = process_file(&entry.path(), profile, crf, args.is_present("keep-audio"));
             if let Err(err) = result {
                 println!("{}", err);
             }
@@ -352,7 +352,7 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             .arg(input_video)
             .arg("-acodec")
             .arg(if convert { "aac" } else { "copy" });
-        if !convert {
+        if convert {
             command.arg("-q:a").arg("1");
         }
         command
