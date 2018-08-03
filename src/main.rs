@@ -328,7 +328,10 @@ fn convert_video(
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute x264".to_owned())
+        Err(format!(
+            "Failed to execute x264: Exited with code {:x}",
+            status.code().unwrap()
+        ))
     }
 }
 
