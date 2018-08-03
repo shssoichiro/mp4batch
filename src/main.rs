@@ -5,15 +5,16 @@ extern crate dotenv_codegen;
 extern crate lazy_static;
 extern crate regex;
 
+use std::env;
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::io::BufReader;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use clap::{App, Arg};
@@ -42,6 +43,7 @@ impl FromStr for Profile {
 }
 
 fn main() {
+    env::set_var("RUST_BACKTRACE", "1");
     let args = App::new("mp4batch")
         .arg(
             Arg::with_name("profile")
@@ -50,36 +52,31 @@ fn main() {
                 .value_name("VALUE")
                 .help("Sets a custom profile (default: film, available: film, anime, 120)")
                 .takes_value(true),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("crf")
                 .short("c")
                 .long("crf")
                 .value_name("VALUE")
                 .help("Sets a CRF value to use (default: 18)")
                 .takes_value(true),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("direct")
                 .short("d")
                 .long("direct")
                 .value_name("A_TRACK")
                 .help("remux mkv to mp4; will convert audio streams to aac without touching video")
                 .takes_value(true),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("keep-audio")
                 .short("a")
                 .long("keep-audio")
                 .help("copy the audio without reencoding"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
                 .index(1),
-        )
-        .get_matches();
+        ).get_matches();
 
     const INPUT_PATH_ERROR: &str = "No input path provided";
     const CRF_PARSE_ERROR: &str = "CRF must be a number between 0-51";
@@ -87,7 +84,8 @@ fn main() {
     let input = args.value_of("input").expect(INPUT_PATH_ERROR);
     let profile = Profile::from_str(args.value_of("profile").unwrap_or("film"))
         .expect("Invalid profile given");
-    let crf = args.value_of("crf")
+    let crf = args
+        .value_of("crf")
         .unwrap_or("18")
         .parse::<u8>()
         .expect(CRF_PARSE_ERROR);
@@ -97,7 +95,8 @@ fn main() {
     assert!(input.exists(), "Input path does not exist");
 
     if args.is_present("direct") {
-        let track: u32 = args.value_of("direct")
+        let track: u32 = args
+            .value_of("direct")
             .map(|t| t.parse().unwrap())
             .unwrap_or(0);
         if input.is_dir() {
@@ -107,7 +106,8 @@ fn main() {
                     .extension()
                     .unwrap_or_default()
                     .to_str()
-                    .unwrap_or_default() == "mkv"
+                    .unwrap_or_default()
+                    == "mkv"
             }) {
                 let result = process_direct(&entry.path(), track);
                 if let Err(err) = result {
@@ -136,7 +136,8 @@ fn main() {
                 .extension()
                 .unwrap_or_default()
                 .to_str()
-                .unwrap_or_default() == "avs"
+                .unwrap_or_default()
+                == "avs"
         }) {
             let result = process_file(&entry.path(), profile, crf, args.is_present("keep-audio"));
             if let Err(err) = result {
@@ -180,8 +181,7 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
             "/dev/null"
         } else {
             "nul"
-        })
-        .arg("-frames")
+        }).arg("-frames")
         .arg("1")
         .output()
         .map_err(|e| format!("{}", e))?;
@@ -214,7 +214,7 @@ fn convert_video(
     profile: Profile,
     crf: u8,
     hd: bool,
-    frames: u32,
+    _frames: u32,
 ) -> Result<(), String> {
     let ref_frames = match profile {
         Profile::Anime => "8",
@@ -245,16 +245,8 @@ fn convert_video(
     };
     let colorspace = if hd { "bt709" } else { "smpte170m" };
 
-    let avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
-        .arg(input)
-        .arg("-")
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    let status = cross_platform_command(dotenv!("X264_PATH"))
-        .arg("--frames")
-        .arg(format!("{}", frames))
+    let mut command = cross_platform_command(dotenv!("X264_PATH"));
+    command
         .arg("--crf")
         .arg(format!("{}", crf))
         .arg("--ref")
@@ -306,24 +298,32 @@ fn convert_video(
         .arg(colorspace)
         .arg("--transfer")
         .arg(colorspace)
-        .arg("--stdin")
-        .arg("y4m")
         .arg("--output")
-        .arg(input.with_extension("264"))
-        .arg("-")
-        .stdin(unsafe {
-            #[cfg(unix)]
-            {
-                Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd())
-            }
-            #[cfg(windows)]
-            {
-                Stdio::from_raw_handle(avs2yuv.stdout.unwrap().as_raw_handle())
-            }
-        })
-        .stderr(Stdio::inherit())
+        .arg(input.with_extension("264"));
+    #[cfg(windows)]
+    {
+        command.arg(input);
+    }
+    #[cfg(unix)]
+    {
+        let avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        command
+            .arg("--frames")
+            .arg(format!("{}", _frames))
+            .arg("--stdin")
+            .arg("y4m")
+            .arg("-")
+            .stdin(unsafe { Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd()) })
+            .stderr(Stdio::inherit());
+    }
+    let status = command
         .status()
-        .map_err(|e| format!("{}", e))?;
+        .map_err(|e| format!("Failed to execute x264: {}", e))?;
 
     if status.success() {
         Ok(())
@@ -361,7 +361,9 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             .arg("-map_chapters")
             .arg("-1")
             .arg(input.with_extension("m4a"));
-        let status = command.status().map_err(|e| format!("{}", e))?;
+        let status = command
+            .status()
+            .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
         return if status.success() {
             Ok(())
         } else {
@@ -374,11 +376,10 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             format!("Z:{}", input.canonicalize().unwrap().to_string_lossy())
         } else {
             input.to_string_lossy().to_string()
-        })
-        .arg("-")
+        }).arg("-")
         .stdout(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("{}", e))?;
+        .map_err(|e| format!("Failed to execute wavi: {}", e))?;
 
     let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
         .arg("-y")
@@ -402,10 +403,9 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             {
                 Stdio::from_raw_handle(wavi.stdout.unwrap().as_raw_handle())
             }
-        })
-        .stderr(Stdio::inherit())
+        }).stderr(Stdio::inherit())
         .status()
-        .map_err(|e| format!("{}", e))?;
+        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
 
     if status.success() {
         Ok(())
@@ -418,14 +418,17 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
-    let status = cross_platform_command(dotenv!("MP4BOX_PATH"))
-        .arg("-add")
-        .arg(input.with_extension("264#trackID=1"))
-        .arg("-add")
-        .arg(input.with_extension("m4a#trackID=1"))
-        .arg("-tmp")
-        .arg(dotenv!("TMP_PATH"))
-        .arg("-new")
+    let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
+        .arg("-i")
+        .arg(input.with_extension("264"))
+        .arg("-i")
+        .arg(input.with_extension("m4a"))
+        .arg("-vcodec")
+        .arg("copy")
+        .arg("-acodec")
+        .arg("copy")
+        .arg("-map_chapters")
+        .arg("-1")
         .arg(output_path)
         .stderr(Stdio::inherit())
         .status()
@@ -433,7 +436,7 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute mp4box".to_owned())
+        Err("Failed to execute ffmpeg".to_owned())
     }
 }
 
