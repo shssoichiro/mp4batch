@@ -72,6 +72,10 @@ fn main() {
                 .long("keep-audio")
                 .help("copy the audio without reencoding"),
         ).arg(
+            Arg::with_name("skip-video")
+                .long("skip-video")
+                .help("assume the video has already been encoded (will use .264 files)"),
+        ).arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -139,7 +143,13 @@ fn main() {
                 .unwrap_or_default()
                 == "avs"
         }) {
-            let result = process_file(&entry.path(), profile, crf, args.is_present("keep-audio"));
+            let result = process_file(
+                &entry.path(),
+                profile,
+                crf,
+                args.is_present("keep-audio"),
+                args.is_present("skip-video"),
+            );
             if let Err(err) = result {
                 println!("{}", err);
             }
@@ -154,13 +164,27 @@ fn main() {
             "avs",
             "Input file must be an avisynth script"
         );
-        process_file(input, profile, crf, args.is_present("keep-audio")).unwrap();
+        process_file(
+            input,
+            profile,
+            crf,
+            args.is_present("keep-audio"),
+            args.is_present("skip-video"),
+        ).unwrap();
     }
 }
 
-fn process_file(input: &Path, profile: Profile, crf: u8, keep_audio: bool) -> Result<(), String> {
+fn process_file(
+    input: &Path,
+    profile: Profile,
+    crf: u8,
+    keep_audio: bool,
+    skip_video: bool,
+) -> Result<(), String> {
     let (_, height, frames) = get_video_dimensions(input)?;
-    convert_video(input, profile, crf, height >= 576, frames)?;
+    if !skip_video {
+        convert_video(input, profile, crf, height >= 576, frames)?;
+    }
     convert_audio(input, !keep_audio)?;
     mux_mp4(input)?;
     println!("Finished converting {}", input.to_string_lossy());
