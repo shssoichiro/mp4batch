@@ -362,7 +362,7 @@ fn convert_video(
 fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
     let avs_contents = read_file(input)?;
     if !avs_contents.to_lowercase().contains("audiodub") {
-        const TRY_EXTENSIONS: [&str; 8] = ["mkv", "avi", "mp4", "flv", "wav", "aac", "ac3", "dts"];
+        const TRY_EXTENSIONS: [&str; 8] = ["wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv"];
         let mut i = 0;
         let mut input_video = input.with_extension(TRY_EXTENSIONS[i]);
         while !input_video.exists() {
