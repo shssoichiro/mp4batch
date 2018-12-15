@@ -1,9 +1,5 @@
-extern crate clap;
 #[macro_use]
 extern crate dotenv_codegen;
-#[macro_use]
-extern crate lazy_static;
-extern crate regex;
 
 use std::env;
 use std::fs::File;
@@ -18,6 +14,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use clap::{App, Arg};
+use lazy_static::lazy_static;
 use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
@@ -52,35 +49,41 @@ fn main() {
                 .value_name("VALUE")
                 .help("Sets a custom profile (default: film, available: film, anime, 120)")
                 .takes_value(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("crf")
                 .short("c")
                 .long("crf")
                 .value_name("VALUE")
                 .help("Sets a CRF value to use (default: 18)")
                 .takes_value(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("direct")
                 .short("d")
                 .long("direct")
                 .value_name("A_TRACK")
                 .help("remux mkv to mp4; will convert audio streams to aac without touching video")
                 .takes_value(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("keep-audio")
                 .short("a")
                 .long("keep-audio")
                 .help("copy the audio without reencoding"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("skip-video")
                 .long("skip-video")
                 .help("assume the video has already been encoded (will use .264 files)"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
                 .index(1),
-        ).get_matches();
+        )
+        .get_matches();
 
     const INPUT_PATH_ERROR: &str = "No input path provided";
     const CRF_PARSE_ERROR: &str = "CRF must be a number between 0-51";
@@ -170,7 +173,8 @@ fn main() {
             crf,
             args.is_present("keep-audio"),
             args.is_present("skip-video"),
-        ).unwrap();
+        )
+        .unwrap();
     }
 }
 
@@ -205,7 +209,8 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
             "/dev/null"
         } else {
             "nul"
-        }).arg("-frames")
+        })
+        .arg("-frames")
         .arg("1")
         .output()
         .map_err(|e| format!("{}", e))?;
@@ -403,7 +408,8 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             format!("Z:{}", input.canonicalize().unwrap().to_string_lossy())
         } else {
             input.to_string_lossy().to_string()
-        }).arg("-")
+        })
+        .arg("-")
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to execute wavi: {}", e))?;
@@ -430,7 +436,8 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
             {
                 Stdio::from_raw_handle(wavi.stdout.unwrap().as_raw_handle())
             }
-        }).stderr(Stdio::inherit())
+        })
+        .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
 
