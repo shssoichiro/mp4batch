@@ -39,6 +39,13 @@ impl FromStr for Profile {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct VideoDimensions {
+    pub width: u32,
+    pub height: u32,
+    pub frames: u32,
+}
+
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
     let args = App::new("mp4batch")
@@ -185,9 +192,9 @@ fn process_file(
     keep_audio: bool,
     skip_video: bool,
 ) -> Result<(), String> {
-    let (_, height, frames) = get_video_dimensions(input)?;
+    let dims = get_video_dimensions(input)?;
     if !skip_video {
-        convert_video(input, profile, crf, height >= 576, frames)?;
+        convert_video(input, profile, crf, dims.height >= 576, dims.frames)?;
     }
     convert_audio(input, !keep_audio)?;
     mux_mp4(input)?;
@@ -201,7 +208,17 @@ fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
     Ok(())
 }
 
-fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
+fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
+    if input.ends_with(".avs") {
+        get_video_dimensions_avs(input)
+    } else if input.ends_with(".vpy") {
+        get_video_dimensions_vps(input)
+    } else {
+        panic!("Unrecognized input type");
+    }
+}
+
+fn get_video_dimensions_avs(input: &Path) -> Result<VideoDimensions, String> {
     let command = cross_platform_command(dotenv!("AVS2YUV_PATH"))
         .arg(input)
         .arg("-o")
@@ -225,11 +242,11 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
     let captures = DIMENSIONS_REGEX.captures(&output);
     if let Some(captures) = captures {
         if captures.len() >= 4 {
-            Ok((
-                captures[1].parse().map_err(|e| format!("{}", e))?,
-                captures[2].parse().map_err(|e| format!("{}", e))?,
-                captures[3].parse().map_err(|e| format!("{}", e))?,
-            ))
+            Ok(VideoDimensions {
+                width: captures[1].parse().map_err(|e| format!("{}", e))?,
+                height: captures[2].parse().map_err(|e| format!("{}", e))?,
+                frames: captures[3].parse().map_err(|e| format!("{}", e))?,
+            })
         } else {
             Err(REGEX_ERROR.to_owned())
         }
@@ -238,118 +255,191 @@ fn get_video_dimensions(input: &Path) -> Result<(u32, u32, u32), String> {
     }
 }
 
+fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
+    let command = cross_platform_command(dotenv!("VSPIPE_PATH"))
+        .arg("-i")
+        .arg(input)
+        .arg("-")
+        .output()
+        .map_err(|e| format!("{}", e))?;
+    let output = String::from_utf8_lossy(&command.stdout);
+
+    const PARSE_ERROR: &str = "Could not detect video dimensions";
+    let lines = output.lines().take(3).collect::<Vec<_>>();
+    if lines.len() == 3 {
+        Ok(VideoDimensions {
+            width: lines[0]
+                .replace("Width: ", "")
+                .trim()
+                .parse()
+                .map_err(|e| format!("{}", e))?,
+            height: lines[1]
+                .replace("Height: ", "")
+                .trim()
+                .parse()
+                .map_err(|e| format!("{}", e))?,
+            frames: lines[2]
+                .replace("Frames: ", "")
+                .trim()
+                .parse()
+                .map_err(|e| format!("{}", e))?,
+        })
+    } else {
+        Err(PARSE_ERROR.to_owned())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct X264Settings {
+    pub crf: u8,
+    pub ref_frames: u8,
+    pub psy_rd: (f32, f32),
+    pub deblock: (i8, i8),
+    pub aq_strength: f32,
+    pub min_keyint: usize,
+    pub max_keyint: usize,
+    pub colorspace: &'static str,
+}
+
+impl X264Settings {
+    pub fn new(crf: u8, profile: Profile, hd: bool) -> Self {
+        X264Settings {
+            crf,
+            ref_frames: match profile {
+                Profile::Anime => 8,
+                Profile::Film => 5,
+                Profile::OneTwenty => 16,
+            },
+            psy_rd: match profile {
+                Profile::Anime => (0.7, 0.0),
+                _ => (1.0, 0.2),
+            },
+            deblock: match profile {
+                Profile::Anime => (-1, -1),
+                _ => (-2, -2),
+            },
+            aq_strength: match profile {
+                Profile::Anime => 0.7,
+                _ => 1.0,
+            },
+            min_keyint: match profile {
+                Profile::Anime => 12,
+                Profile::Film => 24,
+                Profile::OneTwenty => 120,
+            },
+            max_keyint: match profile {
+                Profile::Anime => 400,
+                Profile::Film => 240,
+                Profile::OneTwenty => 1200,
+            },
+            colorspace: if hd { "bt709" } else { "smpte170m" },
+        }
+    }
+
+    pub fn apply_to_command<'a>(&self, command: &'a mut Command) -> &'a mut Command {
+        command
+            .arg("--crf")
+            .arg(self.crf.to_string())
+            .arg("--ref")
+            .arg(self.ref_frames.to_string())
+            .arg("--mixed-refs")
+            .arg("--no-fast-pskip")
+            .arg("--b-adapt")
+            .arg("2")
+            .arg("--bframes")
+            .arg(self.ref_frames.to_string())
+            .arg("--b-pyramid")
+            .arg("normal")
+            .arg("--weightb")
+            .arg("--direct")
+            .arg("spatial")
+            .arg("--subme")
+            .arg("10")
+            .arg("--trellis")
+            .arg("2")
+            .arg("--partitions")
+            .arg("all")
+            .arg("--psy-rd")
+            .arg(format!("{:.1}:{:.1}", self.psy_rd.0, self.psy_rd.1))
+            .arg("--deblock")
+            .arg(format!("{}:{}", self.deblock.0, self.deblock.1))
+            .arg("--me")
+            .arg("umh")
+            .arg("--merange")
+            .arg("32")
+            .arg("--fade-compensate")
+            .arg("0.5")
+            .arg("--rc-lookahead")
+            .arg("60")
+            .arg("--aq-mode")
+            .arg("3")
+            .arg("--aq-strength")
+            .arg(format!("{:.1}", self.aq_strength))
+            .arg("-i")
+            .arg(self.min_keyint.to_string())
+            .arg("-I")
+            .arg(self.max_keyint.to_string())
+            .arg("--vbv-maxrate")
+            .arg("40000")
+            .arg("--vbv-bufsize")
+            .arg("30000")
+            .arg("--colormatrix")
+            .arg(self.colorspace)
+            .arg("--colorprim")
+            .arg(self.colorspace)
+            .arg("--transfer")
+            .arg(self.colorspace)
+    }
+}
+
 fn convert_video(
     input: &Path,
     profile: Profile,
     crf: u8,
     hd: bool,
-    _frames: u32,
+    frames: u32,
 ) -> Result<(), String> {
-    let ref_frames = match profile {
-        Profile::Anime => "8",
-        Profile::Film => "5",
-        Profile::OneTwenty => "16",
-    };
-    let psy_rd = match profile {
-        Profile::Anime => "0.7:0.0",
-        _ => "1.0:0.2",
-    };
-    let deblock = match profile {
-        Profile::Anime => "-1:-1",
-        _ => "-2:-2",
-    };
-    let aq_strength = match profile {
-        Profile::Anime => "0.7",
-        _ => "1.0",
-    };
-    let min_keyint = match profile {
-        Profile::Anime => "12",
-        Profile::Film => "25",
-        Profile::OneTwenty => "120",
-    };
-    let max_keyint = match profile {
-        Profile::Anime => "400",
-        Profile::Film => "250",
-        Profile::OneTwenty => "1200",
-    };
-    let colorspace = if hd { "bt709" } else { "smpte170m" };
-
+    let settings = X264Settings::new(crf, profile, hd);
     let mut command = cross_platform_command(dotenv!("X264_PATH"));
-    command
-        .arg("--crf")
-        .arg(format!("{}", crf))
-        .arg("--ref")
-        .arg(ref_frames)
-        .arg("--mixed-refs")
-        .arg("--no-fast-pskip")
-        .arg("--b-adapt")
-        .arg("2")
-        .arg("--bframes")
-        .arg(ref_frames)
-        .arg("--b-pyramid")
-        .arg("normal")
-        .arg("--weightb")
-        .arg("--direct")
-        .arg("spatial")
-        .arg("--subme")
-        .arg("10")
-        .arg("--trellis")
-        .arg("2")
-        .arg("--partitions")
-        .arg("all")
-        .arg("--psy-rd")
-        .arg(psy_rd)
-        .arg("--deblock")
-        .arg(deblock)
-        .arg("--me")
-        .arg("umh")
-        .arg("--merange")
-        .arg("32")
-        .arg("--fade-compensate")
-        .arg("0.5")
-        .arg("--rc-lookahead")
-        .arg("60")
-        .arg("--aq-mode")
-        .arg("3")
-        .arg("--aq-strength")
-        .arg(aq_strength)
-        .arg("-i")
-        .arg(min_keyint)
-        .arg("-I")
-        .arg(max_keyint)
-        .arg("--vbv-maxrate")
-        .arg("40000")
-        .arg("--vbv-bufsize")
-        .arg("30000")
-        .arg("--colormatrix")
-        .arg(colorspace)
-        .arg("--colorprim")
-        .arg(colorspace)
-        .arg("--transfer")
-        .arg(colorspace)
+    settings
+        .apply_to_command(&mut command)
         .arg("--output")
         .arg(input.with_extension("264"));
-    #[cfg(windows)]
-    {
-        command.arg(input);
-    }
-    #[cfg(unix)]
-    {
-        let avs2yuv = cross_platform_command(dotenv!("AVS2YUV_PATH"))
+    let pipe = if input.ends_with(".avs") {
+        cross_platform_command(dotenv!("AVS2YUV_PATH"))
             .arg(input)
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
-            .unwrap();
-        command
-            .arg("--frames")
-            .arg(format!("{}", _frames))
-            .arg("--stdin")
-            .arg("y4m")
+            .unwrap()
+    } else if input.ends_with(".vpy") {
+        cross_platform_command(dotenv!("VSPIPE_PATH"))
+            .arg("--y4m")
+            .arg(input)
             .arg("-")
-            .stdin(unsafe { Stdio::from_raw_fd(avs2yuv.stdout.unwrap().as_raw_fd()) })
-            .stderr(Stdio::inherit());
-    }
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+    command
+        .arg("--frames")
+        .arg(format!("{}", frames))
+        .arg("--stdin")
+        .arg("y4m")
+        .arg("-")
+        .stdin(unsafe {
+            #[cfg(unix)]
+            {
+                Stdio::from_raw_fd(pipe.stdout.unwrap().as_raw_fd())
+            }
+            #[cfg(windows)]
+            {
+                Stdio::from_raw_handle(pipe.stdout.unwrap().as_raw_handle())
+            }
+        })
+        .stderr(Stdio::inherit());
     let status = command
         .status()
         .map_err(|e| format!("Failed to execute x264: {}", e))?;
