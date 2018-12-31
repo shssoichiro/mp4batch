@@ -82,7 +82,7 @@ fn main() {
         .arg(
             Arg::with_name("skip-video")
                 .long("skip-video")
-                .help("assume the video has already been encoded (will use .264 files)"),
+                .help("assume the video has already been encoded (will use .out.mkv files)"),
         )
         .arg(
             Arg::with_name("input")
@@ -396,7 +396,7 @@ fn convert_video(
     settings
         .apply_to_command(&mut command)
         .arg("--output")
-        .arg(input.with_extension("264"))
+        .arg(input.with_extension("out.mkv"))
         .arg(input);
     // TODO: Fix piping on Windows
 //    let filename = input.file_name().unwrap().to_str().unwrap();
@@ -539,7 +539,7 @@ fn mux_mp4(input: &Path) -> Result<(), String> {
 
     let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
         .arg("-i")
-        .arg(input.with_extension("264"))
+        .arg(input.with_extension("out.mkv"))
         .arg("-i")
         .arg(input.with_extension("m4a"))
         .arg("-vcodec")
