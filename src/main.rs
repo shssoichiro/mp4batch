@@ -165,15 +165,6 @@ fn main() {
             }
         }
     } else {
-        assert_eq!(
-            input
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default(),
-            "avs",
-            "Input file must be an avisynth script"
-        );
         process_file(
             input,
             profile,
@@ -209,9 +200,10 @@ fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
 }
 
 fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
-    if input.ends_with(".avs") {
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    if filename.ends_with(".avs") {
         get_video_dimensions_avs(input)
-    } else if input.ends_with(".vpy") {
+    } else if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
     } else {
         panic!("Unrecognized input type");
@@ -349,7 +341,7 @@ impl X264Settings {
             .arg("--bframes")
             .arg(self.ref_frames.to_string())
             .arg("--b-pyramid")
-            .arg("normal")
+            .arg("strict")
             .arg("--weightb")
             .arg("--direct")
             .arg("spatial")
@@ -405,14 +397,15 @@ fn convert_video(
         .apply_to_command(&mut command)
         .arg("--output")
         .arg(input.with_extension("264"));
-    let pipe = if input.ends_with(".avs") {
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".avs") {
         cross_platform_command(dotenv!("AVS2YUV_PATH"))
             .arg(input)
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
             .unwrap()
-    } else if input.ends_with(".vpy") {
+    } else if filename.ends_with(".vpy") {
         cross_platform_command(dotenv!("VSPIPE_PATH"))
             .arg("--y4m")
             .arg(input)
