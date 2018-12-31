@@ -396,43 +396,45 @@ fn convert_video(
     settings
         .apply_to_command(&mut command)
         .arg("--output")
-        .arg(input.with_extension("264"));
-    let filename = input.file_name().unwrap().to_str().unwrap();
-    let pipe = if filename.ends_with(".avs") {
-        cross_platform_command(dotenv!("AVS2YUV_PATH"))
-            .arg(input)
-            .arg("-")
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap()
-    } else if filename.ends_with(".vpy") {
-        cross_platform_command(dotenv!("VSPIPE_PATH"))
-            .arg("--y4m")
-            .arg(input)
-            .arg("-")
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap()
-    } else {
-        panic!("Unrecognized input type");
-    };
-    command
-        .arg("--frames")
-        .arg(format!("{}", frames))
-        .arg("--stdin")
-        .arg("y4m")
-        .arg("-")
-        .stdin(unsafe {
-            #[cfg(unix)]
-            {
-                Stdio::from_raw_fd(pipe.stdout.unwrap().as_raw_fd())
-            }
-            #[cfg(windows)]
-            {
-                Stdio::from_raw_handle(pipe.stdout.unwrap().as_raw_handle())
-            }
-        })
-        .stderr(Stdio::inherit());
+        .arg(input.with_extension("264"))
+        .arg(input);
+    // TODO: Fix piping on Windows
+//    let filename = input.file_name().unwrap().to_str().unwrap();
+//    let pipe = if filename.ends_with(".avs") {
+//        cross_platform_command(dotenv!("AVS2YUV_PATH"))
+//            .arg(input)
+//            .arg("-")
+//            .stdout(Stdio::piped())
+//            .spawn()
+//            .unwrap()
+//    } else if filename.ends_with(".vpy") {
+//        cross_platform_command(dotenv!("VSPIPE_PATH"))
+//            .arg("--y4m")
+//            .arg(input)
+//            .arg("-")
+//            .stdout(Stdio::piped())
+//            .spawn()
+//            .unwrap()
+//    } else {
+//        panic!("Unrecognized input type");
+//    };
+//    command
+//        .arg("--frames")
+//        .arg(format!("{}", frames))
+//        .arg("--stdin")
+//        .arg("y4m")
+//        .arg("-")
+//        .stdin(unsafe {
+//            #[cfg(unix)]
+//            {
+//                Stdio::from_raw_fd(pipe.stdout.unwrap().as_raw_fd())
+//            }
+//            #[cfg(windows)]
+//            {
+//                Stdio::from_raw_handle(pipe.stdout.unwrap().as_raw_handle())
+//            }
+//        })
+//        .stderr(Stdio::inherit());
     let status = command
         .status()
         .map_err(|e| format!("Failed to execute x264: {}", e))?;
