@@ -341,7 +341,7 @@ impl X264Settings {
             .arg("--bframes")
             .arg(self.ref_frames.to_string())
             .arg("--b-pyramid")
-            .arg("strict")
+            .arg("normal")
             .arg("--weightb")
             .arg("--direct")
             .arg("spatial")
