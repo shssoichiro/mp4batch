@@ -5,10 +5,6 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
@@ -397,44 +393,34 @@ fn convert_video(
         .apply_to_command(&mut command)
         .arg("--output")
         .arg(input.with_extension("out.mkv"))
-        .arg(input);
-    // TODO: Fix piping on Windows
-//    let filename = input.file_name().unwrap().to_str().unwrap();
-//    let pipe = if filename.ends_with(".avs") {
-//        cross_platform_command(dotenv!("AVS2YUV_PATH"))
-//            .arg(input)
-//            .arg("-")
-//            .stdout(Stdio::piped())
-//            .spawn()
-//            .unwrap()
-//    } else if filename.ends_with(".vpy") {
-//        cross_platform_command(dotenv!("VSPIPE_PATH"))
-//            .arg("--y4m")
-//            .arg(input)
-//            .arg("-")
-//            .stdout(Stdio::piped())
-//            .spawn()
-//            .unwrap()
-//    } else {
-//        panic!("Unrecognized input type");
-//    };
-//    command
-//        .arg("--frames")
-//        .arg(format!("{}", frames))
-//        .arg("--stdin")
-//        .arg("y4m")
-//        .arg("-")
-//        .stdin(unsafe {
-//            #[cfg(unix)]
-//            {
-//                Stdio::from_raw_fd(pipe.stdout.unwrap().as_raw_fd())
-//            }
-//            #[cfg(windows)]
-//            {
-//                Stdio::from_raw_handle(pipe.stdout.unwrap().as_raw_handle())
-//            }
-//        })
-//        .stderr(Stdio::inherit());
+        .arg("-");
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".avs") {
+        cross_platform_command(dotenv!("AVS2YUV_PATH"))
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else if filename.ends_with(".vpy") {
+        cross_platform_command(dotenv!("VSPIPE_PATH"))
+            .arg("--y4m")
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+    command
+        .arg("--frames")
+        .arg(format!("{}", frames))
+        .arg("--stdin")
+        .arg("y4m")
+        .arg("-")
+        .stdin(pipe.stdout.unwrap())
+        .stderr(Stdio::inherit());
     let status = command
         .status()
         .map_err(|e| format!("Failed to execute x264: {}", e))?;
@@ -512,16 +498,7 @@ fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
         .arg("-map_chapters")
         .arg("-1")
         .arg(input.with_extension("m4a"))
-        .stdin(unsafe {
-            #[cfg(unix)]
-            {
-                Stdio::from_raw_fd(wavi.stdout.unwrap().as_raw_fd())
-            }
-            #[cfg(windows)]
-            {
-                Stdio::from_raw_handle(wavi.stdout.unwrap().as_raw_handle())
-            }
-        })
+        .stdin(wavi.stdout.unwrap())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
