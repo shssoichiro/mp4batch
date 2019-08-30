@@ -121,7 +121,7 @@ fn main() {
             }) {
                 let result = process_direct(&entry.path(), track);
                 if let Err(err) = result {
-                    println!("{}", err);
+                    eprintln!("An error occurred for {}: {}", entry.path().as_os_str().to_string_lossy(), err);
                 }
             }
         } else {
@@ -142,12 +142,13 @@ fn main() {
     if input.is_dir() {
         let dir_entries = input.read_dir().unwrap();
         for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
-            e.path()
+            let ext = e.path()
                 .extension()
                 .unwrap_or_default()
                 .to_str()
                 .unwrap_or_default()
-                == "avs"
+                .to_string();
+                ext == "avs" || ext == "vpy"
         }) {
             let result = process_file(
                 &entry.path(),
@@ -157,7 +158,7 @@ fn main() {
                 args.is_present("skip-video"),
             );
             if let Err(err) = result {
-                println!("{}", err);
+                eprintln!("An error occurred for {}: {}", entry.path().as_os_str().to_string_lossy(), err);
             }
         }
     } else {
@@ -185,13 +186,13 @@ fn process_file(
     }
     convert_audio(input, !keep_audio)?;
     mux_mp4(input)?;
-    println!("Finished converting {}", input.to_string_lossy());
+    eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
 
 fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
     mux_mp4_direct(input, audio_track)?;
-    println!("Finished converting {}", input.to_string_lossy());
+    eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
 
