@@ -121,7 +121,11 @@ fn main() {
             }) {
                 let result = process_direct(&entry.path(), track);
                 if let Err(err) = result {
-                    eprintln!("An error occurred for {}: {}", entry.path().as_os_str().to_string_lossy(), err);
+                    eprintln!(
+                        "An error occurred for {}: {}",
+                        entry.path().as_os_str().to_string_lossy(),
+                        err
+                    );
                 }
             }
         } else {
@@ -142,13 +146,14 @@ fn main() {
     if input.is_dir() {
         let dir_entries = input.read_dir().unwrap();
         for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
-            let ext = e.path()
+            let ext = e
+                .path()
                 .extension()
                 .unwrap_or_default()
                 .to_str()
                 .unwrap_or_default()
                 .to_string();
-                ext == "avs" || ext == "vpy"
+            ext == "avs" || ext == "vpy"
         }) {
             let result = process_file(
                 &entry.path(),
@@ -158,7 +163,11 @@ fn main() {
                 args.is_present("skip-video"),
             );
             if let Err(err) = result {
-                eprintln!("An error occurred for {}: {}", entry.path().as_os_str().to_string_lossy(), err);
+                eprintln!(
+                    "An error occurred for {}: {}",
+                    entry.path().as_os_str().to_string_lossy(),
+                    err
+                );
             }
         }
     } else {
