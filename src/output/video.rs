@@ -40,6 +40,7 @@ struct X264Settings {
     pub aq_strength: f32,
     pub min_keyint: usize,
     pub max_keyint: usize,
+    pub qcomp: f32,
     pub highbd: bool,
     pub pixel_format: PixelFormat,
     pub colorspace: ColorSpace,
@@ -61,10 +62,7 @@ impl X264Settings {
                 Profile::Anime => (0.7, 0.0),
                 _ => (1.0, 0.2),
             },
-            deblock: match profile {
-                Profile::Anime => (-1, -1),
-                _ => (-3, -3),
-            },
+            deblock: (-3, -3),
             aq_strength: match profile {
                 Profile::Anime => 0.7,
                 _ => 1.0,
@@ -76,6 +74,10 @@ impl X264Settings {
             max_keyint: match profile {
                 Profile::Anime => fps.round() as usize * 30 / 2,
                 Profile::Film => fps.round() as usize * 10,
+            },
+            qcomp: match profile {
+                Profile::Anime => 0.6,
+                Profile::Film => 0.7,
             },
             highbd,
             pixel_format: dimensions.pixel_format,
@@ -107,7 +109,7 @@ impl X264Settings {
             .arg("--partitions")
             .arg("all")
             .arg("--psy-rd")
-            .arg(format!("{:.1}:{:.1}", self.psy_rd.0, self.psy_rd.1))
+            .arg(format!("{:.2}:{:.2}", self.psy_rd.0, self.psy_rd.1))
             .arg("--deblock")
             .arg(format!("{}:{}", self.deblock.0, self.deblock.1))
             .arg("--me")
@@ -117,15 +119,17 @@ impl X264Settings {
             .arg("--fade-compensate")
             .arg("0.5")
             .arg("--rc-lookahead")
-            .arg("60")
+            .arg("250")
             .arg("--aq-mode")
             .arg("3")
             .arg("--aq-strength")
-            .arg(format!("{:.1}", self.aq_strength))
+            .arg(format!("{:.2}", self.aq_strength))
             .arg("-i")
             .arg(self.min_keyint.to_string())
             .arg("-I")
             .arg(self.max_keyint.to_string())
+            .arg("--qcomp")
+            .arg(format!("{:.2}", self.qcomp))
             .arg("--vbv-maxrate")
             .arg("40000")
             .arg("--vbv-bufsize")
