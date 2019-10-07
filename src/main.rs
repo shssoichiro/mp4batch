@@ -211,6 +211,7 @@ fn process_file(
     keep_audio: bool,
     skip_video: bool,
 ) -> Result<(), String> {
+    eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         convert_video(input, profile, crf, highbd, dims)?;
@@ -225,6 +226,7 @@ fn process_file(
 }
 
 fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
+    eprintln!("Converting {}", input.to_string_lossy());
     mux_mp4_direct(input, audio_track)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
