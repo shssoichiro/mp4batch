@@ -73,7 +73,7 @@ fn main() {
                 .short("d")
                 .long("direct")
                 .value_name("A_TRACK")
-                .help("remux mkv to mp4; will convert audio streams to aac without touching video")
+                .help("remux mkv to mp4; will convert audio streams to opus without touching video")
                 .takes_value(true),
         )
         .arg(
