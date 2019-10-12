@@ -10,7 +10,6 @@ use clap::{App, Arg};
 use itertools::Itertools;
 use std::env;
 use std::path::Path;
-use std::process::Command;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -172,7 +171,7 @@ fn main() {
                     .to_str()
                     .unwrap_or_default()
                     .to_string();
-                ext == "avs" || ext == "vpy"
+                ext == "vpy"
             })
             .sorted_by_key(|e| e.path())
         {
@@ -235,14 +234,4 @@ fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
     mux_mp4_direct(input, audio_track)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
-}
-
-fn cross_platform_command(program: &str) -> Command {
-    if program.starts_with("wine ") {
-        let mut command = Command::new("wine");
-        command.arg(&program[5..]);
-        command
-    } else {
-        Command::new(program)
-    }
 }

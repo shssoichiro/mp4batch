@@ -3,8 +3,8 @@ mod video;
 
 pub use self::audio::*;
 pub use self::video::*;
-use crate::cross_platform_command;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::process::Stdio;
 
 pub fn mux_mp4(input: &Path) -> Result<(), String> {
@@ -16,7 +16,7 @@ pub fn mux_mp4(input: &Path) -> Result<(), String> {
     } else {
         input.with_extension("m4a")
     };
-    let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
+    let status = Command::new("ffmpeg")
         .arg("-i")
         .arg(input.with_extension("out.mkv"))
         .arg("-i")
@@ -45,7 +45,7 @@ pub fn mux_mp4_direct(input: &Path, audio_track: u32) -> Result<(), String> {
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
     let channels = get_audio_channel_count(input)?;
-    let status = cross_platform_command(dotenv!("FFMPEG_PATH"))
+    let status = Command::new("ffmpeg")
         .arg("-i")
         .arg(input)
         .arg("-vcodec")

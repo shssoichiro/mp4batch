@@ -1,4 +1,3 @@
-use crate::cross_platform_command;
 use crate::input::{ColorSpace, PixelFormat, VideoDimensions};
 use std::cmp;
 use std::path::Path;
@@ -172,22 +171,15 @@ pub fn convert_video(
     dimensions: VideoDimensions,
 ) -> Result<(), String> {
     let settings = X264Settings::new(crf, profile, highbd, dimensions);
-    let mut command = cross_platform_command(dotenv!("X264_PATH"));
+    let mut command = Command::new("x264");
     settings
         .apply_to_command(&mut command)
         .arg("--output")
         .arg(input.with_extension("out.mkv"))
         .arg("-");
     let filename = input.file_name().unwrap().to_str().unwrap();
-    let pipe = if filename.ends_with(".avs") {
-        cross_platform_command(dotenv!("AVS2YUV_PATH"))
-            .arg(input)
-            .arg("-")
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap()
-    } else if filename.ends_with(".vpy") {
-        cross_platform_command(dotenv!("VSPIPE_PATH"))
+    let pipe = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
             .arg("--y4m")
             .arg(input)
             .arg("-")

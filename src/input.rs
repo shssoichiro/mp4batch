@@ -1,19 +1,7 @@
-use crate::cross_platform_command;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::fmt;
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{BufReader, Read};
 use std::path::Path;
-
-pub fn read_file(input: &Path) -> Result<String, String> {
-    let file = File::open(input).unwrap();
-    let mut buf_reader = BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents).unwrap();
-    Ok(contents)
-}
+use std::process::Command;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
@@ -81,62 +69,15 @@ impl ColorSpace {
 
 pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
     let filename = input.file_name().unwrap().to_str().unwrap();
-    if filename.ends_with(".avs") {
-        get_video_dimensions_avs(input)
-    } else if filename.ends_with(".vpy") {
+    if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
     } else {
         panic!("Unrecognized input type");
     }
 }
 
-fn get_video_dimensions_avs(input: &Path) -> Result<VideoDimensions, String> {
-    let command = cross_platform_command(dotenv!("AVS2YUV_PATH"))
-        .arg(input)
-        .arg("-o")
-        .arg(if Path::new("/dev/null").exists() {
-            "/dev/null"
-        } else {
-            "nul"
-        })
-        .arg("-frames")
-        .arg("1")
-        .output()
-        .map_err(|e| format!("{}", e))?;
-    let output = String::from_utf8_lossy(&command.stderr);
-
-    lazy_static! {
-        // Output e.g.: Tangled.Ever.After.2012.720p.BluRay.DD5.1.x264-EbP.avs: 1280x720, 24000/1001 fps, 9327 frames
-        static ref DIMENSIONS_REGEX: Regex = Regex::new(r": (\d+)x(\d+), (\d+)/(\d+) fps, (\d+) frames").unwrap();
-    }
-
-    const REGEX_ERROR: &str = "Could not detect video dimensions";
-    let captures = DIMENSIONS_REGEX.captures(&output);
-    if let Some(captures) = captures {
-        if captures.len() >= 4 {
-            let width = captures[1].parse().map_err(|e| format!("{}", e))?;
-            let height = captures[2].parse().map_err(|e| format!("{}", e))?;
-            Ok(VideoDimensions {
-                width,
-                height,
-                frames: captures[5].parse().map_err(|e| format!("{}", e))?,
-                fps: (
-                    captures[3].parse().map_err(|e| format!("{}", e))?,
-                    captures[4].parse().map_err(|e| format!("{}", e))?,
-                ),
-                pixel_format: PixelFormat::default(),
-                colorspace: ColorSpace::from_dimensions(width, height),
-            })
-        } else {
-            Err(REGEX_ERROR.to_owned())
-        }
-    } else {
-        Err(REGEX_ERROR.to_owned())
-    }
-}
-
 fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
-    let command = cross_platform_command(dotenv!("VSPIPE_PATH"))
+    let command = Command::new("vspipe")
         .arg("-i")
         .arg(input)
         .arg("-")
