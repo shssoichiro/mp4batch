@@ -7,6 +7,7 @@ mod output;
 use self::input::*;
 use self::output::*;
 use clap::{App, Arg};
+use itertools::Itertools;
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -161,16 +162,20 @@ fn main() {
 
     if input.is_dir() {
         let dir_entries = input.read_dir().unwrap();
-        for entry in dir_entries.filter_map(|e| e.ok()).filter(|e| {
-            let ext = e
-                .path()
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default()
-                .to_string();
-            ext == "avs" || ext == "vpy"
-        }) {
+        for entry in dir_entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let ext = e
+                    .path()
+                    .extension()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_string();
+                ext == "avs" || ext == "vpy"
+            })
+            .sorted_by_key(|e| e.path())
+        {
             let result = process_file(
                 &entry.path(),
                 profile,
