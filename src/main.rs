@@ -161,7 +161,7 @@ fn main() {
 
     if input.is_dir() {
         let dir_entries = input.read_dir().unwrap();
-        for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
+        for entry in dir_entries.filter_map(|e| e.ok()).filter(|e| {
             let ext = e
                 .path()
                 .extension()
