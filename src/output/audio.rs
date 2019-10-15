@@ -27,6 +27,8 @@ pub fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
         command.arg("-b:a").arg(&format!("{}k", 80 * channels));
     }
     command
+        .arg("-af")
+        .arg("aformat=channel_layouts=7.1|5.1|stereo")
         .arg("-map")
         .arg("0:a:0")
         .arg("-map_chapters")

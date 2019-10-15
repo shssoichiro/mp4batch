@@ -56,6 +56,8 @@ pub fn mux_mp4_direct(input: &Path, audio_track: u32) -> Result<(), String> {
         .arg("-2")
         .arg("-b:a")
         .arg(&format!("{}k", 80 * channels))
+        .arg("-af")
+        .arg("aformat=channel_layouts=7.1|5.1|stereo")
         .arg("-map")
         .arg("0:v:0")
         .arg("-map")
