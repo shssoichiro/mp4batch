@@ -60,6 +60,9 @@ pub fn get_audio_channel_count(input: &Path) -> Result<u32, String> {
         .output()
         .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
     String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()
+        .unwrap()
         .trim()
         .parse()
         .map_err(|e| format!("Failed to parse channel count: {}", e))
