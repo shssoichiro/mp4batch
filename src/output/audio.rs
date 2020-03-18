@@ -2,8 +2,8 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
-    const TRY_EXTENSIONS: [&str; 9] = [
-        "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv",
+    const TRY_EXTENSIONS: &[&str] = &[
+        "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv", "m2ts",
     ];
     let mut i = 0;
     let mut input_audio = input.with_extension(TRY_EXTENSIONS[i]);
