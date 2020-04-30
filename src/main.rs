@@ -74,7 +74,18 @@ fn main() {
                 .long("direct")
                 .value_name("A_TRACK")
                 .help("remux mkv to mp4; will convert audio streams to opus without touching video")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with("audio_track"),
+        )
+        .arg(
+            Arg::with_name("audio_track")
+                .short("A")
+                .long("audio-track")
+                .value_name("A_TRACK")
+                .help("define which audio track to use when doing a full conversion")
+                .default_value("0")
+                .takes_value(true)
+                .conflicts_with("direct"),
         )
         .arg(
             Arg::with_name("high-bd")
@@ -116,12 +127,13 @@ fn main() {
         .expect(CRF_PARSE_ERROR);
     assert!(crf <= 51, CRF_PARSE_ERROR);
     let highbd = args.is_present("high-bd");
+    let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
 
     if args.is_present("direct") {
-        let track: u32 = args
+        let track: u8 = args
             .value_of("direct")
             .map(|t| t.parse().unwrap())
             .unwrap_or(0);
@@ -183,6 +195,7 @@ fn main() {
                 highbd,
                 args.is_present("keep-audio"),
                 args.is_present("skip-video"),
+                audio_track,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -201,11 +214,13 @@ fn main() {
             highbd,
             args.is_present("keep-audio"),
             args.is_present("skip-video"),
+            audio_track,
         )
         .unwrap();
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_file(
     input: &Path,
     profile: Profile,
@@ -214,6 +229,7 @@ fn process_file(
     highbd: bool,
     keep_audio: bool,
     skip_video: bool,
+    audio_track: u8,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -222,14 +238,14 @@ fn process_file(
     }
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes
-        convert_audio(input, !keep_audio)?;
+        convert_audio(input, !keep_audio, audio_track)?;
         mux_mp4(input)?;
     }
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
 
-fn process_direct(input: &Path, audio_track: u32) -> Result<(), String> {
+fn process_direct(input: &Path, audio_track: u8) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     mux_mp4_direct(input, audio_track)?;
     eprintln!("Finished converting {}", input.to_string_lossy());

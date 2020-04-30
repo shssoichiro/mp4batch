@@ -40,11 +40,11 @@ pub fn mux_mp4(input: &Path) -> Result<(), String> {
     }
 }
 
-pub fn mux_mp4_direct(input: &Path, audio_track: u32) -> Result<(), String> {
+pub fn mux_mp4_direct(input: &Path, audio_track: u8) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
-    let channels = get_audio_channel_count(input)?;
+    let channels = get_audio_channel_count(input, audio_track)?;
     let status = Command::new("ffmpeg")
         .arg("-i")
         .arg(input)

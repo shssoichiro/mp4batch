@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-pub fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
+pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(), String> {
     const TRY_EXTENSIONS: &[&str] = &[
         "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv", "m2ts",
     ];
@@ -15,12 +15,13 @@ pub fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
         input_audio = input.with_extension(TRY_EXTENSIONS[i]);
     }
 
-    let channels = get_audio_channel_count(&input_audio)?;
+    let channels = get_audio_channel_count(&input_audio, audio_track)?;
     let mut command = Command::new("ffmpeg");
     command
         .arg("-y")
         .arg("-i")
         .arg(input_audio)
+        .arg(format!("0:a:{}", audio_track))
         .arg("-acodec")
         .arg(if convert { "libopus" } else { "copy" });
     if convert {
@@ -45,14 +46,14 @@ pub fn convert_audio(input: &Path, convert: bool) -> Result<(), String> {
     }
 }
 
-pub fn get_audio_channel_count(input: &Path) -> Result<u32, String> {
+pub fn get_audio_channel_count(input: &Path, audio_track: u8) -> Result<u32, String> {
     let output = Command::new("ffprobe")
         .arg("-i")
         .arg(input)
         .arg("-show_entries")
         .arg("stream=channels")
         .arg("-select_streams")
-        .arg("a:0")
+        .arg(format!("a:{}", audio_track))
         .arg("-of")
         .arg("compact=p=0:nk=1")
         .arg("-v")
