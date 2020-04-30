@@ -21,7 +21,6 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(),
         .arg("-y")
         .arg("-i")
         .arg(input_audio)
-        .arg(format!("0:a:{}", audio_track))
         .arg("-acodec")
         .arg(if convert { "libopus" } else { "copy" });
     if convert {
@@ -31,7 +30,7 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(),
         .arg("-af")
         .arg("aformat=channel_layouts=7.1|5.1|stereo")
         .arg("-map")
-        .arg("0:a:0")
+        .arg(format!("0:a:{}", audio_track))
         .arg("-map_chapters")
         .arg("-1")
         .arg(input.with_extension("opus"));
