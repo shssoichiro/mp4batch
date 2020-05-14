@@ -74,8 +74,7 @@ fn main() {
                 .long("direct")
                 .value_name("A_TRACK")
                 .help("remux mkv to mp4; will convert audio streams to opus without touching video")
-                .takes_value(true)
-                .conflicts_with("audio_track"),
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("audio_track")
@@ -84,8 +83,7 @@ fn main() {
                 .value_name("A_TRACK")
                 .help("define which audio track to use when doing a full conversion")
                 .default_value("0")
-                .takes_value(true)
-                .conflicts_with("direct"),
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("high-bd")
