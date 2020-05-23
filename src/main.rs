@@ -145,7 +145,7 @@ fn main() {
                     .unwrap_or_default()
                     == "mkv"
             }) {
-                let result = process_direct(&entry.path(), track);
+                let result = process_direct(&entry.path(), track, !args.is_present("keep-audio"));
                 if let Err(err) = result {
                     eprintln!(
                         "An error occurred for {}: {}",
@@ -164,7 +164,7 @@ fn main() {
                 "mkv",
                 "Input file must be a matroska file"
             );
-            process_direct(input, track).unwrap();
+            process_direct(input, track, !args.is_present("keep-audio")).unwrap();
         }
         return;
     }
@@ -243,9 +243,9 @@ fn process_file(
     Ok(())
 }
 
-fn process_direct(input: &Path, audio_track: u8) -> Result<(), String> {
+fn process_direct(input: &Path, audio_track: u8, convert_audio: bool) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
-    mux_mp4_direct(input, audio_track)?;
+    mux_mp4_direct(input, audio_track, convert_audio)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
