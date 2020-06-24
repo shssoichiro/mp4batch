@@ -145,7 +145,9 @@ fn main() {
                     .unwrap_or_default()
                     == "mkv"
             }) {
-                let result = process_direct(&entry.path(), track, !args.is_present("keep-audio"));
+                let audio_track = find_external_audio(&entry.path(), track);
+                let result =
+                    process_direct(&entry.path(), audio_track, !args.is_present("keep-audio"));
                 if let Err(err) = result {
                     eprintln!(
                         "An error occurred for {}: {}",
@@ -164,7 +166,8 @@ fn main() {
                 "mkv",
                 "Input file must be a matroska file"
             );
-            process_direct(input, track, !args.is_present("keep-audio")).unwrap();
+            let audio_track = find_external_audio(input, audio_track);
+            process_direct(input, audio_track, !args.is_present("keep-audio")).unwrap();
         }
         return;
     }
@@ -185,6 +188,7 @@ fn main() {
             })
             .sorted_by_key(|e| e.path())
         {
+            let audio_track = find_external_audio(&entry.path(), audio_track);
             let result = process_file(
                 &entry.path(),
                 profile,
@@ -204,6 +208,7 @@ fn main() {
             }
         }
     } else {
+        let audio_track = find_external_audio(input, audio_track);
         process_file(
             input,
             profile,
@@ -227,7 +232,7 @@ fn process_file(
     highbd: bool,
     keep_audio: bool,
     skip_video: bool,
-    audio_track: u8,
+    audio_track: AudioTrack,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -243,7 +248,11 @@ fn process_file(
     Ok(())
 }
 
-fn process_direct(input: &Path, audio_track: u8, convert_audio: bool) -> Result<(), String> {
+fn process_direct(
+    input: &Path,
+    audio_track: AudioTrack,
+    convert_audio: bool,
+) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     mux_mp4_direct(input, audio_track, convert_audio)?;
     eprintln!("Finished converting {}", input.to_string_lossy());

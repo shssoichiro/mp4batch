@@ -40,13 +40,21 @@ pub fn mux_mp4(input: &Path) -> Result<(), String> {
     }
 }
 
-pub fn mux_mp4_direct(input: &Path, audio_track: u8, convert_audio: bool) -> Result<(), String> {
+pub fn mux_mp4_direct(
+    input: &Path,
+    audio_track: AudioTrack,
+    convert_audio: bool,
+) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
-    let channels = get_audio_channel_count(input, audio_track)?;
+    let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
-    command.arg("-i").arg(input).arg("-vcodec").arg("copy");
+    command.arg("-i").arg(input);
+    if let AudioTrack::External(ref path) = audio_track {
+        command.arg("-i").arg(path);
+    }
+    command.arg("-vcodec").arg("copy");
     if convert_audio {
         command
             .arg("-acodec")
@@ -63,7 +71,10 @@ pub fn mux_mp4_direct(input: &Path, audio_track: u8, convert_audio: bool) -> Res
     .arg("-map")
     .arg("0:v:0")
     .arg("-map")
-    .arg(format!("0:a:{}", audio_track))
+    .arg(match audio_track {
+        AudioTrack::FromVideo(ref track) => format!("0:a:{}", track),
+        AudioTrack::External(_) => "1:a:0".to_string(),
+    })
     .arg("-map_chapters")
     .arg("-1")
     .arg(output_path);

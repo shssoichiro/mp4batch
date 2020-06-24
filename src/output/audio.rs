@@ -1,7 +1,13 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(), String> {
+#[derive(Debug, Clone)]
+pub enum AudioTrack {
+    FromVideo(u8),
+    External(PathBuf),
+}
+
+pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
     const TRY_EXTENSIONS: &[&str] = &[
         "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv", "m2ts",
     ];
@@ -10,17 +16,23 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(),
     while !input_audio.exists() {
         i += 1;
         if i >= TRY_EXTENSIONS.len() {
-            return Err("No file found to read audio from".to_owned());
+            return AudioTrack::FromVideo(from_video);
         }
         input_audio = input.with_extension(TRY_EXTENSIONS[i]);
     }
+    AudioTrack::External(input_audio)
+}
 
-    let channels = get_audio_channel_count(&input_audio, audio_track)?;
+pub fn convert_audio(input: &Path, convert: bool, audio_track: AudioTrack) -> Result<(), String> {
+    let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
     command
         .arg("-y")
         .arg("-i")
-        .arg(input_audio)
+        .arg(match audio_track {
+            AudioTrack::FromVideo(_) => input,
+            AudioTrack::External(ref path) => &path,
+        })
         .arg("-acodec")
         .arg(if convert { "libopus" } else { "copy" });
     if convert {
@@ -30,7 +42,13 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(),
         .arg("-af")
         .arg("aformat=channel_layouts=7.1|5.1|stereo")
         .arg("-map")
-        .arg(format!("0:a:{}", audio_track))
+        .arg(format!(
+            "0:a:{}",
+            match audio_track {
+                AudioTrack::FromVideo(ref track) => *track,
+                AudioTrack::External(_) => 0,
+            }
+        ))
         .arg("-map_chapters")
         .arg("-1")
         .arg(input.with_extension("opus"));
@@ -45,14 +63,23 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: u8) -> Result<(),
     }
 }
 
-pub fn get_audio_channel_count(input: &Path, audio_track: u8) -> Result<u32, String> {
+pub fn get_audio_channel_count(input: &Path, audio_track: AudioTrack) -> Result<u32, String> {
     let output = Command::new("ffprobe")
         .arg("-i")
-        .arg(input)
+        .arg(match audio_track {
+            AudioTrack::FromVideo(_) => input,
+            AudioTrack::External(ref path) => &path,
+        })
         .arg("-show_entries")
         .arg("stream=channels")
         .arg("-select_streams")
-        .arg(format!("a:{}", audio_track))
+        .arg(format!(
+            "a:{}",
+            match audio_track {
+                AudioTrack::FromVideo(track) => track,
+                AudioTrack::External(_) => 0,
+            }
+        ))
         .arg("-of")
         .arg("compact=p=0:nk=1")
         .arg("-v")
