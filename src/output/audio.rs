@@ -9,7 +9,7 @@ pub enum AudioTrack {
 
 pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
     const TRY_EXTENSIONS: &[&str] = &[
-        "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv", "m2ts",
+        "flac", "wav", "aac", "ac3", "dts", "mkv", "avi", "mp4", "flv", "m2ts", "ts",
     ];
     let mut i = 0;
     let mut input_audio = input.with_extension(TRY_EXTENSIONS[i]);
