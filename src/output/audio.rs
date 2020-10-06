@@ -36,11 +36,13 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: AudioTrack) -> Re
         .arg("-acodec")
         .arg(if convert { "libopus" } else { "copy" });
     if convert {
-        command.arg("-b:a").arg(&format!("{}k", 80 * channels));
+        command
+            .arg("-b:a")
+            .arg(&format!("{}k", 80 * channels))
+            .arg("-af")
+            .arg("aformat=channel_layouts=7.1|5.1|stereo");
     }
     command
-        .arg("-af")
-        .arg("aformat=channel_layouts=7.1|5.1|stereo")
         .arg("-map")
         .arg(format!(
             "0:a:{}",
