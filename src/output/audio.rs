@@ -23,7 +23,12 @@ pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
     AudioTrack::External(input_audio)
 }
 
-pub fn convert_audio(input: &Path, convert: bool, audio_track: AudioTrack) -> Result<(), String> {
+pub fn convert_audio(
+    input: &Path,
+    convert: bool,
+    audio_track: AudioTrack,
+    audio_bitrate: u32,
+) -> Result<(), String> {
     let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
     command
@@ -38,7 +43,7 @@ pub fn convert_audio(input: &Path, convert: bool, audio_track: AudioTrack) -> Re
     if convert {
         command
             .arg("-b:a")
-            .arg(&format!("{}k", 80 * channels))
+            .arg(&format!("{}k", audio_bitrate * channels))
             .arg("-af")
             .arg("aformat=channel_layouts=7.1|5.1|stereo");
     }

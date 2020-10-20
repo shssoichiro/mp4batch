@@ -47,6 +47,7 @@ pub fn mux_mp4_direct(
     input: &Path,
     audio_track: AudioTrack,
     convert_audio: bool,
+    audio_bitrate: u32,
 ) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
@@ -65,7 +66,7 @@ pub fn mux_mp4_direct(
             .arg("-strict")
             .arg("-2")
             .arg("-b:a")
-            .arg(&format!("{}k", 80 * channels))
+            .arg(&format!("{}k", audio_bitrate * channels))
             .arg("-af")
             .arg("aformat=channel_layouts=7.1|5.1|stereo")
     } else {

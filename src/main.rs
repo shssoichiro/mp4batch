@@ -91,6 +91,13 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("audio_bitrate")
+                .long("ab")
+                .value_name("VALUE")
+                .help("Audio bitrate per channel in kbps (Default: 80 kbps/channel)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("high-bd")
                 .long("high-bd")
                 .long("highbd")
@@ -146,6 +153,11 @@ fn main() {
     };
     let highbd = args.is_present("high-bd");
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
+    let audio_bitrate = args
+        .value_of("audio_bitrate")
+        .unwrap_or("80")
+        .parse::<u32>()
+        .unwrap();
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
@@ -166,8 +178,12 @@ fn main() {
                     == "mkv"
             }) {
                 let audio_track = find_external_audio(&entry.path(), track);
-                let result =
-                    process_direct(&entry.path(), audio_track, !args.is_present("keep-audio"));
+                let result = process_direct(
+                    &entry.path(),
+                    audio_track,
+                    !args.is_present("keep-audio"),
+                    audio_bitrate,
+                );
                 if let Err(err) = result {
                     eprintln!(
                         "An error occurred for {}: {}",
@@ -187,7 +203,13 @@ fn main() {
                 "Input file must be a matroska file"
             );
             let audio_track = find_external_audio(input, audio_track);
-            process_direct(input, audio_track, !args.is_present("keep-audio")).unwrap();
+            process_direct(
+                input,
+                audio_track,
+                !args.is_present("keep-audio"),
+                audio_bitrate,
+            )
+            .unwrap();
         }
         return;
     }
@@ -219,6 +241,7 @@ fn main() {
                 args.is_present("keep-audio"),
                 args.is_present("skip-video"),
                 audio_track,
+                audio_bitrate,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -240,6 +263,7 @@ fn main() {
             args.is_present("keep-audio"),
             args.is_present("skip-video"),
             audio_track,
+            audio_bitrate,
         )
         .unwrap();
     }
@@ -256,6 +280,7 @@ fn process_file(
     keep_audio: bool,
     skip_video: bool,
     audio_track: AudioTrack,
+    audio_bitrate: u32,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -267,7 +292,7 @@ fn process_file(
     }
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes
-        convert_audio(input, !keep_audio, audio_track)?;
+        convert_audio(input, !keep_audio, audio_track, audio_bitrate)?;
         mux_mp4(input, encoder)?;
     }
     eprintln!("Finished converting {}", input.to_string_lossy());
@@ -278,9 +303,10 @@ fn process_direct(
     input: &Path,
     audio_track: AudioTrack,
     convert_audio: bool,
+    audio_bitrate: u32,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
-    mux_mp4_direct(input, audio_track, convert_audio)?;
+    mux_mp4_direct(input, audio_track, convert_audio, audio_bitrate)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
