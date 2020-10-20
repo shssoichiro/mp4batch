@@ -161,7 +161,7 @@ impl X264Settings {
     }
 }
 
-pub fn convert_video(
+pub fn convert_video_x264(
     input: &Path,
     profile: Profile,
     crf: u8,
@@ -207,4 +207,62 @@ pub fn convert_video(
             status.code().unwrap()
         ))
     }
+}
+
+pub fn convert_video_rav1e(
+    input: &Path,
+    crf: u8,
+    dimensions: VideoDimensions,
+) -> Result<(), String> {
+    let mut command = Command::new("rav1e-by-gop");
+    let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
+    command
+        .arg("-")
+        .arg("-q")
+        .arg(crf.to_string())
+        .arg("-s")
+        .arg("5")
+        .arg("-i")
+        .arg(fps.to_string())
+        .arg("-I")
+        .arg((fps * 10).to_string())
+        .arg("-o")
+        .arg(input.with_extension("out.ivf"))
+        .arg("--resume")
+        .arg("--frames")
+        .arg(dimensions.frames.to_string())
+        .arg("--tmp-input")
+        .arg("--max-bitrate")
+        .arg(30000.to_string());
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
+            .arg("--y4m")
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+    command.stdin(pipe.stdout.unwrap()).stderr(Stdio::inherit());
+    let status = command
+        .status()
+        .map_err(|e| format!("Failed to execute rav1e: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to execute rav1e: Exited with code {:x}",
+            status.code().unwrap()
+        ))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Encoder {
+    Rav1e,
+    X264,
 }

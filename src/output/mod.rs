@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
 
-pub fn mux_mp4(input: &Path) -> Result<(), String> {
+pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
@@ -18,7 +18,10 @@ pub fn mux_mp4(input: &Path) -> Result<(), String> {
     };
     let status = Command::new("ffmpeg")
         .arg("-i")
-        .arg(input.with_extension("out.mkv"))
+        .arg(match encoder {
+            Encoder::Rav1e => input.with_extension("out.ivf"),
+            Encoder::X264 => input.with_extension("out.mkv"),
+        })
         .arg("-i")
         .arg(audio_path)
         .arg("-vcodec")

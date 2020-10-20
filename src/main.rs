@@ -69,6 +69,11 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("av1")
+                .long("av1")
+                .help("Encode to AV1 using rav1e-by-gop (default QP: 60)"),
+        )
+        .arg(
             Arg::with_name("direct")
                 .short("d")
                 .long("direct")
@@ -118,12 +123,27 @@ fn main() {
         .expect("Invalid profile given");
     let target =
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
-    let crf = args
-        .value_of("crf")
-        .unwrap_or("18")
-        .parse::<u8>()
-        .expect(CRF_PARSE_ERROR);
-    assert!(crf <= 51, CRF_PARSE_ERROR);
+    let encoder = if args.is_present("av1") {
+        Encoder::Rav1e
+    } else {
+        Encoder::X264
+    };
+    let crf = match encoder {
+        Encoder::Rav1e => args
+            .value_of("crf")
+            .unwrap_or("60")
+            .parse::<u8>()
+            .expect(CRF_PARSE_ERROR),
+        Encoder::X264 => {
+            let crf = args
+                .value_of("crf")
+                .unwrap_or("18")
+                .parse::<u8>()
+                .expect(CRF_PARSE_ERROR);
+            assert!(crf <= 51, CRF_PARSE_ERROR);
+            crf
+        }
+    };
     let highbd = args.is_present("high-bd");
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
 
@@ -191,6 +211,7 @@ fn main() {
             let audio_track = find_external_audio(&entry.path(), audio_track);
             let result = process_file(
                 &entry.path(),
+                encoder,
                 profile,
                 target,
                 crf,
@@ -211,6 +232,7 @@ fn main() {
         let audio_track = find_external_audio(input, audio_track);
         process_file(
             input,
+            encoder,
             profile,
             target,
             crf,
@@ -226,6 +248,7 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn process_file(
     input: &Path,
+    encoder: Encoder,
     profile: Profile,
     target: Target,
     crf: u8,
@@ -237,12 +260,15 @@ fn process_file(
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
-        convert_video(input, profile, crf, highbd, dims)?;
+        match encoder {
+            Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
+            Encoder::Rav1e => convert_video_rav1e(input, crf, dims),
+        }?;
     }
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes
         convert_audio(input, !keep_audio, audio_track)?;
-        mux_mp4(input)?;
+        mux_mp4(input, encoder)?;
     }
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
