@@ -32,6 +32,8 @@ pub fn convert_audio(
     let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
     command
+        .arg("-loglevel")
+        .arg("level+error")
         .arg("-y")
         .arg("-i")
         .arg(match audio_track {

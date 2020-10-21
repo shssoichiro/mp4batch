@@ -17,6 +17,8 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
         input.with_extension("m4a")
     };
     let status = Command::new("ffmpeg")
+        .arg("-loglevel")
+        .arg("level+error")
         .arg("-i")
         .arg(match encoder {
             Encoder::Rav1e => input.with_extension("out.ivf"),
@@ -54,7 +56,11 @@ pub fn mux_mp4_direct(
 
     let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
-    command.arg("-i").arg(input);
+    command
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-i")
+        .arg(input);
     if let AudioTrack::External(ref path) = audio_track {
         command.arg("-i").arg(path);
     }
