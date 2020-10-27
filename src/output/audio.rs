@@ -34,6 +34,7 @@ pub fn convert_audio(
     command
         .arg("-loglevel")
         .arg("level+error")
+        .arg("-stats")
         .arg("-y")
         .arg("-i")
         .arg(match audio_track {

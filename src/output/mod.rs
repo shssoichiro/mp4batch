@@ -19,6 +19,7 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
     let status = Command::new("ffmpeg")
         .arg("-loglevel")
         .arg("level+error")
+        .arg("-stats")
         .arg("-i")
         .arg(match encoder {
             Encoder::Rav1e => input.with_extension("out.ivf"),
@@ -59,6 +60,7 @@ pub fn mux_mp4_direct(
     command
         .arg("-loglevel")
         .arg("level+error")
+        .arg("-stats")
         .arg("-i")
         .arg(input);
     if let AudioTrack::External(ref path) = audio_track {
