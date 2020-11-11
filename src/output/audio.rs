@@ -61,7 +61,7 @@ pub fn convert_audio(
         ))
         .arg("-map_chapters")
         .arg("-1")
-        .arg(input.with_extension("opus"));
+        .arg(input.with_extension("out.mka"));
 
     let status = command
         .status()

@@ -11,11 +11,6 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
-    let audio_path = if input.with_extension("opus").is_file() {
-        input.with_extension("opus")
-    } else {
-        input.with_extension("m4a")
-    };
     let status = Command::new("ffmpeg")
         .arg("-loglevel")
         .arg("level+error")
@@ -26,7 +21,7 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
             Encoder::X264 => input.with_extension("out.mkv"),
         })
         .arg("-i")
-        .arg(audio_path)
+        .arg(input.with_extension("out.mka"))
         .arg("-vcodec")
         .arg("copy")
         .arg("-acodec")
