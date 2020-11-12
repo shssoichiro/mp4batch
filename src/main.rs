@@ -169,14 +169,18 @@ fn main() {
             .unwrap_or(0);
         if input.is_dir() {
             let dir_entries = input.read_dir().unwrap();
-            for entry in dir_entries.map(|e| e.unwrap()).filter(|e| {
-                e.path()
-                    .extension()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default()
-                    == "mkv"
-            }) {
+            for entry in dir_entries
+                .map(|e| e.unwrap())
+                .filter(|e| {
+                    e.path()
+                        .extension()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                        == "mkv"
+                })
+                .sorted_by_key(|e| e.path())
+            {
                 let audio_track = find_external_audio(&entry.path(), track);
                 let result = process_direct(
                     &entry.path(),
