@@ -218,6 +218,7 @@ pub fn convert_video_rav1e(
     let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
     command
         .arg("-")
+        .arg("-v")
         .arg("-q")
         .arg(crf.to_string())
         .arg("-s")
