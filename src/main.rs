@@ -115,6 +115,18 @@ fn main() {
                 .help("assume the video has already been encoded (will use .out.mkv files)"),
         )
         .arg(
+            Arg::with_name("tiles")
+                .long("tiles")
+                .help("the number of tiles to use for av1 encoding (default: 1)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("local-workers")
+                .long("local-workers")
+                .help("the number of local workers to use for av1 encoding (default: auto)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -158,6 +170,10 @@ fn main() {
         .unwrap_or("80")
         .parse::<u32>()
         .unwrap();
+    let tiles = args.value_of("tiles").map(|val| val.parse().unwrap());
+    let workers = args
+        .value_of("local-workers")
+        .map(|val| val.parse().unwrap());
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
@@ -246,6 +262,8 @@ fn main() {
                 args.is_present("skip-video"),
                 audio_track,
                 audio_bitrate,
+                tiles,
+                workers,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -268,6 +286,8 @@ fn main() {
             args.is_present("skip-video"),
             audio_track,
             audio_bitrate,
+            tiles,
+            workers,
         )
         .unwrap();
     }
@@ -285,13 +305,15 @@ fn process_file(
     skip_video: bool,
     audio_track: AudioTrack,
     audio_bitrate: u32,
+    tiles: Option<u8>,
+    workers: Option<u8>,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
             Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
-            Encoder::Rav1e => convert_video_rav1e(input, crf, dims),
+            Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers),
         }?;
     }
     if target == Target::Local {

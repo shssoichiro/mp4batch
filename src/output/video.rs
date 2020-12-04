@@ -213,6 +213,8 @@ pub fn convert_video_rav1e(
     input: &Path,
     crf: u8,
     dimensions: VideoDimensions,
+    tiles: Option<u8>,
+    workers: Option<u8>,
 ) -> Result<(), String> {
     let mut command = Command::new("rav1e-by-gop");
     let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
@@ -234,6 +236,12 @@ pub fn convert_video_rav1e(
         .arg("--tmp-input")
         .arg("--max-bitrate")
         .arg(30000.to_string());
+    if let Some(tiles) = tiles {
+        command.arg("--tiles").arg(tiles.to_string());
+    }
+    if let Some(workers) = workers {
+        command.arg("--local-workers").arg(workers.to_string());
+    }
     let filename = input.file_name().unwrap().to_str().unwrap();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
