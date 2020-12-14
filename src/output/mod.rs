@@ -30,6 +30,8 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
         .arg("-2")
         .arg("-map_chapters")
         .arg("-1")
+        .arg("-movflags")
+        .arg("+faststart")
         .arg(output_path)
         .stderr(Stdio::inherit())
         .status()
@@ -84,6 +86,8 @@ pub fn mux_mp4_direct(
     })
     .arg("-map_chapters")
     .arg("-1")
+    .arg("-movflags")
+    .arg("+faststart")
     .arg(output_path);
     let status = command
         .stderr(Stdio::inherit())
