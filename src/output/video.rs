@@ -223,7 +223,7 @@ pub fn convert_video_rav1e(
         .arg("-q")
         .arg(crf.to_string())
         .arg("-s")
-        .arg("5")
+        .arg("6")
         .arg("-i")
         .arg(fps.to_string())
         .arg("-I")
