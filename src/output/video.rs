@@ -52,31 +52,34 @@ impl X264Settings {
             crf,
             ref_frames: cmp::min(
                 match profile {
-                    Profile::Anime => 6,
                     Profile::Film => 3,
+                    Profile::Anime => 6,
                 } + (fps / 10.).round() as u8,
                 16,
             ),
             psy_rd: match profile {
+                Profile::Film => (1.0, 0.0),
                 Profile::Anime => (0.7, 0.0),
-                _ => (1.0, 0.2),
             },
-            deblock: (-3, -3),
+            deblock: match profile {
+                Profile::Film => (-3, -3),
+                Profile::Anime => (-2, -1),
+            },
             aq_strength: match profile {
+                Profile::Film => 0.8,
                 Profile::Anime => 0.7,
-                _ => 1.0,
             },
             min_keyint: match profile {
-                Profile::Anime => fps.round() as usize / 2,
                 Profile::Film => fps.round() as usize,
+                Profile::Anime => fps.round() as usize / 2,
             },
             max_keyint: match profile {
-                Profile::Anime => fps.round() as usize * 30 / 2,
                 Profile::Film => fps.round() as usize * 10,
+                Profile::Anime => fps.round() as usize * 30 / 2,
             },
             qcomp: match profile {
-                Profile::Anime => 0.6,
                 Profile::Film => 0.7,
+                Profile::Anime => 0.6,
             },
             highbd,
             pixel_format: dimensions.pixel_format,
@@ -92,6 +95,7 @@ impl X264Settings {
             .arg(self.ref_frames.to_string())
             .arg("--mixed-refs")
             .arg("--no-fast-pskip")
+            .arg("--no-dct-decimate")
             .arg("--b-adapt")
             .arg("2")
             .arg("--bframes")
@@ -102,7 +106,7 @@ impl X264Settings {
             .arg("--direct")
             .arg("spatial")
             .arg("--subme")
-            .arg("10")
+            .arg("11")
             .arg("--trellis")
             .arg("2")
             .arg("--partitions")
@@ -114,7 +118,7 @@ impl X264Settings {
             .arg("--me")
             .arg("umh")
             .arg("--merange")
-            .arg("32")
+            .arg("48")
             .arg("--rc-lookahead")
             .arg("250")
             .arg("--aq-mode")
@@ -127,6 +131,10 @@ impl X264Settings {
             .arg(self.max_keyint.to_string())
             .arg("--qcomp")
             .arg(format!("{:.2}", self.qcomp))
+            .arg("--ipratio")
+            .arg("1.30")
+            .arg("--pbratio")
+            .arg("1.20")
             .arg("--vbv-maxrate")
             .arg("30000")
             .arg("--vbv-bufsize")
