@@ -40,6 +40,7 @@ struct X264Settings {
     pub min_keyint: usize,
     pub max_keyint: usize,
     pub qcomp: f32,
+    pub merange: u8,
     pub highbd: bool,
     pub pixel_format: PixelFormat,
     pub colorspace: ColorSpace,
@@ -81,6 +82,13 @@ impl X264Settings {
                 Profile::Film => 0.7,
                 Profile::Anime => 0.6,
             },
+            merange: if dimensions.width > 1440 {
+                48
+            } else if dimensions.width > 1024 {
+                32
+            } else {
+                24
+            },
             highbd,
             pixel_format: dimensions.pixel_format,
             colorspace: dimensions.colorspace,
@@ -106,7 +114,7 @@ impl X264Settings {
             .arg("--deblock")
             .arg(format!("{}:{}", self.deblock.0, self.deblock.1))
             .arg("--merange")
-            .arg("48")
+            .arg(self.merange.to_string())
             .arg("--rc-lookahead")
             .arg("250")
             .arg("--aq-mode")
