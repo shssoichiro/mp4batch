@@ -104,7 +104,7 @@ impl X264Settings {
             .arg("normal")
             .arg("--weightb")
             .arg("--direct")
-            .arg("spatial")
+            .arg("auto")
             .arg("--subme")
             .arg("11")
             .arg("--trellis")
