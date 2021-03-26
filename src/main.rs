@@ -4,7 +4,7 @@ extern crate dotenv_codegen;
 mod input;
 mod output;
 
-use std::{env, path::Path, str::FromStr};
+use std::{cmp, env, path::Path, str::FromStr};
 
 use clap::{App, Arg};
 use itertools::Itertools;
@@ -70,7 +70,7 @@ fn main() {
         .arg(
             Arg::with_name("av1")
                 .long("av1")
-                .help("Encode to AV1 using rav1e-by-gop (default QP: 60)"),
+                .help("Encode to AV1 using av1an and libaom (default QP: 30)"),
         )
         .arg(
             Arg::with_name("direct")
@@ -100,7 +100,7 @@ fn main() {
             Arg::with_name("high-bd")
                 .long("high-bd")
                 .long("highbd")
-                .help("output as 10-bit video"),
+                .help("output as 10-bit video, only needed for x264"),
         )
         .arg(
             Arg::with_name("keep-audio")
@@ -142,11 +142,16 @@ fn main() {
     let target =
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
-        Encoder::Rav1e
+        Encoder::Aom
     } else {
         Encoder::X264
     };
     let crf = match encoder {
+        Encoder::Aom => args
+            .value_of("crf")
+            .unwrap_or("30")
+            .parse::<u8>()
+            .expect(CRF_PARSE_ERROR),
         Encoder::Rav1e => args
             .value_of("crf")
             .unwrap_or("60")
@@ -158,7 +163,7 @@ fn main() {
                 .unwrap_or("18")
                 .parse::<u8>()
                 .expect(CRF_PARSE_ERROR);
-            assert!(crf <= 51, CRF_PARSE_ERROR);
+            assert!(crf <= 51, "{}", CRF_PARSE_ERROR);
             crf
         }
     };
@@ -311,6 +316,14 @@ fn process_file(
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
+            Encoder::Aom => convert_video_av1(
+                input,
+                crf,
+                dims,
+                Some(cmp::min(8, num_cpus::get() as u8)),
+                workers,
+                profile,
+            ),
             Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
             Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers),
         }?;

@@ -216,6 +216,94 @@ pub fn convert_video_x264(
     }
 }
 
+pub fn convert_video_av1<P: AsRef<Path>>(
+    input: P,
+    crf: u8,
+    dimensions: VideoDimensions,
+    threads_per_worker: Option<u8>,
+    workers: Option<u8>,
+    profile: Profile,
+) -> Result<(), String> {
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+
+    let mut command = Command::new("nice");
+    command
+        .arg("av1an")
+        .arg("-i")
+        .arg(input.as_ref())
+        .arg("-enc")
+        .arg("aom")
+        .arg("-v")
+        .arg(&format!(
+            "--cpu-used=5 --threads={} -b 10 --input-bit-depth=10 --end-usage=q --cq-level={} \
+             --good --lag-in-frames=35 --enable-fwd-kf=1 --tile-columns={} --tile-rows={} \
+             --auto-alt-ref=1 --color-primaries={} --transfer-characteristics={} \
+             --matrix-coefficients={}",
+            threads_per_worker.unwrap_or(8).to_string(),
+            crf,
+            if dimensions.width >= 1440 { 1 } else { 0 },
+            if dimensions.height >= 1200 { 1 } else { 0 },
+            if dimensions.height >= 1200 {
+                "bt2020"
+            } else if dimensions.height >= 576 {
+                "bt709"
+            } else {
+                "bt601"
+            },
+            if dimensions.height >= 1200 {
+                "bt2020-10bit"
+            } else if dimensions.height >= 576 {
+                "bt709"
+            } else {
+                "bt601"
+            },
+            if dimensions.height >= 1200 {
+                "bt2020ncl"
+            } else if dimensions.height >= 576 {
+                "bt709"
+            } else {
+                "bt601"
+            }
+        ))
+        .arg("-w")
+        .arg(
+            workers
+                .unwrap_or(if dimensions.height >= 1200 {
+                    4
+                } else if dimensions.height >= 1024 {
+                    6
+                } else {
+                    8
+                })
+                .to_string(),
+        )
+        .arg("--split_method")
+        .arg("aom_keyframes")
+        .arg("-xs")
+        .arg(
+            match profile {
+                Profile::Film => fps * 10,
+                Profile::Anime => fps * 15,
+            }
+            .to_string(),
+        )
+        .arg("-r")
+        .arg("-o")
+        .arg(input.as_ref().with_extension("out.mkv"));
+    let status = command
+        .status()
+        .map_err(|e| format!("Failed to execute av1an: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to execute av1an: Exited with code {:x}",
+            status.code().unwrap()
+        ))
+    }
+}
+
 pub fn convert_video_rav1e(
     input: &Path,
     crf: u8,
@@ -278,6 +366,8 @@ pub fn convert_video_rav1e(
 
 #[derive(Debug, Clone, Copy)]
 pub enum Encoder {
+    Aom,
+    #[allow(dead_code)]
     Rav1e,
     X264,
 }

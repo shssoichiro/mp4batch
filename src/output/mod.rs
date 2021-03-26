@@ -19,7 +19,7 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
         .arg("-i")
         .arg(match encoder {
             Encoder::Rav1e => input.with_extension("out.ivf"),
-            Encoder::X264 => input.with_extension("out.mkv"),
+            Encoder::X264 | Encoder::Aom => input.with_extension("out.mkv"),
         })
         .arg("-i")
         .arg(input.with_extension("out.mka"))
