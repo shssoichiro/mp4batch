@@ -223,6 +223,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     threads_per_worker: Option<u8>,
     workers: Option<u8>,
     profile: Profile,
+    is_hdr: bool,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
 
@@ -243,21 +244,21 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             crf,
             if dimensions.width >= 1440 { 1 } else { 0 },
             if dimensions.height >= 1200 { 1 } else { 0 },
-            if dimensions.height >= 1200 {
+            if is_hdr {
                 "bt2020"
             } else if dimensions.height >= 576 {
                 "bt709"
             } else {
                 "bt601"
             },
-            if dimensions.height >= 1200 {
+            if is_hdr {
                 "bt2020-10bit"
             } else if dimensions.height >= 576 {
                 "bt709"
             } else {
                 "bt601"
             },
-            if dimensions.height >= 1200 {
+            if is_hdr {
                 "bt2020ncl"
             } else if dimensions.height >= 576 {
                 "bt709"

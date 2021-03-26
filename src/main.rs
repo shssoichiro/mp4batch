@@ -103,6 +103,12 @@ fn main() {
                 .help("output as 10-bit video, only needed for x264"),
         )
         .arg(
+            Arg::with_name("hdr")
+                .long("hdr")
+                .long("highbd")
+                .help("this video should be treated as HDR and encoded as BT.2020"),
+        )
+        .arg(
             Arg::with_name("keep-audio")
                 .short("a")
                 .long("keep-audio")
@@ -268,6 +274,7 @@ fn main() {
                 audio_bitrate,
                 tiles,
                 workers,
+                args.is_present("hdr"),
             );
             if let Err(err) = result {
                 eprintln!(
@@ -292,6 +299,7 @@ fn main() {
             audio_bitrate,
             tiles,
             workers,
+            args.is_present("hdr"),
         )
         .unwrap();
     }
@@ -311,6 +319,7 @@ fn process_file(
     audio_bitrate: u32,
     tiles: Option<u8>,
     workers: Option<u8>,
+    is_hdr: bool,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -323,6 +332,7 @@ fn process_file(
                 Some(cmp::min(8, num_cpus::get() as u8)),
                 workers,
                 profile,
+                is_hdr,
             ),
             Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
             Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers),
