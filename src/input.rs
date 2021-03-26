@@ -1,5 +1,7 @@
 use std::{fmt, fmt::Display, path::Path, process::Command};
 
+use regex::Regex;
+
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
     pub width: u32,
@@ -69,8 +71,46 @@ pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
     if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
     } else {
-        panic!("Unrecognized input type");
+        get_video_dimensions_ffprobe(input)
     }
+}
+
+fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String> {
+    let command = Command::new("mediainfo")
+        .arg(input)
+        .output()
+        .map_err(|e| format!("{}", e))?;
+    let output = String::from_utf8_lossy(&command.stdout);
+
+    // Raw videos only care about width, height, and FPS
+    let width_regex = Regex::new(r"Width\s+: ([\d ]+) pixels").unwrap();
+    let height_regex = Regex::new(r"Height\s+: ([\d ]+) pixels").unwrap();
+    let fps_regex = Regex::new(r"Frame rate\s+: (\d+\.\d+) FPS").unwrap();
+
+    let width = width_regex.captures(&output).unwrap()[1]
+        .replace(' ', "")
+        .parse()
+        .unwrap();
+    let height = height_regex.captures(&output).unwrap()[1]
+        .replace(' ', "")
+        .parse()
+        .unwrap();
+    let fps = (
+        fps_regex.captures(&output).unwrap()[1]
+            .parse::<f32>()
+            .unwrap()
+            .round() as u32,
+        1,
+    );
+
+    Ok(VideoDimensions {
+        width,
+        height,
+        fps,
+        frames: 0,
+        pixel_format: PixelFormat::Yuv420,
+        colorspace: ColorSpace::Bt709,
+    })
 }
 
 fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
