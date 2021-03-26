@@ -242,7 +242,7 @@ pub fn convert_video_rav1e(
         .arg(dimensions.frames.to_string())
         .arg("--tmp-input")
         .arg("--max-bitrate")
-        .arg(30000.to_string());
+        .arg("30000");
     if let Some(tiles) = tiles {
         command.arg("--tiles").arg(tiles.to_string());
     }
