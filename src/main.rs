@@ -105,7 +105,6 @@ fn main() {
         .arg(
             Arg::with_name("hdr")
                 .long("hdr")
-                .long("highbd")
                 .help("this video should be treated as HDR and encoded as BT.2020"),
         )
         .arg(
