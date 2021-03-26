@@ -1,11 +1,12 @@
 mod audio;
 mod video;
 
-pub use self::audio::*;
-pub use self::video::*;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::process::Stdio;
+use std::{
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
+
+pub use self::{audio::*, video::*};
 
 pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));

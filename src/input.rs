@@ -1,7 +1,4 @@
-use std::fmt;
-use std::fmt::Display;
-use std::path::Path;
-use std::process::Command;
+use std::{fmt, fmt::Display, path::Path, process::Command};
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {

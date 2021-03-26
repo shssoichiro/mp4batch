@@ -4,13 +4,12 @@ extern crate dotenv_codegen;
 mod input;
 mod output;
 
-use self::input::*;
-use self::output::*;
+use std::{env, path::Path, str::FromStr};
+
 use clap::{App, Arg};
 use itertools::Itertools;
-use std::env;
-use std::path::Path;
-use std::str::FromStr;
+
+use self::{input::*, output::*};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Target {

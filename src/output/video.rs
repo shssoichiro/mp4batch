@@ -1,8 +1,11 @@
+use std::{
+    cmp,
+    path::Path,
+    process::{Command, Stdio},
+    str::FromStr,
+};
+
 use crate::input::{ColorSpace, PixelFormat, VideoDimensions};
-use std::cmp;
-use std::path::Path;
-use std::process::{Command, Stdio};
-use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Profile {
