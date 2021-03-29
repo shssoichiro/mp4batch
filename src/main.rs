@@ -147,7 +147,7 @@ fn main() {
     let target =
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
-        Encoder::Aom
+        Encoder::Rav1e
     } else {
         Encoder::X264
     };
@@ -334,7 +334,7 @@ fn process_file(
                 is_hdr,
             ),
             Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
-            Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers),
+            Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers, is_hdr),
         }?;
     }
     if target == Target::Local {

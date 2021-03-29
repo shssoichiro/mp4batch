@@ -311,6 +311,7 @@ pub fn convert_video_rav1e(
     dimensions: VideoDimensions,
     tiles: Option<u8>,
     workers: Option<u8>,
+    is_hdr: bool,
 ) -> Result<(), String> {
     let mut command = Command::new("rav1e-by-gop");
     let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
@@ -319,7 +320,7 @@ pub fn convert_video_rav1e(
         .arg("-q")
         .arg(crf.to_string())
         .arg("-s")
-        .arg("6")
+        .arg("5")
         .arg("-i")
         .arg(fps.to_string())
         .arg("-I")
@@ -331,9 +332,47 @@ pub fn convert_video_rav1e(
         .arg(dimensions.frames.to_string())
         .arg("--tmp-input")
         .arg("--max-bitrate")
-        .arg("30000");
+        .arg(if dimensions.height >= 1440 {
+            "100000"
+        } else if dimensions.height >= 768 && fps >= 45 {
+            "50000"
+        } else {
+            "30000"
+        })
+        .arg("--matrix")
+        .arg(if is_hdr {
+            "BT2020NCL"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        })
+        .arg("--primaries")
+        .arg(if is_hdr {
+            "BT2020"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        })
+        .arg("--transfer")
+        .arg(if is_hdr {
+            "BT2020_10Bit"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        });
     if let Some(tiles) = tiles {
         command.arg("--tiles").arg(tiles.to_string());
+    } else {
+        command.arg("--tiles").arg(if dimensions.width >= 1440 {
+            "4"
+        } else if dimensions.height >= 1200 {
+            "2"
+        } else {
+            "1"
+        });
     }
     if let Some(workers) = workers {
         command.arg("--local-workers").arg(workers.to_string());
@@ -367,6 +406,7 @@ pub fn convert_video_rav1e(
 
 #[derive(Debug, Clone, Copy)]
 pub enum Encoder {
+    #[allow(dead_code)]
     Aom,
     #[allow(dead_code)]
     Rav1e,
