@@ -366,9 +366,9 @@ pub fn convert_video_rav1e(
     if let Some(tiles) = tiles {
         command.arg("--tiles").arg(tiles.to_string());
     } else {
-        command.arg("--tiles").arg(if dimensions.width >= 1440 {
+        command.arg("--tiles").arg(if dimensions.height >= 1200 {
             "4"
-        } else if dimensions.height >= 1200 {
+        } else if dimensions.width >= 1440 {
             "2"
         } else {
             "1"
