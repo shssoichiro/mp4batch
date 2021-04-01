@@ -108,6 +108,24 @@ fn main() {
                 .help("this video should be treated as HDR and encoded as BT.2020"),
         )
         .arg(
+            Arg::with_name("matrix")
+                .long("matrix")
+                .takes_value(true)
+                .help("overrides the assumed color matrix coefficients"),
+        )
+        .arg(
+            Arg::with_name("primaries")
+                .long("primaries")
+                .takes_value(true)
+                .help("overrides the assumed color primaries"),
+        )
+        .arg(
+            Arg::with_name("transfer")
+                .long("transfer")
+                .takes_value(true)
+                .help("overrides the assumed color transfer characteristics"),
+        )
+        .arg(
             Arg::with_name("keep-audio")
                 .short("a")
                 .long("keep-audio")
@@ -274,6 +292,9 @@ fn main() {
                 tiles,
                 workers,
                 args.is_present("hdr"),
+                args.value_of("matrix"),
+                args.value_of("primaries"),
+                args.value_of("transfer"),
             );
             if let Err(err) = result {
                 eprintln!(
@@ -299,6 +320,9 @@ fn main() {
             tiles,
             workers,
             args.is_present("hdr"),
+            args.value_of("matrix"),
+            args.value_of("primaries"),
+            args.value_of("transfer"),
         )
         .unwrap();
     }
@@ -319,6 +343,9 @@ fn process_file(
     tiles: Option<u8>,
     workers: Option<u8>,
     is_hdr: bool,
+    matrix: Option<&str>,
+    primaries: Option<&str>,
+    transfer: Option<&str>,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -334,7 +361,9 @@ fn process_file(
                 is_hdr,
             ),
             Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
-            Encoder::Rav1e => convert_video_rav1e(input, crf, dims, tiles, workers, is_hdr),
+            Encoder::Rav1e => convert_video_rav1e(
+                input, crf, dims, tiles, workers, is_hdr, matrix, primaries, transfer,
+            ),
         }?;
     }
     if target == Target::Local {

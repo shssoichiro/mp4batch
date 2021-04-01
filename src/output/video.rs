@@ -305,6 +305,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     }
 }
 
+#[allow(clippy::clippy::too_many_arguments)]
 pub fn convert_video_rav1e(
     input: &Path,
     crf: u8,
@@ -312,6 +313,9 @@ pub fn convert_video_rav1e(
     tiles: Option<u8>,
     workers: Option<u8>,
     is_hdr: bool,
+    matrix: Option<&str>,
+    primaries: Option<&str>,
+    transfer: Option<&str>,
 ) -> Result<(), String> {
     let mut command = Command::new("rav1e-by-gop");
     let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
@@ -340,7 +344,9 @@ pub fn convert_video_rav1e(
             "30000"
         })
         .arg("--matrix")
-        .arg(if is_hdr {
+        .arg(if let Some(matrix) = matrix {
+            matrix
+        } else if is_hdr {
             "BT2020NCL"
         } else if dimensions.height >= 576 {
             "BT709"
@@ -348,7 +354,9 @@ pub fn convert_video_rav1e(
             "BT601"
         })
         .arg("--primaries")
-        .arg(if is_hdr {
+        .arg(if let Some(primaries) = primaries {
+            primaries
+        } else if is_hdr {
             "BT2020"
         } else if dimensions.height >= 576 {
             "BT709"
@@ -356,7 +364,9 @@ pub fn convert_video_rav1e(
             "BT601"
         })
         .arg("--transfer")
-        .arg(if is_hdr {
+        .arg(if let Some(transfer) = transfer {
+            transfer
+        } else if is_hdr {
             "BT2020_10Bit"
         } else if dimensions.height >= 576 {
             "BT709"
