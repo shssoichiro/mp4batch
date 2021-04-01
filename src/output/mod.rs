@@ -53,7 +53,6 @@ pub fn mux_mp4_direct(
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mp4").file_name().unwrap());
 
-    let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
     command
         .arg("-loglevel")
@@ -68,11 +67,17 @@ pub fn mux_mp4_direct(
     if convert_audio {
         command
             .arg("-acodec")
-            .arg("libopus")
+            .arg("libfdk_aac")
             .arg("-strict")
             .arg("-2")
-            .arg("-b:a")
-            .arg(&format!("{}k", audio_bitrate * channels))
+            .arg("-vbr")
+            .arg(match audio_bitrate {
+                0..=31 => "1",
+                32..=43 => "2",
+                44..=59 => "3",
+                60..=83 => "4",
+                _ => "5",
+            })
             .arg("-af")
             .arg("aformat=channel_layouts=7.1|5.1|stereo")
     } else {

@@ -31,7 +31,6 @@ pub fn convert_audio(
     audio_track: AudioTrack,
     audio_bitrate: u32,
 ) -> Result<(), String> {
-    let channels = get_audio_channel_count(input, audio_track.clone())?;
     let mut command = Command::new("ffmpeg");
     command
         .arg("-loglevel")
@@ -44,11 +43,17 @@ pub fn convert_audio(
             AudioTrack::External(ref path) => &path,
         })
         .arg("-acodec")
-        .arg(if convert { "libopus" } else { "copy" });
+        .arg(if convert { "libfdk_aac" } else { "copy" });
     if convert {
         command
-            .arg("-b:a")
-            .arg(&format!("{}k", audio_bitrate * channels))
+            .arg("-vbr")
+            .arg(match audio_bitrate {
+                0..=31 => "1",
+                32..=43 => "2",
+                44..=59 => "3",
+                60..=83 => "4",
+                _ => "5",
+            })
             .arg("-af")
             .arg("aformat=channel_layouts=7.1|5.1|stereo");
     }
@@ -73,36 +78,4 @@ pub fn convert_audio(
     } else {
         Err("Failed to execute ffmpeg".to_owned())
     }
-}
-
-pub fn get_audio_channel_count(input: &Path, audio_track: AudioTrack) -> Result<u32, String> {
-    let output = Command::new("ffprobe")
-        .arg("-i")
-        .arg(match audio_track {
-            AudioTrack::FromVideo(_) => input,
-            AudioTrack::External(ref path) => &path,
-        })
-        .arg("-show_entries")
-        .arg("stream=channels")
-        .arg("-select_streams")
-        .arg(format!(
-            "a:{}",
-            match audio_track {
-                AudioTrack::FromVideo(track) => track,
-                AudioTrack::External(_) => 0,
-            }
-        ))
-        .arg("-of")
-        .arg("compact=p=0:nk=1")
-        .arg("-v")
-        .arg("0")
-        .output()
-        .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .next()
-        .unwrap()
-        .trim()
-        .parse()
-        .map_err(|e| format!("Failed to parse channel count: {}", e))
 }
