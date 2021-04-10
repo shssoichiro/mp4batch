@@ -8,9 +8,9 @@ use std::{
 
 pub use self::{audio::*, video::*};
 
-pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
+pub fn mux_video(input: &Path, encoder: Encoder) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
-    output_path.push(input.with_extension("mp4").file_name().unwrap());
+    output_path.push(input.with_extension("mkv").file_name().unwrap());
 
     let status = Command::new("ffmpeg")
         .arg("-loglevel")
@@ -31,8 +31,6 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
         .arg("-2")
         .arg("-map_chapters")
         .arg("-1")
-        .arg("-movflags")
-        .arg("+faststart")
         .arg(output_path)
         .stderr(Stdio::inherit())
         .status()
@@ -44,14 +42,14 @@ pub fn mux_mp4(input: &Path, encoder: Encoder) -> Result<(), String> {
     }
 }
 
-pub fn mux_mp4_direct(
+pub fn mux_video_direct(
     input: &Path,
     audio_track: AudioTrack,
-    convert_audio: bool,
+    audio_codec: &str,
     audio_bitrate: u32,
 ) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
-    output_path.push(input.with_extension("mp4").file_name().unwrap());
+    output_path.push(input.with_extension("mkv").file_name().unwrap());
 
     let mut command = Command::new("ffmpeg");
     command
@@ -63,38 +61,41 @@ pub fn mux_mp4_direct(
     if let AudioTrack::External(ref path) = audio_track {
         command.arg("-i").arg(path);
     }
-    command.arg("-vcodec").arg("copy");
-    if convert_audio {
-        command
-            .arg("-acodec")
-            .arg("libfdk_aac")
-            .arg("-strict")
-            .arg("-2")
-            .arg("-vbr")
-            .arg(match audio_bitrate {
-                0..=31 => "1",
-                32..=43 => "2",
-                44..=59 => "3",
-                60..=83 => "4",
-                _ => "5",
-            })
-            .arg("-af")
-            .arg("aformat=channel_layouts=7.1|5.1|stereo")
-    } else {
-        command.arg("-acodec").arg("copy")
-    }
-    .arg("-map")
-    .arg("0:v:0")
-    .arg("-map")
-    .arg(match audio_track {
-        AudioTrack::FromVideo(ref track) => format!("0:a:{}", track),
-        AudioTrack::External(_) => "1:a:0".to_string(),
-    })
-    .arg("-map_chapters")
-    .arg("-1")
-    .arg("-movflags")
-    .arg("+faststart")
-    .arg(output_path);
+    command.arg("-vcodec").arg("copy").arg("-acodec");
+    match audio_codec {
+        "copy" => {
+            command.arg("copy");
+        }
+        "aac" => {
+            command
+                .arg("libfdk_aac")
+                .arg("-vbr")
+                .arg(match audio_bitrate {
+                    0..=31 => "1",
+                    32..=43 => "2",
+                    44..=59 => "3",
+                    60..=83 => "4",
+                    _ => "5",
+                })
+                .arg("-af")
+                .arg("aformat=channel_layouts=7.1|5.1|stereo");
+        }
+        "flac" => {
+            command.arg("flac");
+        }
+        _ => unreachable!(),
+    };
+    command
+        .arg("-map")
+        .arg("0:v:0")
+        .arg("-map")
+        .arg(match audio_track {
+            AudioTrack::FromVideo(ref track) => format!("0:a:{}", track),
+            AudioTrack::External(_) => "1:a:0".to_string(),
+        })
+        .arg("-map_chapters")
+        .arg("-1")
+        .arg(output_path);
     let status = command
         .stderr(Stdio::inherit())
         .status()

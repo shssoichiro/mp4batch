@@ -120,10 +120,13 @@ fn main() {
                 .help("overrides the assumed color transfer characteristics"),
         )
         .arg(
-            Arg::with_name("keep-audio")
+            Arg::with_name("acodec")
                 .short("a")
-                .long("keep-audio")
-                .help("copy the audio without reencoding"),
+                .long("acodec")
+                .help("codec to use for audio")
+                .takes_value(true)
+                .default_value("copy")
+                .possible_values(&["copy", "aac", "flac"]),
         )
         .arg(
             Arg::with_name("skip-video")
@@ -221,7 +224,7 @@ fn main() {
                 let result = process_direct(
                     &entry.path(),
                     audio_track,
-                    !args.is_present("keep-audio"),
+                    args.value_of("acodec").unwrap_or("copy"),
                     audio_bitrate,
                 );
                 if let Err(err) = result {
@@ -246,7 +249,7 @@ fn main() {
             process_direct(
                 input,
                 audio_track,
-                !args.is_present("keep-audio"),
+                args.value_of("acodec").unwrap_or("copy"),
                 audio_bitrate,
             )
             .unwrap();
@@ -277,7 +280,7 @@ fn main() {
                 profile,
                 target,
                 crf,
-                args.is_present("keep-audio"),
+                args.value_of("acodec").unwrap_or("copy"),
                 args.is_present("skip-video"),
                 audio_track,
                 audio_bitrate,
@@ -304,7 +307,7 @@ fn main() {
             profile,
             target,
             crf,
-            args.is_present("keep-audio"),
+            args.value_of("acodec").unwrap_or("copy"),
             args.is_present("skip-video"),
             audio_track,
             audio_bitrate,
@@ -326,7 +329,7 @@ fn process_file(
     profile: Profile,
     target: Target,
     crf: u8,
-    keep_audio: bool,
+    audio_codec: &str,
     skip_video: bool,
     audio_track: AudioTrack,
     audio_bitrate: u32,
@@ -358,8 +361,8 @@ fn process_file(
     }
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes
-        convert_audio(input, !keep_audio, audio_track, audio_bitrate)?;
-        mux_mp4(input, encoder)?;
+        convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
+        mux_video(input, encoder)?;
     }
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
@@ -368,11 +371,11 @@ fn process_file(
 fn process_direct(
     input: &Path,
     audio_track: AudioTrack,
-    convert_audio: bool,
+    audio_codec: &str,
     audio_bitrate: u32,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
-    mux_mp4_direct(input, audio_track, convert_audio, audio_bitrate)?;
+    mux_video_direct(input, audio_track, audio_codec, audio_bitrate)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }

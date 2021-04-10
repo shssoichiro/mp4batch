@@ -27,7 +27,7 @@ pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
 
 pub fn convert_audio(
     input: &Path,
-    convert: bool,
+    audio_codec: &str,
     audio_track: AudioTrack,
     audio_bitrate: u32,
 ) -> Result<(), String> {
@@ -42,21 +42,30 @@ pub fn convert_audio(
             AudioTrack::FromVideo(_) => input,
             AudioTrack::External(ref path) => &path,
         })
-        .arg("-acodec")
-        .arg(if convert { "libfdk_aac" } else { "copy" });
-    if convert {
-        command
-            .arg("-vbr")
-            .arg(match audio_bitrate {
-                0..=31 => "1",
-                32..=43 => "2",
-                44..=59 => "3",
-                60..=83 => "4",
-                _ => "5",
-            })
-            .arg("-af")
-            .arg("aformat=channel_layouts=7.1|5.1|stereo");
-    }
+        .arg("-acodec");
+    match audio_codec {
+        "copy" => {
+            command.arg("copy");
+        }
+        "aac" => {
+            command
+                .arg("libfdk_aac")
+                .arg("-vbr")
+                .arg(match audio_bitrate {
+                    0..=31 => "1",
+                    32..=43 => "2",
+                    44..=59 => "3",
+                    60..=83 => "4",
+                    _ => "5",
+                })
+                .arg("-af")
+                .arg("aformat=channel_layouts=7.1|5.1|stereo");
+        }
+        "flac" => {
+            command.arg("flac");
+        }
+        _ => unreachable!(),
+    };
     command
         .arg("-map")
         .arg(format!(
