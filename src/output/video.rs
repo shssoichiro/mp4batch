@@ -44,13 +44,13 @@ struct X264Settings {
     pub max_keyint: usize,
     pub qcomp: f32,
     pub merange: u8,
-    pub highbd: bool,
+    pub bit_depth: u8,
     pub pixel_format: PixelFormat,
     pub colorspace: ColorSpace,
 }
 
 impl X264Settings {
-    pub fn new(crf: u8, profile: Profile, highbd: bool, dimensions: VideoDimensions) -> Self {
+    pub fn new(crf: u8, profile: Profile, dimensions: VideoDimensions) -> Self {
         let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
         X264Settings {
             crf,
@@ -92,7 +92,7 @@ impl X264Settings {
             } else {
                 24
             },
-            highbd,
+            bit_depth: dimensions.bit_depth,
             pixel_format: dimensions.pixel_format,
             colorspace: dimensions.colorspace,
         }
@@ -143,7 +143,9 @@ impl X264Settings {
             .arg("--colorprim")
             .arg(self.colorspace.to_string())
             .arg("--transfer")
-            .arg(self.colorspace.to_string());
+            .arg(self.colorspace.to_string())
+            .arg("--output-depth")
+            .arg(self.bit_depth.to_string());
         match self.pixel_format {
             PixelFormat::Yuv422 => {
                 command
@@ -161,9 +163,6 @@ impl X264Settings {
             }
             _ => (),
         }
-        if self.highbd {
-            command.arg("--output-depth").arg("10");
-        }
         command
     }
 }
@@ -172,10 +171,9 @@ pub fn convert_video_x264(
     input: &Path,
     profile: Profile,
     crf: u8,
-    highbd: bool,
     dimensions: VideoDimensions,
 ) -> Result<(), String> {
-    let settings = X264Settings::new(crf, profile, highbd, dimensions);
+    let settings = X264Settings::new(crf, profile, dimensions);
     let mut command = Command::new("x264");
     settings
         .apply_to_command(&mut command)

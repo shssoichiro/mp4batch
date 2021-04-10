@@ -11,6 +11,7 @@ pub struct VideoDimensions {
     pub fps: (u32, u32),
     pub pixel_format: PixelFormat,
     pub colorspace: ColorSpace,
+    pub bit_depth: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -86,6 +87,7 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String>
     let width_regex = Regex::new(r"Width\s+: ([\d ]+) pixels").unwrap();
     let height_regex = Regex::new(r"Height\s+: ([\d ]+) pixels").unwrap();
     let fps_regex = Regex::new(r"Frame rate\s+: (\d+\.\d+) FPS").unwrap();
+    let bit_depth_regex = Regex::new(r"Bit depth\s+: (\d+) bits").unwrap();
 
     let width = width_regex.captures(&output).unwrap()[1]
         .replace(' ', "")
@@ -102,6 +104,9 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String>
             .round() as u32,
         1,
     );
+    let bit_depth = bit_depth_regex.captures(&output).unwrap()[1]
+        .parse()
+        .unwrap();
 
     Ok(VideoDimensions {
         width,
@@ -110,6 +115,7 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String>
         frames: 0,
         pixel_format: PixelFormat::Yuv420,
         colorspace: ColorSpace::Bt709,
+        bit_depth,
     })
 }
 
@@ -154,6 +160,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
             .split('/')
             .map(|num| num.parse())
             .collect();
+        let bit_depth = lines[8].replace("Bits: ", "").trim().parse().unwrap();
         Ok(VideoDimensions {
             width,
             height,
@@ -170,6 +177,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
                 &lines[4].replace("Format Name: ", ""),
             ),
             colorspace: ColorSpace::from_dimensions(width, height),
+            bit_depth,
         })
     } else {
         Err(PARSE_ERROR.to_owned())

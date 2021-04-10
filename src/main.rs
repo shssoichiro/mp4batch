@@ -97,12 +97,6 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("high-bd")
-                .long("high-bd")
-                .long("highbd")
-                .help("output as 10-bit video, only needed for x264"),
-        )
-        .arg(
             Arg::with_name("hdr")
                 .long("hdr")
                 .help("this video should be treated as HDR and encoded as BT.2020"),
@@ -190,7 +184,6 @@ fn main() {
             crf
         }
     };
-    let highbd = args.is_present("high-bd");
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
     let audio_bitrate = args
         .value_of("audio_bitrate")
@@ -284,7 +277,6 @@ fn main() {
                 profile,
                 target,
                 crf,
-                highbd,
                 args.is_present("keep-audio"),
                 args.is_present("skip-video"),
                 audio_track,
@@ -312,7 +304,6 @@ fn main() {
             profile,
             target,
             crf,
-            highbd,
             args.is_present("keep-audio"),
             args.is_present("skip-video"),
             audio_track,
@@ -335,7 +326,6 @@ fn process_file(
     profile: Profile,
     target: Target,
     crf: u8,
-    highbd: bool,
     keep_audio: bool,
     skip_video: bool,
     audio_track: AudioTrack,
@@ -360,7 +350,7 @@ fn process_file(
                 profile,
                 is_hdr,
             ),
-            Encoder::X264 => convert_video_x264(input, profile, crf, highbd, dims),
+            Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::Rav1e => convert_video_rav1e(
                 input, crf, dims, tiles, workers, is_hdr, matrix, primaries, transfer,
             ),
