@@ -98,7 +98,7 @@ fn main() {
             Arg::with_name("audio_bitrate")
                 .long("ab")
                 .value_name("VALUE")
-                .help("Audio bitrate per channel in kbps (Default: 80 kbps/channel)")
+                .help("Audio bitrate per channel in kbps (Default: 96 kbps/channel)")
                 .takes_value(true),
         )
         .arg(
@@ -197,7 +197,7 @@ fn main() {
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
     let audio_bitrate = args
         .value_of("audio_bitrate")
-        .unwrap_or("80")
+        .unwrap_or("96")
         .parse::<u32>()
         .unwrap();
     let tiles = args.value_of("tiles").map(|val| val.parse().unwrap());
