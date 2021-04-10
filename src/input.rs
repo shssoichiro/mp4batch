@@ -140,7 +140,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
     let output = String::from_utf8_lossy(&command.stdout);
 
     const PARSE_ERROR: &str = "Could not detect video dimensions";
-    let lines = output.lines().take(5).collect::<Vec<_>>();
+    let lines = output.lines().collect::<Vec<_>>();
     if lines.len() == 5 {
         let width = lines[0]
             .replace("Width: ", "")
