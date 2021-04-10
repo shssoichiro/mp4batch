@@ -35,7 +35,7 @@ impl FromStr for Profile {
 #[derive(Debug, Clone, Copy)]
 struct X264Settings {
     pub crf: u8,
-    pub ref_frames: u8,
+    pub b_frames: u8,
     pub psy_rd: (f32, f32),
     pub deblock: (i8, i8),
     pub aq_strength: f32,
@@ -53,7 +53,7 @@ impl X264Settings {
         let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
         X264Settings {
             crf,
-            ref_frames: match profile {
+            b_frames: match profile {
                 Profile::Film => 5,
                 Profile::Anime => 8,
             },
@@ -100,10 +100,12 @@ impl X264Settings {
             .arg(self.crf.to_string())
             .arg("--preset")
             .arg("veryslow")
+            .arg("--level")
+            .arg("4.1")
             .arg("--ref")
-            .arg(self.ref_frames.to_string())
+            .arg("4")
             .arg("--bframes")
-            .arg(self.ref_frames.to_string())
+            .arg(self.b_frames.to_string())
             .arg("--psy-rd")
             .arg(format!("{:.2}:{:.2}", self.psy_rd.0, self.psy_rd.1))
             .arg("--deblock")
@@ -127,9 +129,9 @@ impl X264Settings {
             .arg("--pbratio")
             .arg("1.20")
             .arg("--vbv-maxrate")
-            .arg("30000")
+            .arg("50000")
             .arg("--vbv-bufsize")
-            .arg("60000")
+            .arg("78125")
             .arg("--colormatrix")
             .arg(self.colorspace.to_string())
             .arg("--colorprim")
