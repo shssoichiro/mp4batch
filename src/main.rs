@@ -70,7 +70,12 @@ fn main() {
         .arg(
             Arg::with_name("av1")
                 .long("av1")
-                .help("Encode to AV1 using av1an and libaom (default QP: 30)"),
+                .help("Encode to AV1 using rav1e (default QP: 30)"),
+        )
+        .arg(
+            Arg::with_name("x265")
+                .long("x265")
+                .help("Encode to x265 (default QP: 30)"),
         )
         .arg(
             Arg::with_name("direct")
@@ -163,6 +168,8 @@ fn main() {
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
         Encoder::Rav1e
+    } else if args.is_present("x265") {
+        Encoder::X265
     } else {
         Encoder::X264
     };
@@ -177,7 +184,7 @@ fn main() {
             .unwrap_or("60")
             .parse::<u8>()
             .expect(CRF_PARSE_ERROR),
-        Encoder::X264 => {
+        Encoder::X264 | Encoder::X265 => {
             let crf = args
                 .value_of("crf")
                 .unwrap_or("18")
@@ -354,6 +361,7 @@ fn process_file(
                 is_hdr,
             ),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
+            Encoder::X265 => convert_video_x265(input, profile, crf, dims),
             Encoder::Rav1e => convert_video_rav1e(
                 input, crf, dims, tiles, workers, is_hdr, matrix, primaries, transfer,
             ),

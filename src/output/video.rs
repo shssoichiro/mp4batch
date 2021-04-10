@@ -1,5 +1,4 @@
 use std::{
-    cmp,
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
@@ -54,13 +53,10 @@ impl X264Settings {
         let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
         X264Settings {
             crf,
-            ref_frames: cmp::min(
-                match profile {
-                    Profile::Film => 3,
-                    Profile::Anime => 6,
-                } + (fps / 10.).round() as u8,
-                16,
-            ),
+            ref_frames: match profile {
+                Profile::Film => 5,
+                Profile::Anime => 8,
+            },
             psy_rd: match profile {
                 Profile::Film => (1.0, 0.0),
                 Profile::Anime => (0.7, 0.0),
@@ -201,6 +197,110 @@ pub fn convert_video_x264(
         .stdin(pipe.stdout.unwrap())
         .stderr(Stdio::inherit());
     let status = command
+        .status()
+        .map_err(|e| format!("Failed to execute x264: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to execute x264: Exited with code {:x}",
+            status.code().unwrap()
+        ))
+    }
+}
+
+pub fn convert_video_x265(
+    input: &Path,
+    profile: Profile,
+    crf: u8,
+    dimensions: VideoDimensions,
+) -> Result<(), String> {
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
+            .arg("--y4m")
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+
+    let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
+    let deblock = match profile {
+        Profile::Anime => -1,
+        Profile::Film => -3,
+    };
+    let status = Command::new("x265")
+        .arg("--crf")
+        .arg(crf.to_string())
+        .arg("--preset")
+        .arg("slow")
+        .arg("--bframes")
+        .arg(match profile {
+            Profile::Film => "5",
+            Profile::Anime => "8",
+        })
+        .arg("--min-keyint")
+        .arg(
+            match profile {
+                Profile::Film => fps.round() as usize,
+                Profile::Anime => fps.round() as usize / 2,
+            }
+            .to_string(),
+        )
+        .arg("--keyint")
+        .arg(
+            match profile {
+                Profile::Film => fps.round() as usize * 10,
+                Profile::Anime => fps.round() as usize * 30 / 2,
+            }
+            .to_string(),
+        )
+        .arg("--limit-sao")
+        .arg("--deblock")
+        .arg(format!("{}:{}", deblock, deblock))
+        .arg("--psy-rd")
+        .arg(match profile {
+            Profile::Film => "1.5",
+            Profile::Anime => "1.0",
+        })
+        .arg("--psy-rdoq")
+        .arg(match profile {
+            Profile::Film => "4.0",
+            Profile::Anime => "1.5",
+        })
+        .arg("--aq-mode")
+        .arg("3")
+        .arg("--aq-strength")
+        .arg(match profile {
+            Profile::Film => "0.8",
+            Profile::Anime => "0.7",
+        })
+        .arg("--colormatrix")
+        .arg(dimensions.colorspace.to_string())
+        .arg("--colorprim")
+        .arg(dimensions.colorspace.to_string())
+        .arg("--transfer")
+        .arg(dimensions.colorspace.to_string())
+        .arg("--output-depth")
+        .arg(dimensions.bit_depth.to_string())
+        .arg("--vbv-maxrate")
+        .arg("30000")
+        .arg("--vbv-bufsize")
+        .arg("60000")
+        .arg("--output")
+        .arg(input.with_extension("out.mkv"))
+        .arg("-")
+        .arg("--frames")
+        .arg(format!("{}", dimensions.frames))
+        .arg("--y4m")
+        .arg("-")
+        .stdin(pipe.stdout.unwrap())
+        .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("Failed to execute x264: {}", e))?;
 
@@ -419,4 +519,5 @@ pub enum Encoder {
     #[allow(dead_code)]
     Rav1e,
     X264,
+    X265,
 }
