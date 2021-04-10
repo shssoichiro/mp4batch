@@ -294,7 +294,7 @@ pub fn convert_video_x265(
         .arg("--vbv-bufsize")
         .arg("60000")
         .arg("--output")
-        .arg(input.with_extension("out.mkv"))
+        .arg(input.with_extension("out.265"))
         .arg("--frames")
         .arg(format!("{}", dimensions.frames))
         .arg("--y4m")

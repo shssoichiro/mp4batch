@@ -12,33 +12,40 @@ pub fn mux_video(input: &Path, encoder: Encoder) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension("mkv").file_name().unwrap());
 
-    let status = Command::new("ffmpeg")
-        .arg("-loglevel")
-        .arg("level+error")
-        .arg("-stats")
-        .arg("-i")
+    let status = Command::new("mkvmerge")
+        .arg("--ui-language")
+        .arg("en_US")
+        .arg("--output")
+        .arg(&output_path)
+        .arg("--language")
+        .arg("0:und")
+        .arg("(")
         .arg(match encoder {
             Encoder::Rav1e => input.with_extension("out.ivf"),
-            Encoder::X264 | Encoder::Aom | Encoder::X265 => input.with_extension("out.mkv"),
+            Encoder::X264 | Encoder::Aom => input.with_extension("out.mkv"),
+            Encoder::X265 => input.with_extension("out.265"),
         })
-        .arg("-i")
+        .arg(")")
+        .arg("--language")
+        .arg("0:en")
+        .arg("--track-name")
+        .arg("0:Audio")
+        .arg("--default-track")
+        .arg("0:yes")
+        .arg("(")
         .arg(input.with_extension("out.mka"))
-        .arg("-vcodec")
-        .arg("copy")
-        .arg("-acodec")
-        .arg("copy")
-        .arg("-strict")
-        .arg("-2")
-        .arg("-map_chapters")
-        .arg("-1")
-        .arg(output_path)
+        .arg(")")
+        .arg("--title")
+        .arg(output_path.file_stem().unwrap().to_string_lossy().as_ref())
+        .arg("--track-order")
+        .arg("0:0,1:0")
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("{}", e))?;
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute ffmpeg".to_owned())
+        Err("Failed to execute mkvmerge".to_owned())
     }
 }
 
