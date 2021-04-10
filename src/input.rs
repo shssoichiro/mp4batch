@@ -139,47 +139,40 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
     // SubSampling H: 1
     let output = String::from_utf8_lossy(&command.stdout);
 
-    const PARSE_ERROR: &str = "Could not detect video dimensions";
     let lines = output.lines().collect::<Vec<_>>();
-    if lines.len() == 5 {
-        let width = lines[0]
-            .replace("Width: ", "")
+    let width = lines[0]
+        .replace("Width: ", "")
+        .trim()
+        .parse()
+        .map_err(|e| format!("{}", e))?;
+    let height = lines[1]
+        .replace("Height: ", "")
+        .trim()
+        .parse()
+        .map_err(|e| format!("{}", e))?;
+    let fps: Vec<_> = lines[3]
+        .replace("FPS: ", "")
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .split('/')
+        .map(|num| num.parse())
+        .collect();
+    let bit_depth = lines[8].replace("Bits: ", "").trim().parse().unwrap();
+    Ok(VideoDimensions {
+        width,
+        height,
+        frames: lines[2]
+            .replace("Frames: ", "")
             .trim()
             .parse()
-            .map_err(|e| format!("{}", e))?;
-        let height = lines[1]
-            .replace("Height: ", "")
-            .trim()
-            .parse()
-            .map_err(|e| format!("{}", e))?;
-        let fps: Vec<_> = lines[3]
-            .replace("FPS: ", "")
-            .split_whitespace()
-            .next()
-            .unwrap()
-            .split('/')
-            .map(|num| num.parse())
-            .collect();
-        let bit_depth = lines[8].replace("Bits: ", "").trim().parse().unwrap();
-        Ok(VideoDimensions {
-            width,
-            height,
-            frames: lines[2]
-                .replace("Frames: ", "")
-                .trim()
-                .parse()
-                .map_err(|e| format!("{}", e))?,
-            fps: (
-                *fps[0].as_ref().map_err(|e| format!("{}", e))?,
-                *fps[1].as_ref().map_err(|e| format!("{}", e))?,
-            ),
-            pixel_format: PixelFormat::from_vapoursynth_format(
-                &lines[4].replace("Format Name: ", ""),
-            ),
-            colorspace: ColorSpace::from_dimensions(width, height),
-            bit_depth,
-        })
-    } else {
-        Err(PARSE_ERROR.to_owned())
-    }
+            .map_err(|e| format!("{}", e))?,
+        fps: (
+            *fps[0].as_ref().map_err(|e| format!("{}", e))?,
+            *fps[1].as_ref().map_err(|e| format!("{}", e))?,
+        ),
+        pixel_format: PixelFormat::from_vapoursynth_format(&lines[4].replace("Format Name: ", "")),
+        colorspace: ColorSpace::from_dimensions(width, height),
+        bit_depth,
+    })
 }
