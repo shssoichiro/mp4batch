@@ -235,6 +235,7 @@ pub fn convert_video_x265(
         Profile::Film => -3,
     };
     let status = Command::new("x265")
+        .arg("-")
         .arg("--crf")
         .arg(crf.to_string())
         .arg("--preset")
@@ -294,11 +295,9 @@ pub fn convert_video_x265(
         .arg("60000")
         .arg("--output")
         .arg(input.with_extension("out.mkv"))
-        .arg("-")
         .arg("--frames")
         .arg(format!("{}", dimensions.frames))
         .arg("--y4m")
-        .arg("-")
         .stdin(pipe.stdout.unwrap())
         .stderr(Stdio::inherit())
         .status()
