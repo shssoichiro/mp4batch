@@ -69,7 +69,12 @@ pub fn convert_audio(
                 .arg("-b:a")
                 .arg(&format!(
                     "{}k",
-                    audio_bitrate * get_channel_count(input).map_err(|e| e.to_string())?
+                    audio_bitrate
+                        * get_channel_count(match audio_track {
+                            AudioTrack::FromVideo(_) => input,
+                            AudioTrack::External(ref path) => &path,
+                        })
+                        .map_err(|e| e.to_string())?
                 ))
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
