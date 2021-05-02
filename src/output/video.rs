@@ -128,6 +128,8 @@ impl X264Settings {
             .arg("1.30")
             .arg("--pbratio")
             .arg("1.20")
+            .arg("--no-fast-pskip")
+            .arg("--no-dct-decimate")
             .arg("--vbv-maxrate")
             .arg("50000")
             .arg("--vbv-bufsize")
