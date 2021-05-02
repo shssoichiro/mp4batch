@@ -131,7 +131,7 @@ fn main() {
                 .help("codec to use for audio")
                 .takes_value(true)
                 .default_value("copy")
-                .possible_values(&["copy", "aac", "flac"]),
+                .possible_values(&["copy", "aac", "flac", "opus"]),
         )
         .arg(
             Arg::with_name("skip-video")

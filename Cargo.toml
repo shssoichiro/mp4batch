@@ -5,6 +5,7 @@ version = "1.0.0"
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 clap = "2.24.2"
 dotenv_codegen = "0.15"
 itertools = "0.10"

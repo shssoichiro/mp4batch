@@ -3,6 +3,8 @@ use std::{
     process::Command,
 };
 
+use anyhow::{anyhow, Result};
+
 #[derive(Debug, Clone)]
 pub enum AudioTrack {
     FromVideo(u8),
@@ -61,6 +63,17 @@ pub fn convert_audio(
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
         }
+        "opus" => {
+            command
+                .arg("libopus")
+                .arg("-b:a")
+                .arg(&format!(
+                    "{}k",
+                    audio_bitrate * get_channel_count(input).map_err(|e| e.to_string())?
+                ))
+                .arg("-af")
+                .arg("aformat=channel_layouts=7.1|5.1|stereo");
+        }
         "flac" => {
             command.arg("flac");
         }
@@ -87,4 +100,25 @@ pub fn convert_audio(
     } else {
         Err("Failed to execute ffmpeg".to_owned())
     }
+}
+
+fn get_channel_count(path: &Path) -> Result<u32> {
+    let output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("error")
+        .arg("-select_streams")
+        .arg("a:0")
+        .arg("-show_entries")
+        .arg("stream=channels")
+        .arg("-of")
+        .arg("compact=p=0:nk=1")
+        .arg(path.as_os_str())
+        .output()
+        .map_err(|e| anyhow!("Failed to run ffprobe on {}: {}", path.to_string_lossy(), e))?;
+    let output = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find(|line| !line.is_empty())
+        .ok_or_else(|| anyhow!("No output from ffprobe"))?
+        .to_string();
+    Ok(output.parse()?)
 }
