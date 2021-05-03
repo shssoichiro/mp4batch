@@ -139,6 +139,11 @@ fn main() {
                 .help("assume the video has already been encoded (will use .out.mkv files)"),
         )
         .arg(
+            Arg::with_name("mp4")
+                .long("mp4")
+                .help("output to mp4 instead of mkv"),
+        )
+        .arg(
             Arg::with_name("tiles")
                 .long("tiles")
                 .help("the number of tiles to use for av1 encoding (default: 1)")
@@ -200,6 +205,7 @@ fn main() {
         .unwrap_or("96")
         .parse::<u32>()
         .unwrap();
+    let extension = if args.is_present("mp4") { "mp4" } else { "mkv" };
     let tiles = args.value_of("tiles").map(|val| val.parse().unwrap());
     let workers = args
         .value_of("local-workers")
@@ -233,6 +239,7 @@ fn main() {
                     audio_track,
                     args.value_of("acodec").unwrap_or("copy"),
                     audio_bitrate,
+                    extension,
                 );
                 if let Err(err) = result {
                     eprintln!(
@@ -258,6 +265,7 @@ fn main() {
                 audio_track,
                 args.value_of("acodec").unwrap_or("copy"),
                 audio_bitrate,
+                extension,
             )
             .unwrap();
         }
@@ -297,6 +305,7 @@ fn main() {
                 args.value_of("matrix"),
                 args.value_of("primaries"),
                 args.value_of("transfer"),
+                extension,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -324,6 +333,7 @@ fn main() {
             args.value_of("matrix"),
             args.value_of("primaries"),
             args.value_of("transfer"),
+            extension,
         )
         .unwrap();
     }
@@ -346,6 +356,7 @@ fn process_file(
     matrix: Option<&str>,
     primaries: Option<&str>,
     transfer: Option<&str>,
+    extension: &str,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -370,7 +381,7 @@ fn process_file(
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes
         convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
-        mux_video(input, encoder)?;
+        mux_video(input, encoder, extension)?;
     }
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
@@ -381,9 +392,10 @@ fn process_direct(
     audio_track: AudioTrack,
     audio_codec: &str,
     audio_bitrate: u32,
+    extension: &str,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
-    mux_video_direct(input, audio_track, audio_codec, audio_bitrate)?;
+    mux_video_direct(input, audio_track, audio_codec, audio_bitrate, extension)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
