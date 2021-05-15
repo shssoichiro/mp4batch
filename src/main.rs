@@ -4,7 +4,7 @@ extern crate dotenv_codegen;
 mod input;
 mod output;
 
-use std::{cmp, env, path::Path, str::FromStr};
+use std::{env, path::Path, str::FromStr};
 
 use clap::{App, Arg};
 use itertools::Itertools;
@@ -107,24 +107,6 @@ fn main() {
                 .help("this video should be treated as HDR and encoded as BT.2020"),
         )
         .arg(
-            Arg::with_name("matrix")
-                .long("matrix")
-                .takes_value(true)
-                .help("overrides the assumed color matrix coefficients"),
-        )
-        .arg(
-            Arg::with_name("primaries")
-                .long("primaries")
-                .takes_value(true)
-                .help("overrides the assumed color primaries"),
-        )
-        .arg(
-            Arg::with_name("transfer")
-                .long("transfer")
-                .takes_value(true)
-                .help("overrides the assumed color transfer characteristics"),
-        )
-        .arg(
             Arg::with_name("acodec")
                 .short("a")
                 .long("acodec")
@@ -142,18 +124,6 @@ fn main() {
             Arg::with_name("mp4")
                 .long("mp4")
                 .help("output to mp4 instead of mkv"),
-        )
-        .arg(
-            Arg::with_name("tiles")
-                .long("tiles")
-                .help("the number of tiles to use for av1 encoding (default: 1)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("local-workers")
-                .long("local-workers")
-                .help("the number of local workers to use for av1 encoding (default: auto)")
-                .takes_value(true),
         )
         .arg(
             Arg::with_name("input")
@@ -206,10 +176,6 @@ fn main() {
         .parse::<u32>()
         .unwrap();
     let extension = if args.is_present("mp4") { "mp4" } else { "mkv" };
-    let tiles = args.value_of("tiles").map(|val| val.parse().unwrap());
-    let workers = args
-        .value_of("local-workers")
-        .map(|val| val.parse().unwrap());
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
@@ -299,12 +265,7 @@ fn main() {
                 args.is_present("skip-video"),
                 audio_track,
                 audio_bitrate,
-                tiles,
-                workers,
                 args.is_present("hdr"),
-                args.value_of("matrix"),
-                args.value_of("primaries"),
-                args.value_of("transfer"),
                 extension,
             );
             if let Err(err) = result {
@@ -327,12 +288,7 @@ fn main() {
             args.is_present("skip-video"),
             audio_track,
             audio_bitrate,
-            tiles,
-            workers,
             args.is_present("hdr"),
-            args.value_of("matrix"),
-            args.value_of("primaries"),
-            args.value_of("transfer"),
             extension,
         )
         .unwrap();
@@ -350,32 +306,17 @@ fn process_file(
     skip_video: bool,
     audio_track: AudioTrack,
     audio_bitrate: u32,
-    tiles: Option<u8>,
-    workers: Option<u8>,
     is_hdr: bool,
-    matrix: Option<&str>,
-    primaries: Option<&str>,
-    transfer: Option<&str>,
     extension: &str,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
-            Encoder::Aom => convert_video_av1(
-                input,
-                crf,
-                dims,
-                Some(cmp::min(8, num_cpus::get() as u8)),
-                workers,
-                profile,
-                is_hdr,
-            ),
+            Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => convert_video_rav1e(
-                input, crf, dims, tiles, workers, is_hdr, matrix, primaries, transfer,
-            ),
+            Encoder::Rav1e => convert_video_rav1e(input, crf, profile, dims, is_hdr),
         }?;
     }
     if target == Target::Local {

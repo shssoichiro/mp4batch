@@ -317,8 +317,6 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     input: P,
     crf: u8,
     dimensions: VideoDimensions,
-    threads_per_worker: Option<u8>,
-    workers: Option<u8>,
     profile: Profile,
     is_hdr: bool,
 ) -> Result<(), String> {
@@ -333,11 +331,9 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("aom")
         .arg("-v")
         .arg(&format!(
-            "--cpu-used=5 --threads={} -b 10 --input-bit-depth=10 --end-usage=q --cq-level={} \
-             --good --lag-in-frames=35 --enable-fwd-kf=1 --tile-columns={} --tile-rows={} \
-             --auto-alt-ref=1 --color-primaries={} --transfer-characteristics={} \
+            "--cpu-used=5 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
+             --tile-columns={} --tile-rows={} --color-primaries={} --transfer-characteristics={} \
              --matrix-coefficients={}",
-            threads_per_worker.unwrap_or(8).to_string(),
             crf,
             if dimensions.width >= 1440 { 1 } else { 0 },
             if dimensions.height >= 1200 { 1 } else { 0 },
@@ -363,25 +359,19 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                 "bt601"
             }
         ))
-        .arg("-w")
-        .arg(
-            workers
-                .unwrap_or(if dimensions.height >= 1200 {
-                    4
-                } else if dimensions.height >= 1024 {
-                    6
-                } else {
-                    8
-                })
-                .to_string(),
-        )
-        .arg("--split_method")
-        .arg("aom_keyframes")
         .arg("-xs")
         .arg(
             match profile {
                 Profile::Film => fps * 10,
                 Profile::Anime => fps * 15,
+            }
+            .to_string(),
+        )
+        .arg("--min_scene_len")
+        .arg(
+            match profile {
+                Profile::Film => fps,
+                Profile::Anime => fps / 2,
             }
             .to_string(),
         )
@@ -403,109 +393,79 @@ pub fn convert_video_av1<P: AsRef<Path>>(
 }
 
 #[allow(clippy::clippy::too_many_arguments)]
-pub fn convert_video_rav1e(
-    input: &Path,
+pub fn convert_video_rav1e<P: AsRef<Path>>(
+    input: P,
     crf: u8,
+    profile: Profile,
     dimensions: VideoDimensions,
-    tiles: Option<u8>,
-    workers: Option<u8>,
     is_hdr: bool,
-    matrix: Option<&str>,
-    primaries: Option<&str>,
-    transfer: Option<&str>,
 ) -> Result<(), String> {
-    let mut command = Command::new("rav1e-by-gop");
-    let fps = (dimensions.fps.0 as f64 / dimensions.fps.1 as f64).round() as u32;
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+
+    let mut command = Command::new("nice");
     command
-        .arg("-")
-        .arg("-q")
-        .arg(crf.to_string())
-        .arg("-s")
-        .arg("5")
+        .arg("av1an")
         .arg("-i")
-        .arg(fps.to_string())
-        .arg("-I")
-        .arg((fps * 10).to_string())
+        .arg(input.as_ref())
+        .arg("-enc")
+        .arg("rav1e")
+        .arg("-v")
+        .arg(&format!(
+            "--speed 5 --quantizer {} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
+             --matrix={}",
+            crf,
+            if dimensions.width >= 1440 { 1 } else { 0 },
+            if dimensions.height >= 1200 { 1 } else { 0 },
+            if is_hdr {
+                "BT2020"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            },
+            if is_hdr {
+                "BT2020_10Bit"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            },
+            if is_hdr {
+                "BT2020NCL"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            }
+        ))
+        .arg("-xs")
+        .arg(
+            match profile {
+                Profile::Film => fps * 10,
+                Profile::Anime => fps * 15,
+            }
+            .to_string(),
+        )
+        .arg("--min_scene_len")
+        .arg(
+            match profile {
+                Profile::Film => fps,
+                Profile::Anime => fps / 2,
+            }
+            .to_string(),
+        )
+        .arg("-r")
         .arg("-o")
-        .arg(input.with_extension("out.ivf"))
-        .arg("--resume")
-        .arg("--frames")
-        .arg(dimensions.frames.to_string())
-        .arg("--tmp-input")
-        .arg("--max-bitrate")
-        .arg(if dimensions.height >= 1440 {
-            "100000"
-        } else if dimensions.height >= 768 && fps >= 45 {
-            "50000"
-        } else {
-            "30000"
-        })
-        .arg("--matrix")
-        .arg(if let Some(matrix) = matrix {
-            matrix
-        } else if is_hdr {
-            "BT2020NCL"
-        } else if dimensions.height >= 576 {
-            "BT709"
-        } else {
-            "BT601"
-        })
-        .arg("--primaries")
-        .arg(if let Some(primaries) = primaries {
-            primaries
-        } else if is_hdr {
-            "BT2020"
-        } else if dimensions.height >= 576 {
-            "BT709"
-        } else {
-            "BT601"
-        })
-        .arg("--transfer")
-        .arg(if let Some(transfer) = transfer {
-            transfer
-        } else if is_hdr {
-            "BT2020_10Bit"
-        } else if dimensions.height >= 576 {
-            "BT709"
-        } else {
-            "BT601"
-        });
-    if let Some(tiles) = tiles {
-        command.arg("--tiles").arg(tiles.to_string());
-    } else {
-        command.arg("--tiles").arg(if dimensions.height >= 1200 {
-            "4"
-        } else if dimensions.width >= 1440 {
-            "2"
-        } else {
-            "1"
-        });
-    }
-    if let Some(workers) = workers {
-        command.arg("--local-workers").arg(workers.to_string());
-    }
-    let filename = input.file_name().unwrap().to_str().unwrap();
-    let pipe = if filename.ends_with(".vpy") {
-        Command::new("vspipe")
-            .arg("--y4m")
-            .arg(input)
-            .arg("-")
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap()
-    } else {
-        panic!("Unrecognized input type");
-    };
-    command.stdin(pipe.stdout.unwrap()).stderr(Stdio::inherit());
+        .arg(input.as_ref().with_extension("out.mkv"));
     let status = command
         .status()
-        .map_err(|e| format!("Failed to execute rav1e: {}", e))?;
+        .map_err(|e| format!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
         Ok(())
     } else {
         Err(format!(
-            "Failed to execute rav1e: Exited with code {:x}",
+            "Failed to execute av1an: Exited with code {:x}",
             status.code().unwrap()
         ))
     }
