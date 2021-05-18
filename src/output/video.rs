@@ -420,8 +420,16 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
         .arg("rav1e-ch")
         .arg("--speed")
         .arg("5")
-        .arg("--quantizer")
+        .arg("--min-quantizer")
         .arg(crf.to_string())
+        .arg("--bitrate")
+        .arg(if dimensions.width >= 1440 {
+            "50000"
+        } else if dimensions.width >= 1200 {
+            "30000"
+        } else {
+            "16000"
+        })
         .arg("--tile-cols")
         .arg(if dimensions.width >= 1440 { "2" } else { "1" })
         .arg("--tile-rows")
