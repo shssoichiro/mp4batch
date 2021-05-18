@@ -399,46 +399,34 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
     profile: Profile,
     dimensions: VideoDimensions,
     is_hdr: bool,
+    slots: Option<u8>,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
+            .arg("--y4m")
+            .arg(input.as_ref())
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
 
     let mut command = Command::new("nice");
     command
-        .arg("av1an")
-        .arg("-i")
-        .arg(input.as_ref())
-        .arg("-enc")
-        .arg("rav1e")
-        .arg("-v")
-        .arg(&format!(
-            "--speed 5 --quantizer {} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
-             --matrix={}",
-            crf,
-            if dimensions.width >= 1440 { 1 } else { 0 },
-            if dimensions.height >= 1200 { 1 } else { 0 },
-            if is_hdr {
-                "BT2020"
-            } else if dimensions.height >= 576 {
-                "BT709"
-            } else {
-                "BT601"
-            },
-            if is_hdr {
-                "BT2020_10Bit"
-            } else if dimensions.height >= 576 {
-                "BT709"
-            } else {
-                "BT601"
-            },
-            if is_hdr {
-                "BT2020NCL"
-            } else if dimensions.height >= 576 {
-                "BT709"
-            } else {
-                "BT601"
-            }
-        ))
-        .arg("-xs")
+        .arg("rav1e-ch")
+        .arg("--speed")
+        .arg("5")
+        .arg("--quantizer")
+        .arg(crf.to_string())
+        .arg("--tile-cols")
+        .arg(if dimensions.width >= 1440 { "2" } else { "1" })
+        .arg("--tile-rows")
+        .arg(if dimensions.width >= 1200 { "2" } else { "1" })
+        .arg("-I")
         .arg(
             match profile {
                 Profile::Film => fps * 10,
@@ -446,7 +434,7 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
             }
             .to_string(),
         )
-        .arg("--min_scene_len")
+        .arg("-i")
         .arg(
             match profile {
                 Profile::Film => fps,
@@ -454,12 +442,50 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
             }
             .to_string(),
         )
-        .arg("-r")
+        .arg("--primaries")
+        .arg(if is_hdr {
+            "BT2020"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        })
+        .arg("--transfer")
+        .arg(if is_hdr {
+            "BT2020_10Bit"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        })
+        .arg("--matrix")
+        .arg(if is_hdr {
+            "BT2020NCL"
+        } else if dimensions.height >= 576 {
+            "BT709"
+        } else {
+            "BT601"
+        })
+        .arg("--slots")
+        .arg(
+            if let Some(slots) = slots {
+                slots
+            } else if dimensions.width >= 1440 {
+                3
+            } else if dimensions.width >= 1200 {
+                5
+            } else {
+                8
+            }
+            .to_string(),
+        )
+        .arg("-")
         .arg("-o")
-        .arg(input.as_ref().with_extension("out.mkv"));
+        .arg(input.as_ref().with_extension("out.ivf"))
+        .stdin(pipe.stdout.unwrap());
     let status = command
         .status()
-        .map_err(|e| format!("Failed to execute av1an: {}", e))?;
+        .map_err(|e| format!("Failed to execute rav1e: {}", e))?;
 
     if status.success() {
         Ok(())

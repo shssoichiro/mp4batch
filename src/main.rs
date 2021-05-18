@@ -126,6 +126,12 @@ fn main() {
                 .help("output to mp4 instead of mkv"),
         )
         .arg(
+            Arg::with_name("slots")
+                .long("slots")
+                .help("the number of local workers to use for rav1e encoding (default: auto)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -267,6 +273,7 @@ fn main() {
                 audio_bitrate,
                 args.is_present("hdr"),
                 extension,
+                args.value_of("slots").map(|val| val.parse().unwrap()),
             );
             if let Err(err) = result {
                 eprintln!(
@@ -290,6 +297,7 @@ fn main() {
             audio_bitrate,
             args.is_present("hdr"),
             extension,
+            args.value_of("slots").map(|val| val.parse().unwrap()),
         )
         .unwrap();
     }
@@ -308,6 +316,7 @@ fn process_file(
     audio_bitrate: u32,
     is_hdr: bool,
     extension: &str,
+    slots: Option<u8>,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -316,7 +325,7 @@ fn process_file(
             Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => convert_video_rav1e(input, crf, profile, dims, is_hdr),
+            Encoder::Rav1e => convert_video_rav1e(input, crf, profile, dims, is_hdr, slots),
         }?;
     }
     if target == Target::Local {
