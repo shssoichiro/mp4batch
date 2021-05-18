@@ -471,9 +471,9 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
             if let Some(slots) = slots {
                 slots
             } else if dimensions.width >= 1440 {
-                3
+                4
             } else if dimensions.width >= 1200 {
-                5
+                6
             } else {
                 8
             }
