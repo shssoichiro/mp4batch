@@ -414,6 +414,17 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
     } else {
         panic!("Unrecognized input type");
     };
+    let slots = if let Some(slots) = slots {
+        slots
+    } else if dimensions.width >= 1440 {
+        3
+    } else if dimensions.width >= 1200 {
+        5
+    } else {
+        8
+    };
+    let tile_cols = if dimensions.width >= 1440 { 2 } else { 1 };
+    let tile_rows = if dimensions.width >= 1200 { 2 } else { 1 };
 
     let mut command = Command::new("nice");
     command
@@ -431,9 +442,9 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
             "16000"
         })
         .arg("--tile-cols")
-        .arg(if dimensions.width >= 1440 { "2" } else { "1" })
+        .arg(tile_cols.to_string())
         .arg("--tile-rows")
-        .arg(if dimensions.width >= 1200 { "2" } else { "1" })
+        .arg(tile_rows.to_string())
         .arg("-I")
         .arg(
             match profile {
@@ -475,18 +486,9 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
             "BT601"
         })
         .arg("--slots")
-        .arg(
-            if let Some(slots) = slots {
-                slots
-            } else if dimensions.width >= 1440 {
-                3
-            } else if dimensions.width >= 1200 {
-                5
-            } else {
-                8
-            }
-            .to_string(),
-        )
+        .arg(slots.to_string())
+        .arg("--threads")
+        .arg((4 + slots * tile_cols * tile_rows).to_string())
         .arg("-")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.ivf"))
