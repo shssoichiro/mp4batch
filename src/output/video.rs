@@ -489,6 +489,8 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
         .arg(slots.to_string())
         .arg("--threads")
         .arg((4 + slots * tile_cols * tile_rows).to_string())
+        .arg("--limit")
+        .arg(dimensions.frames.to_string())
         .arg("-")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.ivf"))
