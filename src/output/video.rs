@@ -423,8 +423,8 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
     } else {
         8
     };
-    let tile_cols = if dimensions.width >= 1440 { 2 } else { 1 };
-    let tile_rows = if dimensions.width >= 1200 { 2 } else { 1 };
+    let tile_rows = if dimensions.width >= 1440 { 2 } else { 1 };
+    let tile_cols = if dimensions.width >= 1200 { 2 } else { 1 };
 
     let mut command = Command::new("nice");
     command
