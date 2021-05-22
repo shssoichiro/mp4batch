@@ -384,9 +384,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             "--cpu-used=5 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --deltaq-mode=2 --aq-mode=1 --quant-b-adapt=1 --tile-columns={} --tile-rows={} \
-             --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
-             --matrix-coefficients={}",
+             --deltaq-mode=2 --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
+             --color-primaries={} --transfer-characteristics={} --matrix-coefficients={}",
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
             if dimensions.height >= 1440 { 1 } else { 0 },
