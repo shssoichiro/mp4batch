@@ -148,7 +148,7 @@ fn main() {
     let target =
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
-        Encoder::Rav1e
+        Encoder::Aom
     } else if args.is_present("x265") {
         Encoder::X265
     } else {
@@ -316,7 +316,7 @@ fn process_file(
     audio_bitrate: u32,
     is_hdr: bool,
     extension: &str,
-    slots: Option<u8>,
+    _slots: Option<u8>,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -325,7 +325,7 @@ fn process_file(
             Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr, true),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => convert_video_rav1e(input, crf, profile, dims, is_hdr, slots),
+            Encoder::Rav1e => convert_video_av1an_rav1e(input, crf, dims, profile, is_hdr, true),
         }?;
     }
     if target == Target::Local {

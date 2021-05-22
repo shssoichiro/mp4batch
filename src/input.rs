@@ -119,6 +119,16 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String>
     })
 }
 
+pub fn get_video_frame_count(input: &Path) -> Result<u32, String> {
+    let command = Command::new("mediainfo")
+        .arg("--Output=Video;%FrameCount%")
+        .arg(input)
+        .output()
+        .map_err(|e| format!("{}", e))?;
+    let output = String::from_utf8_lossy(&command.stdout);
+    Ok(output.trim().parse().unwrap())
+}
+
 fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
     let command = Command::new("vspipe")
         .arg("-i")

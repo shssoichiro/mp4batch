@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::input::{ColorSpace, PixelFormat, VideoDimensions};
+use crate::input::{get_video_frame_count, ColorSpace, PixelFormat, VideoDimensions};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Profile {
@@ -324,55 +324,67 @@ pub fn convert_video_av1<P: AsRef<Path>>(
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     if use_lossless {
-        let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
-        let pipe = if filename.ends_with(".vpy") {
-            Command::new("vspipe")
-                .arg("--y4m")
-                .arg(input.as_ref())
+        let lossless_filename = input.as_ref().with_extension("lossless.mkv");
+        let mut needs_encode = true;
+        if lossless_filename.exists() {
+            if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+                if lossless_frames == dimensions.frames {
+                    needs_encode = false;
+                }
+            }
+        }
+
+        if needs_encode {
+            let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
+            let pipe = if filename.ends_with(".vpy") {
+                Command::new("vspipe")
+                    .arg("--y4m")
+                    .arg(input.as_ref())
+                    .arg("-")
+                    .stdout(Stdio::piped())
+                    .spawn()
+                    .unwrap()
+            } else {
+                panic!("Unrecognized input type");
+            };
+            let mut command = Command::new("nice");
+            let status = command
+                .arg("ffmpeg")
+                .arg("-i")
                 .arg("-")
-                .stdout(Stdio::piped())
-                .spawn()
-                .unwrap()
-        } else {
-            panic!("Unrecognized input type");
-        };
-        let mut command = Command::new("nice");
-        let status = command
-            .arg("ffmpeg")
-            .arg("-i")
-            .arg("-")
-            .arg("-vcodec")
-            .arg("libx264")
-            .arg("-preset")
-            .arg("veryfast")
-            .arg("-crf")
-            .arg("0")
-            .arg("-g")
-            .arg(
-                match profile {
-                    Profile::Film => fps * 10,
-                    Profile::Anime => fps * 15,
-                }
-                .to_string(),
-            )
-            .arg("-keyint_min")
-            .arg(
-                match profile {
-                    Profile::Film => fps,
-                    Profile::Anime => fps / 2,
-                }
-                .to_string(),
-            )
-            .arg(input.as_ref().with_extension("lossless.mkv"))
-            .stdin(pipe.stdout.unwrap())
-            .stderr(Stdio::inherit())
-            .status()
-            .map_err(|e| format!("Failed to execute x264: {}", e))?;
-        if !status.success() {
-            return Err(format!(
-                "Failed to execute x264: Exited with code {:x}",
-                status.code().unwrap()
-            ));
+                .arg("-vcodec")
+                .arg("libx264")
+                .arg("-preset")
+                .arg("veryfast")
+                .arg("-crf")
+                .arg("0")
+                .arg("-g")
+                .arg(
+                    match profile {
+                        Profile::Film => fps * 10,
+                        Profile::Anime => fps * 15,
+                    }
+                    .to_string(),
+                )
+                .arg("-keyint_min")
+                .arg(
+                    match profile {
+                        Profile::Film => fps,
+                        Profile::Anime => fps / 2,
+                    }
+                    .to_string(),
+                )
+                .arg(&lossless_filename)
+                .stdin(pipe.stdout.unwrap())
+                .stderr(Stdio::inherit())
+                .status()
+                .map_err(|e| format!("Failed to execute x264: {}", e))?;
+            if !status.success() {
+                return Err(format!(
+                    "Failed to execute x264: Exited with code {:x}",
+                    status.code().unwrap()
+                ));
+            }
         }
     }
 
@@ -390,8 +402,9 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             "--cpu-used=5 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --deltaq-mode=2 --tile-columns={} --tile-rows={} --color-primaries={} \
-             --transfer-characteristics={} --matrix-coefficients={}",
+             --deltaq-mode=2 --aq-mode=1 --quant-b-adapt=1 --tile-columns={} --tile-rows={} \
+             --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
+             --matrix-coefficients={}",
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
             if dimensions.height >= 1440 { 1 } else { 0 },
@@ -433,6 +446,169 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             }
             .to_string(),
         )
+        .arg("-w")
+        .arg(if dimensions.width >= 1440 {
+            "8"
+        } else if dimensions.width >= 1200 {
+            "12"
+        } else {
+            "16"
+        })
+        .arg("-r")
+        .arg("-o")
+        .arg(input.as_ref().with_extension("out.mkv"));
+    let status = command
+        .status()
+        .map_err(|e| format!("Failed to execute av1an: {}", e))?;
+
+    if status.success() {
+        let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to execute av1an: Exited with code {:x}",
+            status.code().unwrap()
+        ))
+    }
+}
+
+pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
+    input: P,
+    crf: u8,
+    dimensions: VideoDimensions,
+    profile: Profile,
+    is_hdr: bool,
+    use_lossless: bool,
+) -> Result<(), String> {
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    if use_lossless {
+        let lossless_filename = input.as_ref().with_extension("lossless.mkv");
+        let mut needs_encode = true;
+        if lossless_filename.exists() {
+            if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+                if lossless_frames == dimensions.frames {
+                    needs_encode = false;
+                }
+            }
+        }
+
+        if needs_encode {
+            let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
+            let pipe = if filename.ends_with(".vpy") {
+                Command::new("vspipe")
+                    .arg("--y4m")
+                    .arg(input.as_ref())
+                    .arg("-")
+                    .stdout(Stdio::piped())
+                    .spawn()
+                    .unwrap()
+            } else {
+                panic!("Unrecognized input type");
+            };
+            let mut command = Command::new("nice");
+            let status = command
+                .arg("ffmpeg")
+                .arg("-i")
+                .arg("-")
+                .arg("-vcodec")
+                .arg("libx264")
+                .arg("-preset")
+                .arg("veryfast")
+                .arg("-crf")
+                .arg("0")
+                .arg("-g")
+                .arg(
+                    match profile {
+                        Profile::Film => fps * 10,
+                        Profile::Anime => fps * 15,
+                    }
+                    .to_string(),
+                )
+                .arg("-keyint_min")
+                .arg(
+                    match profile {
+                        Profile::Film => fps,
+                        Profile::Anime => fps / 2,
+                    }
+                    .to_string(),
+                )
+                .arg(&lossless_filename)
+                .stdin(pipe.stdout.unwrap())
+                .stderr(Stdio::inherit())
+                .status()
+                .map_err(|e| format!("Failed to execute x264: {}", e))?;
+            if !status.success() {
+                return Err(format!(
+                    "Failed to execute x264: Exited with code {:x}",
+                    status.code().unwrap()
+                ));
+            }
+        }
+    }
+
+    let mut command = Command::new("nice");
+    command
+        .arg("av1an")
+        .arg("-i")
+        .arg(if use_lossless {
+            input.as_ref().with_extension("lossless.mkv")
+        } else {
+            input.as_ref().to_path_buf()
+        })
+        .arg("-enc")
+        .arg("rav1e")
+        .arg("-v")
+        .arg(&format!(
+            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows={} \
+             --primaries={} --transfer={} --matrix={}",
+            crf,
+            if dimensions.width >= 1440 {
+                "50000"
+            } else if dimensions.width >= 1200 {
+                "30000"
+            } else {
+                "16000"
+            },
+            if dimensions.width >= 1200 { 2 } else { 1 },
+            if dimensions.height >= 1440 { 2 } else { 1 },
+            if is_hdr {
+                "BT2020"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            },
+            if is_hdr {
+                "BT2020_10Bit"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            },
+            if is_hdr {
+                "BT2020NCL"
+            } else if dimensions.height >= 576 {
+                "BT709"
+            } else {
+                "BT601"
+            }
+        ))
+        .arg("-xs")
+        .arg(
+            match profile {
+                Profile::Film => fps * 10,
+                Profile::Anime => fps * 15,
+            }
+            .to_string(),
+        )
+        .arg("--min_scene_len")
+        .arg(
+            match profile {
+                Profile::Film => fps,
+                Profile::Anime => fps / 2,
+            }
+            .to_string(),
+        )
         .arg("-r")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
@@ -452,6 +628,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
 }
 
 #[allow(clippy::clippy::too_many_arguments)]
+#[allow(dead_code)]
 pub fn convert_video_rav1e<P: AsRef<Path>>(
     input: P,
     crf: u8,
