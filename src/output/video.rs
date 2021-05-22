@@ -1,4 +1,5 @@
 use std::{
+    fs,
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
@@ -319,14 +320,71 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
+    use_lossless: bool,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    if use_lossless {
+        let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
+        let pipe = if filename.ends_with(".vpy") {
+            Command::new("vspipe")
+                .arg("--y4m")
+                .arg(input.as_ref())
+                .arg("-")
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap()
+        } else {
+            panic!("Unrecognized input type");
+        };
+        let mut command = Command::new("nice");
+        let status = command
+            .arg("ffmpeg")
+            .arg("-i")
+            .arg("-")
+            .arg("-vcodec")
+            .arg("libx264")
+            .arg("-preset")
+            .arg("veryfast")
+            .arg("-crf")
+            .arg("0")
+            .arg("-g")
+            .arg(
+                match profile {
+                    Profile::Film => fps * 10,
+                    Profile::Anime => fps * 15,
+                }
+                .to_string(),
+            )
+            .arg("-keyint_min")
+            .arg(
+                match profile {
+                    Profile::Film => fps,
+                    Profile::Anime => fps / 2,
+                }
+                .to_string(),
+            )
+            .arg(input.as_ref().with_extension("lossless.mkv"))
+            .stdin(pipe.stdout.unwrap())
+            .stderr(Stdio::inherit())
+            .status()
+            .map_err(|e| format!("Failed to execute x264: {}", e))?;
+        if !status.success() {
+            return Err(format!(
+                "Failed to execute x264: Exited with code {:x}",
+                status.code().unwrap()
+            ));
+        }
+    }
 
     let mut command = Command::new("nice");
     command
         .arg("av1an")
         .arg("-i")
-        .arg(input.as_ref())
+        .arg(if use_lossless {
+            input.as_ref().with_extension("lossless.mkv")
+        } else {
+            input.as_ref().to_path_buf()
+        })
         .arg("-enc")
         .arg("aom")
         .arg("-v")
@@ -383,6 +441,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .map_err(|e| format!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
+        let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
         Ok(())
     } else {
         Err(format!(

@@ -322,7 +322,7 @@ fn process_file(
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
-            Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr),
+            Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr, true),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
             Encoder::Rav1e => convert_video_rav1e(input, crf, profile, dims, is_hdr, slots),
