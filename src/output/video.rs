@@ -402,11 +402,10 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             "--cpu-used=5 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --deltaq-mode=2 --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
+             --deltaq-mode=2 --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
              --color-primaries={} --transfer-characteristics={} --matrix-coefficients={}",
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
-            if dimensions.height >= 1440 { 1 } else { 0 },
             if is_hdr {
                 "bt2020"
             } else if dimensions.height >= 576 {
@@ -446,13 +445,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             .to_string(),
         )
         .arg("-w")
-        .arg(if dimensions.width >= 1440 {
-            "8"
-        } else if dimensions.width >= 1200 {
-            "12"
-        } else {
-            "16"
-        })
+        .arg(if dimensions.width >= 1200 { "8" } else { "16" })
         .arg("-r")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
