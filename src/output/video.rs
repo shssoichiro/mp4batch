@@ -353,9 +353,27 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                 .arg("-i")
                 .arg("-")
                 .arg("-vcodec")
-                .arg("ffv1")
-                .arg("-level")
-                .arg("3")
+                .arg("libx264")
+                .arg("-preset")
+                .arg("veryfast")
+                .arg("-crf")
+                .arg("0")
+                .arg("-g")
+                .arg(
+                    match profile {
+                        Profile::Film => fps * 10,
+                        Profile::Anime => fps * 15,
+                    }
+                    .to_string(),
+                )
+                .arg("-keyint_min")
+                .arg(
+                    match profile {
+                        Profile::Film => fps,
+                        Profile::Anime => fps / 2,
+                    }
+                    .to_string(),
+                )
                 .arg(&lossless_filename)
                 .stdin(pipe.stdout.unwrap())
                 .stderr(Stdio::inherit())
@@ -492,9 +510,27 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
                 .arg("-i")
                 .arg("-")
                 .arg("-vcodec")
-                .arg("ffv1")
-                .arg("-level")
-                .arg("3")
+                .arg("libx264")
+                .arg("-preset")
+                .arg("veryfast")
+                .arg("-crf")
+                .arg("0")
+                .arg("-g")
+                .arg(
+                    match profile {
+                        Profile::Film => fps * 10,
+                        Profile::Anime => fps * 15,
+                    }
+                    .to_string(),
+                )
+                .arg("-keyint_min")
+                .arg(
+                    match profile {
+                        Profile::Film => fps,
+                        Profile::Anime => fps / 2,
+                    }
+                    .to_string(),
+                )
                 .arg(&lossless_filename)
                 .stdin(pipe.stdout.unwrap())
                 .stderr(Stdio::inherit())
