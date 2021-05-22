@@ -335,8 +335,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
              --deltaq-mode=2 --tile-columns={} --tile-rows={} --color-primaries={} \
              --transfer-characteristics={} --matrix-coefficients={}",
             crf,
-            if dimensions.width >= 1440 { 1 } else { 0 },
-            if dimensions.height >= 1200 { 1 } else { 0 },
+            if dimensions.width >= 1200 { 1 } else { 0 },
+            if dimensions.height >= 1440 { 1 } else { 0 },
             if is_hdr {
                 "bt2020"
             } else if dimensions.height >= 576 {
