@@ -517,8 +517,9 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("rav1e")
         .arg("-v")
         .arg(&format!(
-            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows={} \
-             --primaries={} --transfer={} --matrix={}",
+            "--speed=5 --min-quantizer={} --bitrate={} --enable-qm=1 --enable-chroma-deltaq=1 \
+             --quant-b-adapt=1 --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
+             --matrix={}",
             crf,
             if dimensions.width >= 1440 {
                 "50000"
