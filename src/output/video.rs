@@ -385,8 +385,9 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             "--cpu-used=5 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --deltaq-mode=2 --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
-             --color-primaries={} --transfer-characteristics={} --matrix-coefficients={}",
+             --deltaq-mode=2 --enable-qm=1 --enable-chroma-deltaq=1 --quant-b-adapt=1 \
+             --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
+             --transfer-characteristics={} --matrix-coefficients={}",
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {
@@ -517,9 +518,8 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("rav1e")
         .arg("-v")
         .arg(&format!(
-            "--speed=5 --min-quantizer={} --bitrate={} --enable-qm=1 --enable-chroma-deltaq=1 \
-             --quant-b-adapt=1 --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
-             --matrix={}",
+            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows={} \
+             --primaries={} --transfer={} --matrix={}",
             crf,
             if dimensions.width >= 1440 {
                 "50000"
