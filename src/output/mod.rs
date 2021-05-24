@@ -44,6 +44,7 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
             .map_err(|e| format!("{}", e))?
     } else {
         Command::new("ffmpeg")
+            .arg("-hide_banner")
             .arg("-loglevel")
             .arg("level+error")
             .arg("-stats")
@@ -90,6 +91,7 @@ pub fn mux_video_direct(
 
     let mut command = Command::new("ffmpeg");
     command
+        .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")
         .arg("-stats")

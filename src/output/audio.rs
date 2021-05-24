@@ -35,6 +35,7 @@ pub fn convert_audio(
 ) -> Result<(), String> {
     let mut command = Command::new("ffmpeg");
     command
+        .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")
         .arg("-stats")
