@@ -495,10 +495,10 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
                 .stdin(pipe.stdout.unwrap())
                 .stderr(Stdio::inherit())
                 .status()
-                .map_err(|e| format!("Failed to execute x264: {}", e))?;
+                .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
             if !status.success() {
                 return Err(format!(
-                    "Failed to execute x264: Exited with code {:x}",
+                    "Failed to execute ffmpeg: Exited with code {:x}",
                     status.code().unwrap()
                 ));
             }
