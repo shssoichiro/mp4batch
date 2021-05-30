@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 #[derive(Debug, Clone)]
 pub enum AudioTrack {
     FromVideo(u8),
-    External(PathBuf),
+    External(PathBuf, u8),
 }
 
 pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
@@ -24,7 +24,7 @@ pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
         }
         input_audio = input.with_extension(TRY_EXTENSIONS[i]);
     }
-    AudioTrack::External(input_audio)
+    AudioTrack::External(input_audio, from_video)
 }
 
 pub fn convert_audio(
@@ -43,7 +43,7 @@ pub fn convert_audio(
         .arg("-i")
         .arg(match audio_track {
             AudioTrack::FromVideo(_) => input,
-            AudioTrack::External(ref path) => &path,
+            AudioTrack::External(ref path, _) => &path,
         })
         .arg("-acodec");
     match audio_codec {
@@ -71,10 +71,13 @@ pub fn convert_audio(
                 .arg(&format!(
                     "{}k",
                     audio_bitrate
-                        * get_channel_count(match audio_track {
-                            AudioTrack::FromVideo(_) => input,
-                            AudioTrack::External(ref path) => &path,
-                        })
+                        * get_channel_count(
+                            match audio_track {
+                                AudioTrack::FromVideo(_) => input,
+                                AudioTrack::External(ref path, _) => &path,
+                            },
+                            &audio_track
+                        )
                         .map_err(|e| e.to_string())?
                 ))
                 .arg("-af")
@@ -91,7 +94,7 @@ pub fn convert_audio(
             "0:a:{}",
             match audio_track {
                 AudioTrack::FromVideo(ref track) => *track,
-                AudioTrack::External(_) => 0,
+                AudioTrack::External(_, ref track) => *track,
             }
         ))
         .arg("-map_chapters")
@@ -108,12 +111,18 @@ pub fn convert_audio(
     }
 }
 
-fn get_channel_count(path: &Path) -> Result<u32> {
+fn get_channel_count(path: &Path, audio_track: &AudioTrack) -> Result<u32> {
     let output = Command::new("ffprobe")
         .arg("-v")
         .arg("error")
         .arg("-select_streams")
-        .arg("a:0")
+        .arg(format!(
+            "a:{}",
+            match audio_track {
+                AudioTrack::FromVideo(ref track) => *track,
+                AudioTrack::External(_, ref track) => *track,
+            }
+        ))
         .arg("-show_entries")
         .arg("stream=channels")
         .arg("-of")

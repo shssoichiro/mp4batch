@@ -97,7 +97,7 @@ pub fn mux_video_direct(
         .arg("-stats")
         .arg("-i")
         .arg(input);
-    if let AudioTrack::External(ref path) = audio_track {
+    if let AudioTrack::External(ref path, _) = audio_track {
         command.arg("-i").arg(path);
     }
     command.arg("-vcodec").arg("copy").arg("-acodec");
@@ -130,7 +130,7 @@ pub fn mux_video_direct(
         .arg("-map")
         .arg(match audio_track {
             AudioTrack::FromVideo(ref track) => format!("0:a:{}", track),
-            AudioTrack::External(_) => "1:a:0".to_string(),
+            AudioTrack::External(_, ref track) => format!("1:a:{}", track),
         })
         .arg("-map_chapters")
         .arg("-1")
