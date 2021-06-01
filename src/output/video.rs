@@ -386,8 +386,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg(&format!(
             "--cpu-used=4 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
              --deltaq-mode=2 --enable-qm=1 --enable-chroma-deltaq=1 --quant-b-adapt=1 \
-             --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
-             --transfer-characteristics={} --matrix-coefficients={}",
+             --sharpness=4 --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
+             --color-primaries={} --transfer-characteristics={} --matrix-coefficients={}",
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {
