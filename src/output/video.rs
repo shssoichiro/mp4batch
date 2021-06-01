@@ -520,7 +520,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("rav1e")
         .arg("-v")
         .arg(&format!(
-            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows={} \
+            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows=0 \
              --primaries={} --transfer={} --matrix={}",
             crf,
             if dimensions.width >= 1440 {
@@ -530,8 +530,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             } else {
                 "16000"
             },
-            if dimensions.width >= 1200 { 2 } else { 1 },
-            if dimensions.height >= 1440 { 2 } else { 1 },
+            if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {
                 "BT2020"
             } else if dimensions.height >= 576 {
@@ -554,6 +553,8 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
                 "BT601"
             }
         ))
+        .arg("--split_method")
+        .arg("aom_keyframes")
         .arg("-xs")
         .arg(
             match profile {
@@ -570,6 +571,8 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             }
             .to_string(),
         )
+        .arg("-w")
+        .arg(if dimensions.width >= 1200 { "10" } else { "16" })
         .arg("-r")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
