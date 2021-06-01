@@ -412,8 +412,6 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                 "bt601"
             }
         ))
-        .arg("--split_method")
-        .arg("aom_keyframes")
         .arg("-xs")
         .arg(
             match profile {
