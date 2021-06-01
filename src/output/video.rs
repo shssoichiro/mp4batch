@@ -429,7 +429,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             .to_string(),
         )
         .arg("-w")
-        .arg(if dimensions.width >= 1200 { "8" } else { "16" })
+        .arg(if dimensions.width >= 1200 { "10" } else { "16" })
         .arg("-r")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
