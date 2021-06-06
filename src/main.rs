@@ -56,7 +56,7 @@ fn main() {
                 .short("p")
                 .long("profile")
                 .value_name("VALUE")
-                .help("Sets a custom profile (default: film, available: film, anime)")
+                .help("Sets a custom profile (default: film, available: film, anime, fast)")
                 .takes_value(true),
         )
         .arg(

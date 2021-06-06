@@ -7,10 +7,11 @@ use std::{
 
 use crate::input::{get_video_frame_count, ColorSpace, PixelFormat, VideoDimensions};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     Film,
     Anime,
+    Fast,
 }
 
 impl Default for Profile {
@@ -26,6 +27,7 @@ impl FromStr for Profile {
         Ok(match s.to_lowercase().as_ref() {
             "film" => Profile::Film,
             "anime" => Profile::Anime,
+            "fast" => Profile::Fast,
             _ => {
                 return Err("Invalid profile given".to_owned());
             }
@@ -35,6 +37,7 @@ impl FromStr for Profile {
 
 #[derive(Debug, Clone, Copy)]
 struct X264Settings {
+    pub profile: Profile,
     pub crf: u8,
     pub b_frames: u8,
     pub psy_rd: (f32, f32),
@@ -53,33 +56,38 @@ impl X264Settings {
     pub fn new(crf: u8, profile: Profile, dimensions: VideoDimensions) -> Self {
         let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
         X264Settings {
+            profile,
             crf,
             b_frames: match profile {
                 Profile::Film => 5,
                 Profile::Anime => 8,
+                Profile::Fast => 3,
             },
             psy_rd: match profile {
                 Profile::Film => (1.0, 0.0),
                 Profile::Anime => (0.7, 0.0),
+                Profile::Fast => (0.0, 0.0),
             },
             deblock: match profile {
                 Profile::Film => (-3, -3),
                 Profile::Anime => (-2, -1),
+                Profile::Fast => (0, 0),
             },
             aq_strength: match profile {
                 Profile::Film => 0.8,
                 Profile::Anime => 0.7,
+                Profile::Fast => 0.7,
             },
             min_keyint: match profile {
-                Profile::Film => fps.round() as usize,
+                Profile::Film | Profile::Fast => fps.round() as usize,
                 Profile::Anime => fps.round() as usize / 2,
             },
             max_keyint: match profile {
-                Profile::Film => fps.round() as usize * 10,
+                Profile::Film | Profile::Fast => fps.round() as usize * 10,
                 Profile::Anime => fps.round() as usize * 30 / 2,
             },
             qcomp: match profile {
-                Profile::Film => 0.7,
+                Profile::Film | Profile::Fast => 0.7,
                 Profile::Anime => 0.6,
             },
             merange: if dimensions.width > 1440 {
@@ -100,7 +108,11 @@ impl X264Settings {
             .arg("--crf")
             .arg(self.crf.to_string())
             .arg("--preset")
-            .arg("veryslow")
+            .arg(if self.profile == Profile::Fast {
+                "faster"
+            } else {
+                "veryslow"
+            })
             .arg("--level")
             .arg("4.1")
             .arg("--ref")
@@ -232,7 +244,7 @@ pub fn convert_video_x265(
 
     let fps = dimensions.fps.0 as f32 / dimensions.fps.1 as f32;
     let deblock = match profile {
-        Profile::Anime => -1,
+        Profile::Anime | Profile::Fast => -1,
         Profile::Film => -3,
     };
     let status = Command::new("x265")
@@ -245,11 +257,12 @@ pub fn convert_video_x265(
         .arg(match profile {
             Profile::Film => "5",
             Profile::Anime => "8",
+            Profile::Fast => "3",
         })
         .arg("--min-keyint")
         .arg(
             match profile {
-                Profile::Film => fps.round() as usize,
+                Profile::Film | Profile::Fast => fps.round() as usize,
                 Profile::Anime => fps.round() as usize / 2,
             }
             .to_string(),
@@ -257,7 +270,7 @@ pub fn convert_video_x265(
         .arg("--keyint")
         .arg(
             match profile {
-                Profile::Film => fps.round() as usize * 10,
+                Profile::Film | Profile::Fast => fps.round() as usize * 10,
                 Profile::Anime => fps.round() as usize * 30 / 2,
             }
             .to_string(),
@@ -268,19 +281,19 @@ pub fn convert_video_x265(
         .arg("--psy-rd")
         .arg(match profile {
             Profile::Film => "1.5",
-            Profile::Anime => "1.0",
+            Profile::Anime | Profile::Fast => "1.0",
         })
         .arg("--psy-rdoq")
         .arg(match profile {
             Profile::Film => "4.0",
-            Profile::Anime => "1.5",
+            Profile::Anime | Profile::Fast => "1.5",
         })
         .arg("--aq-mode")
         .arg("3")
         .arg("--aq-strength")
         .arg(match profile {
             Profile::Film => "0.8",
-            Profile::Anime => "0.7",
+            Profile::Anime | Profile::Fast => "0.7",
         })
         .arg("--colormatrix")
         .arg(dimensions.colorspace.to_string())
@@ -415,7 +428,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-xs")
         .arg(
             match profile {
-                Profile::Film => fps * 10,
+                Profile::Film | Profile::Fast => fps * 10,
                 Profile::Anime => fps * 15,
             }
             .to_string(),
@@ -423,7 +436,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("--min_scene_len")
         .arg(
             match profile {
-                Profile::Film => fps,
+                Profile::Film | Profile::Fast => fps,
                 Profile::Anime => fps / 2,
             }
             .to_string(),
@@ -556,7 +569,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("-xs")
         .arg(
             match profile {
-                Profile::Film => fps * 10,
+                Profile::Film | Profile::Fast => fps * 10,
                 Profile::Anime => fps * 15,
             }
             .to_string(),
@@ -564,7 +577,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("--min_scene_len")
         .arg(
             match profile {
-                Profile::Film => fps,
+                Profile::Film | Profile::Fast => fps,
                 Profile::Anime => fps / 2,
             }
             .to_string(),
@@ -646,7 +659,7 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
         .arg("-I")
         .arg(
             match profile {
-                Profile::Film => fps * 10,
+                Profile::Film | Profile::Fast => fps * 10,
                 Profile::Anime => fps * 15,
             }
             .to_string(),
@@ -654,7 +667,7 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
         .arg("-i")
         .arg(
             match profile {
-                Profile::Film => fps,
+                Profile::Film | Profile::Fast => fps,
                 Profile::Anime => fps / 2,
             }
             .to_string(),
