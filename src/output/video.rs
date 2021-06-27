@@ -330,6 +330,7 @@ pub fn convert_video_x265(
 pub fn convert_video_av1<P: AsRef<Path>>(
     input: P,
     crf: u8,
+    speed: Option<u8>,
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
@@ -397,10 +398,11 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("aom")
         .arg("-v")
         .arg(&format!(
-            "--cpu-used=4 --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
+            "--cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
              --deltaq-mode=2 --enable-qm=1 --quant-b-adapt=1 --enable-keyframe-filtering=0 \
              --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
              --transfer-characteristics={} --matrix-coefficients={}",
+            speed.unwrap_or(4),
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {

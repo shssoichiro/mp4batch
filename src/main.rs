@@ -132,6 +132,12 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("speed")
+                .long("speed")
+                .help("the speed level to use for aomenc (default: 4)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -175,6 +181,7 @@ fn main() {
             crf
         }
     };
+    let speed = args.value_of("speed").map(|val| val.parse::<u8>().unwrap());
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
     let audio_bitrate = args
         .value_of("audio_bitrate")
@@ -267,6 +274,7 @@ fn main() {
                 profile,
                 target,
                 crf,
+                speed,
                 args.value_of("acodec").unwrap_or("copy"),
                 args.is_present("skip-video"),
                 audio_track,
@@ -291,6 +299,7 @@ fn main() {
             profile,
             target,
             crf,
+            speed,
             args.value_of("acodec").unwrap_or("copy"),
             args.is_present("skip-video"),
             audio_track,
@@ -310,6 +319,7 @@ fn process_file(
     profile: Profile,
     target: Target,
     crf: u8,
+    speed: Option<u8>,
     audio_codec: &str,
     skip_video: bool,
     audio_track: AudioTrack,
@@ -322,7 +332,7 @@ fn process_file(
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
-            Encoder::Aom => convert_video_av1(input, crf, dims, profile, is_hdr, true),
+            Encoder::Aom => convert_video_av1(input, crf, speed, dims, profile, is_hdr, true),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
             Encoder::Rav1e => convert_video_av1an_rav1e(input, crf, dims, profile, is_hdr, true),
