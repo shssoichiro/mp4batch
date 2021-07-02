@@ -365,6 +365,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             let status = command
                 .arg("ffmpeg")
                 .arg("-hide_banner")
+                .arg("-y")
                 .arg("-i")
                 .arg("-")
                 .arg("-vcodec")
@@ -500,6 +501,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             let status = command
                 .arg("ffmpeg")
                 .arg("-hide_banner")
+                .arg("-y")
                 .arg("-i")
                 .arg("-")
                 .arg("-vcodec")
