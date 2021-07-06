@@ -501,6 +501,9 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             let status = command
                 .arg("ffmpeg")
                 .arg("-hide_banner")
+                .arg("-loglevel")
+                .arg("level+error")
+                .arg("-stats")
                 .arg("-y")
                 .arg("-i")
                 .arg("-")
