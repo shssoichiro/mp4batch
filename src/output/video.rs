@@ -458,11 +458,12 @@ pub fn convert_video_av1<P: AsRef<Path>>(
 
     if status.success() {
         let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
-        let _ = Command::new("aomstats")
-            .arg(input.as_ref().with_extension("out.mkv"))
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status();
+        // FIXME: This is still too slow.
+        // let _ = Command::new("aomstats")
+        //     .arg(input.as_ref().with_extension("out.mkv"))
+        //     .stdout(Stdio::inherit())
+        //     .stderr(Stdio::inherit())
+        //     .status();
         Ok(())
     } else {
         Err(format!(
