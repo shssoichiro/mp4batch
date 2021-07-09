@@ -227,6 +227,8 @@ fn main() {
                         err
                     );
                 }
+                eprintln!();
+                eprintln!();
             }
         } else {
             assert_eq!(
@@ -290,6 +292,8 @@ fn main() {
                     err
                 );
             }
+            eprintln!();
+            eprintln!();
         }
     } else {
         let audio_track = find_external_audio(input, audio_track);

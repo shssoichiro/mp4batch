@@ -14,6 +14,7 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
 
     let status = if extension == "mkv" {
         Command::new("mkvmerge")
+            .arg("-q")
             .arg("--ui-language")
             .arg("en_US")
             .arg("--output")
