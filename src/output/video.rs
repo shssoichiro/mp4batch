@@ -115,8 +115,6 @@ impl X264Settings {
             })
             .arg("--level")
             .arg("4.1")
-            .arg("--ref")
-            .arg("4")
             .arg("--bframes")
             .arg(self.b_frames.to_string())
             .arg("--psy-rd")
