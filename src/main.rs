@@ -134,6 +134,7 @@ fn main() {
         .arg(
             Arg::with_name("speed")
                 .long("speed")
+                .short("s")
                 .help("the speed level to use for aomenc (default: 4)")
                 .takes_value(true),
         )
