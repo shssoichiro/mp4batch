@@ -70,7 +70,12 @@ fn main() {
         .arg(
             Arg::with_name("av1")
                 .long("av1")
-                .help("Encode to AV1 using rav1e (default QP: 30)"),
+                .help("Encode to AV1 using aomenc (default QP: 30)"),
+        )
+        .arg(
+            Arg::with_name("rav1e")
+                .long("rav1e")
+                .help("Encode to AV1 using rav1e (default QP: 60)"),
         )
         .arg(
             Arg::with_name("x265")
@@ -156,6 +161,8 @@ fn main() {
         Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
         Encoder::Aom
+    } else if args.is_present("rav1e") {
+        Encoder::Rav1e
     } else if args.is_present("x265") {
         Encoder::X265
     } else {
@@ -340,7 +347,9 @@ fn process_file(
             Encoder::Aom => convert_video_av1(input, crf, speed, dims, profile, is_hdr, true),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => convert_video_av1an_rav1e(input, crf, dims, profile, is_hdr, true),
+            Encoder::Rav1e => {
+                convert_video_av1an_rav1e(input, crf, speed, dims, profile, is_hdr, true)
+            }
         }?;
     }
     if target == Target::Local {

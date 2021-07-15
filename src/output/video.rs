@@ -474,6 +474,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
 pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
     input: P,
     crf: u8,
+    speed: Option<u8>,
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
@@ -545,16 +546,10 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("rav1e")
         .arg("-v")
         .arg(&format!(
-            "--speed=5 --min-quantizer={} --bitrate={} --tile-cols={} --tile-rows=0 \
-             --primaries={} --transfer={} --matrix={}",
+            "--speed={} --quantizer={} --tile-cols={} --tile-rows=0 --primaries={} --transfer={} \
+             --matrix={} --no-scene-detection",
+            speed.unwrap_or(4),
             crf,
-            if dimensions.width >= 1440 {
-                "50000"
-            } else if dimensions.width >= 1200 {
-                "30000"
-            } else {
-                "16000"
-            },
             if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {
                 "BT2020"
@@ -578,8 +573,6 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
                 "BT601"
             }
         ))
-        .arg("--split_method")
-        .arg("aom_keyframes")
         .arg("-xs")
         .arg(
             match profile {
