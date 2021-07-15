@@ -23,8 +23,7 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
             .arg("0:und")
             .arg("(")
             .arg(match encoder {
-                Encoder::Rav1e => input.with_extension("out.ivf"),
-                Encoder::X264 | Encoder::Aom => input.with_extension("out.mkv"),
+                Encoder::X264 | Encoder::Aom | Encoder::Rav1e => input.with_extension("out.mkv"),
                 Encoder::X265 => input.with_extension("out.265"),
             })
             .arg(")")
