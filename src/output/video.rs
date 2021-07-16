@@ -87,8 +87,8 @@ impl X264Settings {
                 Profile::Anime => fps.round() as usize * 30 / 2,
             },
             qcomp: match profile {
-                Profile::Film | Profile::Fast => 0.7,
-                Profile::Anime => 0.6,
+                Profile::Film | Profile::Fast => 0.75,
+                Profile::Anime => 0.65,
             },
             merange: if dimensions.width > 1440 {
                 48
