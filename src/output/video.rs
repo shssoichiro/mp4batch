@@ -325,6 +325,7 @@ pub fn convert_video_x265(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn convert_video_av1<P: AsRef<Path>>(
     input: P,
     crf: u8,
@@ -333,6 +334,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     profile: Profile,
     is_hdr: bool,
     use_lossless: bool,
+    keep_lossless: bool,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     if use_lossless {
@@ -455,7 +457,9 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .map_err(|e| format!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
-        let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
+        if !keep_lossless {
+            let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
+        }
         // FIXME: This is still too slow.
         // let _ = Command::new("aomstats")
         //     .arg(input.as_ref().with_extension("out.mkv"))
@@ -471,6 +475,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
     input: P,
     crf: u8,
@@ -479,6 +484,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
     profile: Profile,
     is_hdr: bool,
     use_lossless: bool,
+    keep_lossless: bool,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     if use_lossless {
@@ -599,7 +605,9 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .map_err(|e| format!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
-        let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
+        if !keep_lossless {
+            let _ = fs::remove_file(input.as_ref().with_extension("lossless.mkv"));
+        }
         Ok(())
     } else {
         Err(format!(

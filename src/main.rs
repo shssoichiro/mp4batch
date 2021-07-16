@@ -126,15 +126,14 @@ fn main() {
                 .help("assume the video has already been encoded (will use .out.mkv files)"),
         )
         .arg(
+            Arg::with_name("keep-lossless")
+                .long("keep-lossless")
+                .help("don't delete the lossless intermediate encode"),
+        )
+        .arg(
             Arg::with_name("mp4")
                 .long("mp4")
                 .help("output to mp4 instead of mkv"),
-        )
-        .arg(
-            Arg::with_name("slots")
-                .long("slots")
-                .help("the number of local workers to use for rav1e encoding (default: auto)")
-                .takes_value(true),
         )
         .arg(
             Arg::with_name("speed")
@@ -291,7 +290,7 @@ fn main() {
                 audio_bitrate,
                 args.is_present("hdr"),
                 extension,
-                args.value_of("slots").map(|val| val.parse().unwrap()),
+                args.is_present("keep-lossless"),
             );
             if let Err(err) = result {
                 eprintln!(
@@ -318,7 +317,7 @@ fn main() {
             audio_bitrate,
             args.is_present("hdr"),
             extension,
-            args.value_of("slots").map(|val| val.parse().unwrap()),
+            args.is_present("keep-lossless"),
         )
         .unwrap();
     }
@@ -338,18 +337,34 @@ fn process_file(
     audio_bitrate: u32,
     is_hdr: bool,
     extension: &str,
-    _slots: Option<u8>,
+    keep_lossless: bool,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
         match encoder {
-            Encoder::Aom => convert_video_av1(input, crf, speed, dims, profile, is_hdr, true),
+            Encoder::Aom => convert_video_av1(
+                input,
+                crf,
+                speed,
+                dims,
+                profile,
+                is_hdr,
+                true,
+                keep_lossless,
+            ),
             Encoder::X264 => convert_video_x264(input, profile, crf, dims),
             Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => {
-                convert_video_av1an_rav1e(input, crf, speed, dims, profile, is_hdr, true)
-            }
+            Encoder::Rav1e => convert_video_av1an_rav1e(
+                input,
+                crf,
+                speed,
+                dims,
+                profile,
+                is_hdr,
+                true,
+                keep_lossless,
+            ),
         }?;
     }
     if target == Target::Local {
