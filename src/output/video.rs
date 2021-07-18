@@ -398,14 +398,14 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         } else {
             input.as_ref().to_path_buf()
         })
-        .arg("-enc")
+        .arg("-e")
         .arg("aom")
         .arg("-v")
         .arg(&format!(
-            "--cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
+            " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
              --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering=0 --tile-columns={} \
              --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
-             --transfer-characteristics={} --matrix-coefficients={}",
+             --transfer-characteristics={} --matrix-coefficients={} ",
             speed.unwrap_or(4),
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
@@ -431,7 +431,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                 "bt601"
             }
         ))
-        .arg("-xs")
+        .arg("-x")
         .arg(
             match profile {
                 Profile::Film | Profile::Fast => fps * 10,
@@ -439,7 +439,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             }
             .to_string(),
         )
-        .arg("--min_scene_len")
+        .arg("--min-scene-len")
         .arg(
             match profile {
                 Profile::Film | Profile::Fast => fps,
@@ -548,12 +548,12 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         } else {
             input.as_ref().to_path_buf()
         })
-        .arg("-enc")
+        .arg("-e")
         .arg("rav1e")
         .arg("-v")
         .arg(&format!(
-            "--speed={} --quantizer={} --tile-cols={} --tile-rows=0 --primaries={} --transfer={} \
-             --matrix={} --no-scene-detection",
+            " --speed={} --quantizer={} --tile-cols={} --tile-rows=0 --primaries={} --transfer={} \
+             --matrix={} --no-scene-detection ",
             speed.unwrap_or(4),
             crf,
             if dimensions.width >= 1200 { 1 } else { 0 },
@@ -579,7 +579,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
                 "BT601"
             }
         ))
-        .arg("-xs")
+        .arg("-x")
         .arg(
             match profile {
                 Profile::Film | Profile::Fast => fps * 10,
@@ -587,7 +587,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             }
             .to_string(),
         )
-        .arg("--min_scene_len")
+        .arg("--min-scene-len")
         .arg(
             match profile {
                 Profile::Film | Profile::Fast => fps,
