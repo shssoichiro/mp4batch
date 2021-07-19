@@ -450,6 +450,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-w")
         .arg(if dimensions.width >= 1200 { "10" } else { "16" })
         .arg("-r")
+        .arg("--verbose")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
     let status = command
@@ -598,6 +599,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         .arg("-w")
         .arg(if dimensions.width >= 1200 { "10" } else { "16" })
         .arg("-r")
+        .arg("--verbose")
         .arg("-o")
         .arg(input.as_ref().with_extension("out.mkv"));
     let status = command
