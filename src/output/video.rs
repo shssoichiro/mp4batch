@@ -349,6 +349,14 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         }
 
         if needs_encode {
+            // Print the info once
+            Command::new("vspipe")
+                .arg("-i")
+                .arg(input.as_ref())
+                .arg("-")
+                .status()
+                .unwrap();
+
             let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
             let pipe = if filename.ends_with(".vpy") {
                 Command::new("vspipe")
@@ -504,6 +512,14 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
         }
 
         if needs_encode {
+            // Print the info once
+            Command::new("vspipe")
+                .arg("-i")
+                .arg(input.as_ref())
+                .arg("-")
+                .status()
+                .unwrap();
+
             let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
             let pipe = if filename.ends_with(".vpy") {
                 Command::new("vspipe")
