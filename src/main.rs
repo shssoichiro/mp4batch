@@ -7,6 +7,7 @@ mod output;
 use std::{env, path::Path, str::FromStr};
 
 use clap::{App, Arg};
+use glob::glob;
 use itertools::Itertools;
 
 use self::{input::*, output::*};
@@ -206,22 +207,14 @@ fn main() {
             .map(|t| t.parse().unwrap())
             .unwrap_or(0);
         if input.is_dir() {
-            let dir_entries = input.read_dir().unwrap();
-            for entry in dir_entries
-                .map(|e| e.unwrap())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default()
-                        == "mkv"
-                })
-                .sorted_by_key(|e| e.path())
+            for entry in glob(&format!("{}/**/*.mkv", input.to_string_lossy()))
+                .unwrap()
+                .filter_map(Result::ok)
+                .sorted()
             {
-                let audio_track = find_external_audio(&entry.path(), track);
+                let audio_track = find_external_audio(&entry, track);
                 let result = process_direct(
-                    &entry.path(),
+                    &entry,
                     audio_track,
                     args.value_of("acodec").unwrap_or("copy"),
                     audio_bitrate,
@@ -230,7 +223,7 @@ fn main() {
                 if let Err(err) = result {
                     eprintln!(
                         "An error occurred for {}: {}",
-                        entry.path().as_os_str().to_string_lossy(),
+                        entry.as_os_str().to_string_lossy(),
                         err
                     );
                 }
@@ -261,24 +254,14 @@ fn main() {
     }
 
     if input.is_dir() {
-        let dir_entries = input.read_dir().unwrap();
-        for entry in dir_entries
+        for entry in glob(&format!("{}/**/*.vpy", input.to_string_lossy()))
+            .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                let ext = e
-                    .path()
-                    .extension()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default()
-                    .to_string();
-                ext == "vpy"
-            })
-            .sorted_by_key(|e| e.path())
+            .sorted()
         {
-            let audio_track = find_external_audio(&entry.path(), audio_track);
+            let audio_track = find_external_audio(&entry, audio_track);
             let result = process_file(
-                &entry.path(),
+                &entry,
                 encoder,
                 profile,
                 target,
@@ -295,7 +278,7 @@ fn main() {
             if let Err(err) = result {
                 eprintln!(
                     "An error occurred for {}: {}",
-                    entry.path().as_os_str().to_string_lossy(),
+                    entry.as_os_str().to_string_lossy(),
                     err
                 );
             }
