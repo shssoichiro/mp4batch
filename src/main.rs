@@ -325,30 +325,41 @@ fn process_file(
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
     if !skip_video {
-        match encoder {
-            Encoder::Aom => convert_video_av1(
-                input,
-                crf,
-                speed,
-                dims,
-                profile,
-                is_hdr,
-                true,
-                keep_lossless,
-            ),
-            Encoder::X264 => convert_video_x264(input, profile, crf, dims),
-            Encoder::X265 => convert_video_x265(input, profile, crf, dims),
-            Encoder::Rav1e => convert_video_av1an_rav1e(
-                input,
-                crf,
-                speed,
-                dims,
-                profile,
-                is_hdr,
-                true,
-                keep_lossless,
-            ),
-        }?;
+        loop {
+            let result = match encoder {
+                Encoder::Aom => convert_video_av1(
+                    input,
+                    crf,
+                    speed,
+                    dims,
+                    profile,
+                    is_hdr,
+                    true,
+                    keep_lossless,
+                ),
+                Encoder::X264 => convert_video_x264(input, profile, crf, dims),
+                Encoder::X265 => convert_video_x265(input, profile, crf, dims),
+                Encoder::Rav1e => convert_video_av1an_rav1e(
+                    input,
+                    crf,
+                    speed,
+                    dims,
+                    profile,
+                    is_hdr,
+                    true,
+                    keep_lossless,
+                ),
+            };
+            // I hate this lazy workaround,
+            // but this is due to a heisenbug in DFTTest
+            // due to some sort of race condition,
+            // which causes crashes often enough to be annoying.
+            //
+            // Essentially, we retry the encode until it works.
+            if result.is_ok() {
+                break;
+            }
+        }
     }
     if target == Target::Local {
         // TODO: Handle audio and muxing for dist encodes

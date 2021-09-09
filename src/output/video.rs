@@ -355,7 +355,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                 .arg(input.as_ref())
                 .arg("-")
                 .status()
-                .unwrap();
+                .map_err(|e| format!("Failed to execute vspipe -i: {}", e))?;
 
             let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
             let pipe = if filename.ends_with(".vpy") {
@@ -397,6 +397,12 @@ pub fn convert_video_av1<P: AsRef<Path>>(
                     "Failed to execute ffmpeg: Exited with code {:x}",
                     status.code().unwrap()
                 ));
+            }
+
+            if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+                if lossless_frames != dimensions.frames {
+                    return Err("Incomlete lossless encode".to_string());
+                }
             }
         }
     }
