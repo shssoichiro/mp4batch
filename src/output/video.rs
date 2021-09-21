@@ -657,7 +657,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
     }
 }
 
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 #[allow(dead_code)]
 pub fn convert_video_rav1e<P: AsRef<Path>>(
     input: P,

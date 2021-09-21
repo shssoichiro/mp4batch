@@ -43,7 +43,7 @@ pub fn convert_audio(
         .arg("-i")
         .arg(match audio_track {
             AudioTrack::FromVideo(_) => input,
-            AudioTrack::External(ref path, _) => &path,
+            AudioTrack::External(ref path, _) => path,
         })
         .arg("-acodec");
     match audio_codec {
@@ -74,7 +74,7 @@ pub fn convert_audio(
                         * get_channel_count(
                             match audio_track {
                                 AudioTrack::FromVideo(_) => input,
-                                AudioTrack::External(ref path, _) => &path,
+                                AudioTrack::External(ref path, _) => path,
                             },
                             &audio_track
                         )
