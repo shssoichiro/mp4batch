@@ -450,7 +450,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             }
         ))
         .arg("--sc-method")
-        .arg("slow")
+        .arg("standard")
         .arg("--sc-downscale-height")
         .arg("720")
         .arg("-x")
@@ -615,7 +615,7 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             }
         ))
         .arg("--sc-method")
-        .arg("slow")
+        .arg("standard")
         .arg("--sc-downscale-height")
         .arg("720")
         .arg("-x")
