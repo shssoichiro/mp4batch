@@ -470,7 +470,14 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             .to_string(),
         )
         .arg("-w")
-        .arg(if dimensions.width >= 1200 { "10" } else { "16" })
+        .arg(
+            if dimensions.width >= 1200 {
+                num_cpus::get() / 2 + num_cpus::get() / 8
+            } else {
+                num_cpus::get()
+            }
+            .to_string(),
+        )
         .arg("-r")
         .arg("--verbose")
         .arg("-o")
@@ -635,7 +642,14 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             .to_string(),
         )
         .arg("-w")
-        .arg(if dimensions.width >= 1200 { "10" } else { "16" })
+        .arg(
+            if dimensions.width >= 1200 {
+                num_cpus::get() / 2 + num_cpus::get() / 8
+            } else {
+                num_cpus::get()
+            }
+            .to_string(),
+        )
         .arg("-r")
         .arg("--verbose")
         .arg("-o")
