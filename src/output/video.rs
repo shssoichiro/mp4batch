@@ -421,8 +421,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering=0 --tile-columns={} \
-             --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
+             --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering=0 --arnr-strength=4 \
+             --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
              --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
             speed.unwrap_or(4),
             crf,
