@@ -35,6 +35,27 @@ impl FromStr for Profile {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Compat {
+    Dxva,
+    Normal,
+    None,
+}
+
+impl FromStr for Compat {
+    type Err = &'static str;
+    fn from_str(input: &str) -> std::result::Result<Self, <Self as std::str::FromStr>::Err> {
+        Ok(match input.to_lowercase().as_str() {
+            "dxva" => Compat::Dxva,
+            "normal" => Compat::Normal,
+            "none" => Compat::None,
+            _ => {
+                return Err("Valid compat values are 'dxva', 'normal', or 'none'");
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct X264Settings {
     pub profile: Profile,
@@ -103,7 +124,11 @@ impl X264Settings {
         }
     }
 
-    pub fn apply_to_command<'a>(&self, command: &'a mut Command) -> &'a mut Command {
+    pub fn apply_to_command<'a>(
+        &self,
+        command: &'a mut Command,
+        compat: Compat,
+    ) -> &'a mut Command {
         command
             .arg("--crf")
             .arg(self.crf.to_string())
@@ -113,8 +138,6 @@ impl X264Settings {
             } else {
                 "veryslow"
             })
-            .arg("--level")
-            .arg("4.1")
             .arg("--bframes")
             .arg(self.b_frames.to_string())
             .arg("--psy-rd")
@@ -141,10 +164,6 @@ impl X264Settings {
             .arg("1.20")
             .arg("--no-fast-pskip")
             .arg("--no-dct-decimate")
-            .arg("--vbv-maxrate")
-            .arg("50000")
-            .arg("--vbv-bufsize")
-            .arg("78125")
             .arg("--colormatrix")
             .arg(self.colorspace.to_string())
             .arg("--colorprim")
@@ -153,6 +172,21 @@ impl X264Settings {
             .arg(self.colorspace.to_string())
             .arg("--output-depth")
             .arg(self.bit_depth.to_string());
+        match compat {
+            Compat::Dxva => {
+                command
+                    .arg("--level")
+                    .arg("4.1")
+                    .arg("--vbv-maxrate")
+                    .arg("50000")
+                    .arg("--vbv-bufsize")
+                    .arg("78125");
+            }
+            Compat::Normal => (),
+            Compat::None => {
+                command.arg("--open-gop");
+            }
+        }
         match self.pixel_format {
             PixelFormat::Yuv422 => {
                 command
@@ -179,11 +213,12 @@ pub fn convert_video_x264(
     profile: Profile,
     crf: u8,
     dimensions: VideoDimensions,
+    compat: Compat,
 ) -> Result<(), String> {
     let settings = X264Settings::new(crf, profile, dimensions);
     let mut command = Command::new("x264");
     settings
-        .apply_to_command(&mut command)
+        .apply_to_command(&mut command, compat)
         .arg("--output")
         .arg(input.with_extension("out.mkv"))
         .arg("-");
@@ -335,6 +370,7 @@ pub fn convert_video_av1<P: AsRef<Path>>(
     is_hdr: bool,
     use_lossless: bool,
     keep_lossless: bool,
+    compat: Compat,
 ) -> Result<(), String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     if use_lossless {
@@ -421,11 +457,12 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         .arg("-v")
         .arg(&format!(
             " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
-             --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering=0 --arnr-strength=4 \
+             --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering={} --arnr-strength=4 \
              --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
              --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
             speed.unwrap_or(4),
             crf,
+            if compat == Compat::None { 2 } else { 0 },
             if dimensions.width >= 1200 { 1 } else { 0 },
             if is_hdr {
                 "bt2020"

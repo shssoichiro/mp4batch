@@ -146,6 +146,14 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("compat")
+                .long("compat")
+                .help("defines the compatibility level to use for encoding")
+                .takes_value(true)
+                .possible_values(&["dxva", "normal", "none"])
+                .default_value("normal"),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -199,6 +207,7 @@ fn main() {
         .parse::<u32>()
         .unwrap();
     let extension = if args.is_present("mp4") { "mp4" } else { "mkv" };
+    let compat = Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap();
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
@@ -276,6 +285,7 @@ fn main() {
                 args.is_present("hdr"),
                 extension,
                 args.is_present("keep-lossless"),
+                compat,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -303,6 +313,7 @@ fn main() {
             args.is_present("hdr"),
             extension,
             args.is_present("keep-lossless"),
+            compat,
         )
         .unwrap();
     }
@@ -323,6 +334,7 @@ fn process_file(
     is_hdr: bool,
     extension: &str,
     keep_lossless: bool,
+    compat: Compat,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -338,8 +350,10 @@ fn process_file(
                     is_hdr,
                     true,
                     keep_lossless,
+                    compat,
                 ),
-                Encoder::X264 => convert_video_x264(input, profile, crf, dims),
+                Encoder::X264 => convert_video_x264(input, profile, crf, dims, compat),
+                // TODO: Support x265 dxva options
                 Encoder::X265 => convert_video_x265(input, profile, crf, dims),
                 Encoder::Rav1e => convert_video_av1an_rav1e(
                     input,
