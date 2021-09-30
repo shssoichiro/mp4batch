@@ -454,6 +454,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
         })
         .arg("-e")
         .arg("aom")
+        .arg("-c")
+        .arg("mkvmerge")
         .arg("-v")
         .arg(&format!(
             " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
