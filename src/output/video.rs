@@ -225,7 +225,8 @@ pub fn convert_video_x264(
     let filename = input.file_name().unwrap().to_str().unwrap();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
-            .arg("--y4m")
+            .arg("-c")
+            .arg("y4m")
             .arg(input)
             .arg("-")
             .stdout(Stdio::piped())
@@ -265,7 +266,8 @@ pub fn convert_video_x265(
     let filename = input.file_name().unwrap().to_str().unwrap();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
-            .arg("--y4m")
+            .arg("-c")
+            .arg("y4m")
             .arg(input)
             .arg("-")
             .stdout(Stdio::piped())
@@ -396,7 +398,8 @@ pub fn convert_video_av1<P: AsRef<Path>>(
             let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
             let pipe = if filename.ends_with(".vpy") {
                 Command::new("vspipe")
-                    .arg("--y4m")
+                    .arg("-c")
+                    .arg("y4m")
                     .arg(input.as_ref())
                     .arg("-")
                     .stdout(Stdio::piped())
@@ -579,7 +582,8 @@ pub fn convert_video_av1an_rav1e<P: AsRef<Path>>(
             let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
             let pipe = if filename.ends_with(".vpy") {
                 Command::new("vspipe")
-                    .arg("--y4m")
+                    .arg("-c")
+                    .arg("y4m")
                     .arg(input.as_ref())
                     .arg("-")
                     .stdout(Stdio::piped())
@@ -724,7 +728,8 @@ pub fn convert_video_rav1e<P: AsRef<Path>>(
     let filename = input.as_ref().file_name().unwrap().to_str().unwrap();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
-            .arg("--y4m")
+            .arg("-c")
+            .arg("y4m")
             .arg(input.as_ref())
             .arg("-")
             .stdout(Stdio::piped())
