@@ -178,7 +178,7 @@ pub fn convert_video_av1an(
         )
         .arg("-w")
         .arg(
-            if (encoder == Encoder::Aom || encoder == Encoder::Rav1e) && dimensions.width >= 1200 {
+            if encoder.has_tiling() && dimensions.width >= 1200 {
                 num_cpus::get() / 2 + num_cpus::get() / 8
             } else {
                 num_cpus::get()
@@ -239,6 +239,10 @@ impl Encoder {
             Encoder::X264 => build_x264_args_string(crf, dimensions, profile, compat),
             Encoder::X265 => build_x265_args_string(crf, dimensions, profile),
         }
+    }
+
+    pub fn has_tiling(&self) -> bool {
+        *self == Encoder::Aom || *self == Encoder::Rav1e
     }
 }
 
@@ -326,7 +330,7 @@ fn build_x265_args_string(crf: u8, dimensions: VideoDimensions, profile: Profile
     format!(
         " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut \
          --limit-sao --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} \
-         --colormatrix {} --colorprim {} --transfer {} --output-depth {} ",
+         --colormatrix {} --colorprim {} --transfer {} --output-depth {} --frame-threads 1 ",
         crf,
         match profile {
             Profile::Film => 5,
@@ -363,7 +367,7 @@ fn build_x264_args_string(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
          250 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
          1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} {} {} ",
+         --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
         if profile == Profile::Fast {
             "faster"
