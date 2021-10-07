@@ -256,13 +256,12 @@ fn build_aom_args_string(
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
          --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering={} --arnr-strength=4 \
-         --tile-columns={} --tile-rows=0 --threads={} --row-mt=0 --color-primaries={} \
+         --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
         if compat == Compat::None { 2 } else { 0 },
         if dimensions.width >= 1200 { 1 } else { 0 },
-        if dimensions.width >= 1200 { 4 } else { 2 },
         if is_hdr {
             "bt2020"
         } else if dimensions.height >= 576 {
@@ -368,7 +367,7 @@ fn build_x264_args_string(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
          250 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
          1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} {} {} --threads 2 ",
+         --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
         if profile == Profile::Fast {
             "faster"
