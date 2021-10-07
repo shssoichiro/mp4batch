@@ -254,7 +254,7 @@ fn build_aom_args_string(
     compat: Compat,
 ) -> String {
     format!(
-        " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=35 --enable-fwd-kf=1 \
+        " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
          --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering={} --arnr-strength=4 \
          --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
