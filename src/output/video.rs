@@ -187,7 +187,7 @@ pub fn convert_video_av1an(
         )
         .arg("--pix-format")
         .arg(if dimensions.bit_depth == 8 {
-            "yuv420p8"
+            "yuv420p"
         } else {
             "yuv420p10le"
         })
