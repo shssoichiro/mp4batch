@@ -14,46 +14,11 @@ use itertools::Itertools;
 
 use self::{input::*, output::*};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Target {
-    Local,
-    Dist,
-}
-
-impl Default for Target {
-    fn default() -> Self {
-        Target::Local
-    }
-}
-
-impl FromStr for Target {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_ref() {
-            "local" => Target::Local,
-            "dist" => Target::Dist,
-            _ => {
-                return Err("Invalid target given".to_owned());
-            }
-        })
-    }
-}
-
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
     let args = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .arg(
-            Arg::with_name("target")
-                .short("t")
-                .long("target")
-                .value_name("VALUE")
-                .help(
-                    "The target audience for the encode (default: local, available: local, dist)",
-                ),
-        )
         .arg(
             Arg::with_name("profile")
                 .short("p")
@@ -167,8 +132,6 @@ fn main() {
     let input = args.value_of("input").expect(INPUT_PATH_ERROR);
     let profile = Profile::from_str(args.value_of("profile").unwrap_or("film"))
         .expect("Invalid profile given");
-    let target =
-        Target::from_str(args.value_of("target").unwrap_or("local")).expect("Invalid target given");
     let encoder = if args.is_present("av1") {
         Encoder::Aom
     } else if args.is_present("rav1e") {
@@ -275,7 +238,6 @@ fn main() {
                 &entry,
                 encoder,
                 profile,
-                target,
                 crf,
                 speed,
                 args.value_of("acodec").unwrap_or("copy"),
@@ -303,7 +265,6 @@ fn main() {
             input,
             encoder,
             profile,
-            target,
             crf,
             speed,
             args.value_of("acodec").unwrap_or("copy"),
@@ -324,7 +285,6 @@ fn process_file(
     input: &Path,
     encoder: Encoder,
     profile: Profile,
-    target: Target,
     crf: u8,
     speed: Option<u8>,
     audio_codec: &str,
@@ -362,11 +322,10 @@ fn process_file(
             }
         }
     }
-    if target == Target::Local {
-        // TODO: Handle audio and muxing for dist encodes
-        convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
-        mux_video(input, encoder, extension)?;
-    }
+
+    convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
+    mux_video(input, encoder, extension)?;
+
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
