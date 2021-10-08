@@ -185,6 +185,12 @@ pub fn convert_video_av1an(
             }
             .to_string(),
         )
+        .arg("--pix-format")
+        .arg(if dimensions.bit_depth == 8 {
+            "yuv420p8"
+        } else {
+            "yuv420p10le"
+        })
         .arg("-r")
         .arg("--verbose")
         .arg("-o")
