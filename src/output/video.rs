@@ -186,10 +186,13 @@ pub fn convert_video_av1an(
             .to_string(),
         )
         .arg("--pix-format")
-        .arg(if dimensions.bit_depth == 8 {
-            "yuv420p"
-        } else {
-            "yuv420p10le"
+        .arg(match (dimensions.bit_depth, dimensions.pixel_format) {
+            (8, PixelFormat::Yuv420) => "yuv420p".to_string(),
+            (8, PixelFormat::Yuv422) => "yuv422p".to_string(),
+            (8, PixelFormat::Yuv444) => "yuv444p".to_string(),
+            (bd, PixelFormat::Yuv420) => format!("yuv420p{}le", bd),
+            (bd, PixelFormat::Yuv422) => format!("yuv422p{}le", bd),
+            (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
         })
         .arg("-r")
         .arg("--verbose")
@@ -261,11 +264,13 @@ fn build_aom_args_string(
 ) -> String {
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
-         --qm-min=5 --quant-b-adapt=1 --enable-keyframe-filtering={} --arnr-strength=4 \
-         --sharpness=2 --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
-         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
+         --deltaq-mode={} --enable-tpl-model=1 --qm-min=5 --quant-b-adapt=1 \
+         --enable-keyframe-filtering={} --arnr-strength=4 --sharpness=2 --tile-columns={} \
+         --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
+         --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
+        if is_hdr { 5 } else { 1 },
         if compat == Compat::None { 2 } else { 0 },
         if dimensions.width >= 1200 { 1 } else { 0 },
         if is_hdr {
