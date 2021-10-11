@@ -266,7 +266,7 @@ fn build_aom_args_string(
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
          --deltaq-mode=1 --enable-chroma-deltaq=1 --enable-tpl-model=1 --qm-min=5 --quant-b-adapt=1 \
-         --enable-keyframe-filtering={} --arnr-strength=4 --arnr-max-frames={} --sharpness=2 \
+         --enable-keyframe-filtering={} --arnr-strength=4 --arnr-maxframes={} --sharpness=2 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
          --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
