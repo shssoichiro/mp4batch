@@ -243,7 +243,7 @@ impl Encoder {
         compat: Compat,
     ) -> String {
         match self {
-            Encoder::Aom => build_aom_args_string(crf, speed, dimensions, is_hdr, compat),
+            Encoder::Aom => build_aom_args_string(crf, speed, dimensions, profile, is_hdr, compat),
             Encoder::Rav1e => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
             Encoder::X264 => build_x264_args_string(crf, dimensions, profile, compat),
             Encoder::X265 => build_x265_args_string(crf, dimensions, profile),
@@ -259,19 +259,21 @@ fn build_aom_args_string(
     crf: u8,
     speed: Option<u8>,
     dimensions: VideoDimensions,
+    profile: Profile,
     is_hdr: bool,
     compat: Compat,
 ) -> String {
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
          --deltaq-mode={} --enable-tpl-model=1 --qm-min=5 --quant-b-adapt=1 \
-         --enable-keyframe-filtering={} --arnr-strength=4 --sharpness=2 \
+         --enable-keyframe-filtering={} --arnr-strength=4 --arnr-max-frames={} --sharpness=2 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
          --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
         if compat == Compat::None { 2 } else { 0 },
+        if profile == Profile::Anime { 15 } else { 7 },
         if dimensions.width >= 1200 { 1 } else { 0 },
         if is_hdr {
             "bt2020"
