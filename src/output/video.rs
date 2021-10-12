@@ -180,6 +180,14 @@ pub fn convert_video_av1an(
         .arg(
             if encoder.has_tiling() && dimensions.width >= 1200 {
                 num_cpus::get() / 2 + num_cpus::get() / 8
+            } else if encoder.tons_of_lookahead() {
+                if dimensions.width >= 1200 {
+                    std::cmp::min(6, num_cpus::get())
+                } else if dimensions.width >= 1024 {
+                    std::cmp::min(10, num_cpus::get())
+                } else {
+                    num_cpus::get()
+                }
             } else {
                 num_cpus::get()
             }
@@ -252,6 +260,10 @@ impl Encoder {
 
     pub fn has_tiling(&self) -> bool {
         *self == Encoder::Aom || *self == Encoder::Rav1e
+    }
+
+    pub fn tons_of_lookahead(&self) -> bool {
+        *self == Encoder::X264
     }
 }
 
