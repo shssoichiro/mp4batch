@@ -152,8 +152,6 @@ pub fn convert_video_av1an(
         .arg(input.with_extension("lossless.mkv"))
         .arg("-e")
         .arg(encoder.get_av1an_name())
-        .arg("-c")
-        .arg("mkvmerge")
         .arg("-v")
         .arg(&encoder.get_args_string(crf, speed, dimensions, profile, is_hdr, compat))
         .arg("--sc-method")
@@ -251,7 +249,7 @@ impl Encoder {
         compat: Compat,
     ) -> String {
         match self {
-            Encoder::Aom => build_aom_args_string(crf, speed, dimensions, profile, is_hdr, compat),
+            Encoder::Aom => build_aom_args_string(crf, speed, dimensions, profile, is_hdr),
             Encoder::Rav1e => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
             Encoder::X264 => build_x264_args_string(crf, dimensions, profile, compat),
             Encoder::X265 => build_x265_args_string(crf, dimensions, profile),
@@ -273,19 +271,17 @@ fn build_aom_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
-    compat: Compat,
 ) -> String {
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
          --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 \
-         --min-q=1 --enable-keyframe-filtering={} --arnr-strength=4 --arnr-maxframes={} \
-         --sharpness=2 --enable-dnl-denoising=0 --tune=image_perceptual_quality --tile-columns={} \
-         --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
-         --matrix-coefficients={} --disable-kf ",
+         --min-q=1 --enable-keyframe-filtering=0 --arnr-strength=4 --arnr-maxframes={} \
+         --sharpness=2 --enable-dnl-denoising=0 --disable-trellis-quant=0 \
+         --tune=image_perceptual_quality --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
-        if compat == Compat::None { 2 } else { 0 },
         if profile == Profile::Anime { 15 } else { 7 },
         if dimensions.width >= 1200 { 1 } else { 0 },
         if is_hdr {
