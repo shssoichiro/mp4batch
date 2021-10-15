@@ -99,6 +99,11 @@ fn main() {
                 .help("don't delete the lossless intermediate encode"),
         )
         .arg(
+            Arg::with_name("lossless-only")
+                .long("lossless-only")
+                .help("quit after making the lossless video"),
+        )
+        .arg(
             Arg::with_name("mp4")
                 .long("mp4")
                 .help("output to mp4 instead of mkv"),
@@ -247,6 +252,7 @@ fn main() {
                 args.is_present("hdr"),
                 extension,
                 args.is_present("keep-lossless"),
+                args.is_present("lossless-only"),
                 compat,
             );
             if let Err(err) = result {
@@ -274,6 +280,7 @@ fn main() {
             args.is_present("hdr"),
             extension,
             args.is_present("keep-lossless"),
+            args.is_present("lossless-only"),
             compat,
         )
         .unwrap();
@@ -294,6 +301,7 @@ fn process_file(
     is_hdr: bool,
     extension: &str,
     keep_lossless: bool,
+    lossless_only: bool,
     compat: Compat,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
@@ -309,6 +317,7 @@ fn process_file(
                 profile,
                 is_hdr,
                 keep_lossless,
+                lossless_only,
                 compat,
             );
             // I hate this lazy workaround,

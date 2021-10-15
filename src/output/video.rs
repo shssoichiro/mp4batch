@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::Path,
-    process::{Command, Stdio},
+    process::{exit, Command, Stdio},
     str::FromStr,
 };
 
@@ -63,6 +63,7 @@ fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), Stri
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
             if lossless_frames == dimensions.frames {
                 needs_encode = false;
+                eprintln!("Lossless already exists");
             }
         }
     }
@@ -139,9 +140,13 @@ pub fn convert_video_av1an(
     profile: Profile,
     is_hdr: bool,
     keep_lossless: bool,
+    lossless_only: bool,
     compat: Compat,
 ) -> Result<(), String> {
     create_lossless(input, dimensions)?;
+    if lossless_only {
+        exit(0);
+    }
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
 
