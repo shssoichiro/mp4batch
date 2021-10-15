@@ -283,7 +283,8 @@ fn build_aom_args_string(
          --min-q=1 --enable-keyframe-filtering=0 --arnr-strength=4 --arnr-maxframes={} \
          --sharpness=2 --enable-dnl-denoising=0 --disable-trellis-quant=0 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
-         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf \
+         --kf-max-dist=9999 ",
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
