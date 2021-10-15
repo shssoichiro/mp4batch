@@ -274,11 +274,11 @@ fn build_aom_args_string(
 ) -> String {
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
-         --deltaq-mode={} --quant-b-adapt=1 --enable-qm=1 --qm-min=0 --min-q=1 \
-         --enable-keyframe-filtering=0 --arnr-strength=4 --arnr-maxframes={} --sharpness=2 \
-         --enable-dnl-denoising=0 --disable-trellis-quant=0 --tune=image_perceptual_quality \
-         --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} \
-         --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
+         --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 \
+         --min-q=1 --enable-keyframe-filtering=0 --arnr-strength=4 --arnr-maxframes={} \
+         --sharpness=2 --enable-dnl-denoising=0 --disable-trellis-quant=0 \
+         --tune=image_perceptual_quality --tile-columns={} --tile-rows=0 --threads=4 --row-mt=0 \
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
