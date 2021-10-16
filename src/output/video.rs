@@ -161,8 +161,6 @@ pub fn convert_video_av1an(
         .arg(&encoder.get_args_string(crf, speed, dimensions, profile, is_hdr, compat))
         .arg("--sc-method")
         .arg("standard")
-        .arg("--sc-downscale-height")
-        .arg("720")
         .arg("-x")
         .arg(
             match profile {
