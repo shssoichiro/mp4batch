@@ -325,7 +325,7 @@ fn build_aom_args_string(
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
-        if grain > 0 { 3 } else { 4 },
+        if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
         if dimensions.width >= 2400 {
