@@ -124,6 +124,13 @@ fn main() {
                 .default_value("normal"),
         )
         .arg(
+            Arg::with_name("grain")
+                .long("grain")
+                .value_name("VALUE")
+                .help("Grain synthesis noise level (0-50, aomenc only)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -176,6 +183,10 @@ fn main() {
         .unwrap();
     let extension = if args.is_present("mp4") { "mp4" } else { "mkv" };
     let compat = Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap();
+    let grain = args
+        .value_of("grain")
+        .map(|val| val.parse::<u8>().unwrap())
+        .unwrap_or(0);
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
@@ -254,6 +265,7 @@ fn main() {
                 args.is_present("keep-lossless"),
                 args.is_present("lossless-only"),
                 compat,
+                grain,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -282,6 +294,7 @@ fn main() {
             args.is_present("keep-lossless"),
             args.is_present("lossless-only"),
             compat,
+            grain,
         )
         .unwrap();
     }
@@ -303,6 +316,7 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     compat: Compat,
+    grain: u8,
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
@@ -319,6 +333,7 @@ fn process_file(
                 keep_lossless,
                 lossless_only,
                 compat,
+                grain,
             );
             // I hate this lazy workaround,
             // but this is due to a heisenbug in DFTTest
