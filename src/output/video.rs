@@ -220,6 +220,9 @@ pub fn convert_video_av1an(
         .arg("--verbose")
         .arg("-o")
         .arg(input.with_extension("out.mkv"));
+    if dimensions.height > 1200 {
+        command.arg("--sc-downscale-height").arg("1080");
+    }
     let status = command
         .status()
         .map_err(|e| format!("Failed to execute av1an: {}", e))?;
