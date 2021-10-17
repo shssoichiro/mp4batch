@@ -204,6 +204,7 @@ pub fn convert_video_av1an(
             (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
         })
         .arg("-r")
+        .arg("--vmaf")
         .arg("--verbose")
         .arg("-o")
         .arg(input.with_extension("out.mkv"));
