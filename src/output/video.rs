@@ -130,19 +130,12 @@ fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), Stri
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn convert_video_av1an(
     input: &Path,
     encoder: Encoder,
-    crf: u8,
-    speed: Option<u8>,
     dimensions: VideoDimensions,
-    profile: Profile,
-    is_hdr: bool,
     keep_lossless: bool,
     lossless_only: bool,
-    compat: Compat,
-    grain: u8,
 ) -> Result<(), String> {
     create_lossless(input, dimensions)?;
     if lossless_only {
@@ -159,22 +152,32 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(crf, speed, dimensions, profile, is_hdr, compat, grain))
+        .arg(&encoder.get_args_string(dimensions))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
         .arg(
-            match profile {
-                Profile::Film | Profile::Fast => fps * 10,
-                Profile::Anime => fps * 15,
+            match encoder {
+                Encoder::Aom { profile, .. }
+                | Encoder::Rav1e { profile, .. }
+                | Encoder::X264 { profile, .. }
+                | Encoder::X265 { profile, .. } => match profile {
+                    Profile::Film | Profile::Fast => fps * 10,
+                    Profile::Anime => fps * 15,
+                },
             }
             .to_string(),
         )
         .arg("--min-scene-len")
         .arg(
-            match profile {
-                Profile::Film | Profile::Fast => fps,
-                Profile::Anime => fps / 2,
+            match encoder {
+                Encoder::Aom { profile, .. }
+                | Encoder::Rav1e { profile, .. }
+                | Encoder::X264 { profile, .. }
+                | Encoder::X265 { profile, .. } => match profile {
+                    Profile::Film | Profile::Fast => fps,
+                    Profile::Anime => fps / 2,
+                },
             }
             .to_string(),
         )
@@ -225,49 +228,69 @@ pub fn convert_video_av1an(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum Encoder {
-    Aom,
-    Rav1e,
-    X264,
-    X265,
+    Aom {
+        crf: u8,
+        speed: Option<u8>,
+        profile: Profile,
+        is_hdr: bool,
+        grain: u8,
+    },
+    Rav1e {
+        crf: u8,
+        speed: Option<u8>,
+        profile: Profile,
+        is_hdr: bool,
+    },
+    X264 {
+        crf: u8,
+        profile: Profile,
+        compat: Compat,
+    },
+    X265 {
+        crf: u8,
+        profile: Profile,
+    },
 }
 
 impl Encoder {
     pub fn get_av1an_name(&self) -> &str {
         match self {
-            Encoder::Aom => "aom",
-            Encoder::Rav1e => "rav1e",
-            Encoder::X264 => "x264",
-            Encoder::X265 => "x265",
+            Encoder::Aom { .. } => "aom",
+            Encoder::Rav1e { .. } => "rav1e",
+            Encoder::X264 { .. } => "x264",
+            Encoder::X265 { .. } => "x265",
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn get_args_string(
-        &self,
-        crf: u8,
-        speed: Option<u8>,
-        dimensions: VideoDimensions,
-        profile: Profile,
-        is_hdr: bool,
-        compat: Compat,
-        grain: u8,
-    ) -> String {
+    pub fn get_args_string(&self, dimensions: VideoDimensions) -> String {
         match self {
-            Encoder::Aom => build_aom_args_string(crf, speed, dimensions, profile, is_hdr, grain),
-            Encoder::Rav1e => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
-            Encoder::X264 => build_x264_args_string(crf, dimensions, profile, compat),
-            Encoder::X265 => build_x265_args_string(crf, dimensions, profile),
+            Encoder::Aom {
+                crf,
+                speed,
+                profile,
+                is_hdr,
+                grain,
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain),
+            Encoder::Rav1e {
+                crf, speed, is_hdr, ..
+            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
+            Encoder::X264 {
+                crf,
+                profile,
+                compat,
+            } => build_x264_args_string(*crf, dimensions, *profile, *compat),
+            Encoder::X265 { crf, profile } => build_x265_args_string(*crf, dimensions, *profile),
         }
     }
 
     pub fn has_tiling(&self) -> bool {
-        *self == Encoder::Aom || *self == Encoder::Rav1e
+        matches!(self, Encoder::Aom { .. } | Encoder::Rav1e { .. })
     }
 
     pub fn tons_of_lookahead(&self) -> bool {
-        *self == Encoder::X264
+        matches!(self, Encoder::X264 { .. })
     }
 }
 
