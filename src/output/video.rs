@@ -183,19 +183,28 @@ pub fn convert_video_av1an(
         )
         .arg("-w")
         .arg(
-            if encoder.has_tiling() && dimensions.width >= 1200 {
-                num_cpus::get() / 2 + num_cpus::get() / 8
-            } else if encoder.tons_of_lookahead() {
-                if dimensions.width >= 1440 {
-                    std::cmp::min(6, num_cpus::get())
-                } else if dimensions.width >= 1024 {
-                    std::cmp::min(10, num_cpus::get())
+            std::cmp::max(
+                if encoder.has_tiling() {
+                    if dimensions.width >= 2400 {
+                        num_cpus::get() / 4
+                    } else if dimensions.width >= 1200 {
+                        num_cpus::get() / 2 + num_cpus::get() / 8
+                    } else {
+                        num_cpus::get()
+                    }
+                } else if encoder.tons_of_lookahead() {
+                    if dimensions.width >= 1440 {
+                        std::cmp::min(6, num_cpus::get())
+                    } else if dimensions.width >= 1024 {
+                        std::cmp::min(10, num_cpus::get())
+                    } else {
+                        num_cpus::get()
+                    }
                 } else {
                     num_cpus::get()
-                }
-            } else {
-                num_cpus::get()
-            }
+                },
+                1,
+            )
             .to_string(),
         )
         .arg("--pix-format")
@@ -308,7 +317,7 @@ fn build_aom_args_string(
          --min-q=1 --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} \
          --sharpness=2 --enable-dnl-denoising=0 --denoise-noise-level={} \
          --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
-         --tile-rows=0 --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
+         --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
          --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
         speed.unwrap_or(4),
         crf,
@@ -316,7 +325,14 @@ fn build_aom_args_string(
         if grain > 0 { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
-        if dimensions.width >= 1200 { 1 } else { 0 },
+        if dimensions.width >= 2400 {
+            2
+        } else if dimensions.width >= 1200 {
+            1
+        } else {
+            0
+        },
+        if dimensions.width >= 2400 { 1 } else { 0 },
         if is_hdr {
             "bt2020"
         } else if dimensions.height >= 576 {
@@ -348,11 +364,18 @@ fn build_rav1e_args_string(
     is_hdr: bool,
 ) -> String {
     format!(
-        " --speed={} --quantizer={} --tile-cols={} --tile-rows=0 --primaries={} --transfer={} \
+        " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
          --matrix={} --no-scene-detection --keyint 0 --min-keyint 0 ",
         speed.unwrap_or(4),
         crf,
-        if dimensions.width >= 1200 { 1 } else { 0 },
+        if dimensions.width >= 2400 {
+            4
+        } else if dimensions.width >= 1200 {
+            2
+        } else {
+            1
+        },
+        if dimensions.width >= 2400 { 2 } else { 1 },
         if is_hdr {
             "BT2020"
         } else if dimensions.height >= 576 {
