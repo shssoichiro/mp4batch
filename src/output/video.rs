@@ -248,6 +248,7 @@ pub enum Encoder {
         profile: Profile,
         is_hdr: bool,
         grain: u8,
+        compat: Compat,
     },
     Rav1e {
         crf: u8,
@@ -284,7 +285,10 @@ impl Encoder {
                 profile,
                 is_hdr,
                 grain,
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain),
+                compat,
+            } => {
+                build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain, *compat)
+            }
             Encoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
@@ -313,6 +317,7 @@ fn build_aom_args_string(
     profile: Profile,
     is_hdr: bool,
     grain: u8,
+    compat: Compat,
 ) -> String {
     format!(
         " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
@@ -321,7 +326,7 @@ fn build_aom_args_string(
          --sharpness=2 --enable-dnl-denoising=0 --denoise-noise-level={} \
          --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
          --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
-         --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
+         --matrix-coefficients={} --disable-kf --kf-max-dist=9999 {} ",
         speed.unwrap_or(4),
         crf,
         if is_hdr { 5 } else { 1 },
@@ -356,6 +361,11 @@ fn build_aom_args_string(
             "bt709"
         } else {
             "bt601"
+        },
+        if compat == Compat::Dxva {
+            "--profile=0 --target-seq-level-idx=0013"
+        } else {
+            ""
         }
     )
 }

@@ -160,6 +160,7 @@ fn main() {
                 .value_of("grain")
                 .map(|val| val.parse::<u8>().unwrap())
                 .unwrap_or(0),
+            compat: Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap(),
         }
     } else if args.is_present("rav1e") {
         Encoder::Rav1e {
