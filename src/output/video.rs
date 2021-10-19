@@ -200,6 +200,10 @@ pub fn convert_video_av1an(
                     } else {
                         num_cpus::get()
                     }
+                } else if dimensions.width >= 2400 {
+                    std::cmp::min(6, num_cpus::get())
+                } else if dimensions.width >= 1440 {
+                    std::cmp::min(10, num_cpus::get())
                 } else {
                     num_cpus::get()
                 },
@@ -429,7 +433,7 @@ fn build_x265_args_string(
         Profile::Anime | Profile::Fast => -1,
     };
     format!(
-        " --crf {} --preset slow --bframes {} --ref 6 --keyint -1 --min-keyint 1 --no-scenecut {} \
+        " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
          --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
          --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} --frame-threads 1 --y4m {} ",
