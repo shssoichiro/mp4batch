@@ -335,7 +335,7 @@ fn process_file(
     }
 
     convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
-    mux_video(input, encoder, extension)?;
+    mux_video(input, extension)?;
 
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())

@@ -8,7 +8,7 @@ use std::{
 
 pub use self::{audio::*, video::*};
 
-pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), String> {
+pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension(extension).file_name().unwrap());
 
@@ -22,12 +22,7 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
             .arg("--language")
             .arg("0:und")
             .arg("(")
-            .arg(match encoder {
-                Encoder::X264 { .. } | Encoder::Aom { .. } | Encoder::Rav1e { .. } => {
-                    input.with_extension("out.mkv")
-                }
-                Encoder::X265 { .. } => input.with_extension("out.265"),
-            })
+            .arg(input.with_extension("out.mkv"))
             .arg(")")
             .arg("--language")
             .arg("0:en")
@@ -49,11 +44,7 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
             .arg("level+error")
             .arg("-stats")
             .arg("-i")
-            .arg(match encoder {
-                Encoder::Rav1e { .. } => input.with_extension("out.ivf"),
-                Encoder::X264 { .. } | Encoder::Aom { .. } => input.with_extension("out.mkv"),
-                Encoder::X265 { .. } => input.with_extension("out.265"),
-            })
+            .arg(input.with_extension("out.mkv"))
             .arg("-i")
             .arg(input.with_extension("out.mka"))
             .arg("-vcodec")
