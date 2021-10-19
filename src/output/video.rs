@@ -463,9 +463,9 @@ fn build_x265_args_string(
         dimensions.bit_depth.to_string(),
         if compat == Compat::Dxva {
             if dimensions.bit_depth == 10 {
-                "--profile main10 --levelidc 5.1"
+                "--profile main10 --level-idc 5.1"
             } else {
-                "--profile main --levelidc 5.1"
+                "--profile main --level-idc 5.1"
             }
         } else {
             ""
