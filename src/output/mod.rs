@@ -38,8 +38,6 @@ pub fn mux_video(input: &Path, encoder: Encoder, extension: &str) -> Result<(), 
             .arg("(")
             .arg(input.with_extension("out.mka"))
             .arg(")")
-            .arg("--title")
-            .arg(output_path.file_stem().unwrap().to_string_lossy().as_ref())
             .arg("--track-order")
             .arg("0:0,1:0")
             .status()
