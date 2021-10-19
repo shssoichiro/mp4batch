@@ -264,6 +264,7 @@ pub enum Encoder {
     X265 {
         crf: u8,
         profile: Profile,
+        compat: Compat,
     },
 }
 
@@ -297,7 +298,11 @@ impl Encoder {
                 profile,
                 compat,
             } => build_x264_args_string(*crf, dimensions, *profile, *compat),
-            Encoder::X265 { crf, profile } => build_x265_args_string(*crf, dimensions, *profile),
+            Encoder::X265 {
+                crf,
+                profile,
+                compat,
+            } => build_x265_args_string(*crf, dimensions, *profile, *compat),
         }
     }
 
@@ -413,15 +418,21 @@ fn build_rav1e_args_string(
     )
 }
 
-fn build_x265_args_string(crf: u8, dimensions: VideoDimensions, profile: Profile) -> String {
+fn build_x265_args_string(
+    crf: u8,
+    dimensions: VideoDimensions,
+    profile: Profile,
+    compat: Compat,
+) -> String {
     let deblock = match profile {
         Profile::Film => -3,
         Profile::Anime | Profile::Fast => -1,
     };
     format!(
-        " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut \
-         --limit-sao --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} \
-         --colormatrix {} --colorprim {} --transfer {} --output-depth {} --frame-threads 1 ",
+        " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut --no-sao \
+         --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
+         --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
+         --transfer {} --output-depth {} --frame-threads 1 --y4m {} ",
         crf,
         match profile {
             Profile::Film => 5,
@@ -444,7 +455,16 @@ fn build_x265_args_string(crf: u8, dimensions: VideoDimensions, profile: Profile
         dimensions.colorspace.to_string(),
         dimensions.colorspace.to_string(),
         dimensions.colorspace.to_string(),
-        dimensions.bit_depth.to_string()
+        dimensions.bit_depth.to_string(),
+        if compat == Compat::Dxva {
+            if dimensions.bit_depth == 10 {
+                "--profile main10 --levelidc 5.1"
+            } else {
+                "--profile main --levelidc 5.1"
+            }
+        } else {
+            ""
+        }
     )
 }
 

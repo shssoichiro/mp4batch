@@ -144,6 +144,7 @@ fn main() {
     let input = args.value_of("input").expect(INPUT_PATH_ERROR);
     let profile = Profile::from_str(args.value_of("profile").unwrap_or("film"))
         .expect("Invalid profile given");
+    let compat = Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap();
     let encoder = if args.is_present("av1") {
         Encoder::Aom {
             crf: args
@@ -160,7 +161,7 @@ fn main() {
                 .value_of("grain")
                 .map(|val| val.parse::<u8>().unwrap())
                 .unwrap_or(0),
-            compat: Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap(),
+            compat,
         }
     } else if args.is_present("rav1e") {
         Encoder::Rav1e {
@@ -183,6 +184,7 @@ fn main() {
                 .parse::<u8>()
                 .expect(CRF_PARSE_ERROR),
             profile,
+            compat,
         }
     } else {
         Encoder::X264 {
@@ -192,7 +194,7 @@ fn main() {
                 .parse::<u8>()
                 .expect(CRF_PARSE_ERROR),
             profile,
-            compat: Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap(),
+            compat,
         }
     };
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
