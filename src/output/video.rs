@@ -425,11 +425,11 @@ fn build_x265_args_string(
     compat: Compat,
 ) -> String {
     let deblock = match profile {
-        Profile::Film => -3,
+        Profile::Film => -2,
         Profile::Anime | Profile::Fast => -1,
     };
     format!(
-        " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut --no-sao \
+        " --crf {} --preset slow --bframes {} --ref 6 --keyint -1 --min-keyint 1 --no-scenecut {} \
          --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
          --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} --frame-threads 1 --y4m {} ",
@@ -439,13 +439,18 @@ fn build_x265_args_string(
             Profile::Anime => 8,
             Profile::Fast => 3,
         },
+        if (profile == Profile::Anime && crf >= 17) || crf >= 19 {
+            "--limit-sao"
+        } else {
+            "--no-sao"
+        },
         format!("{}:{}", deblock, deblock),
         match profile {
             Profile::Film => "1.5",
             Profile::Anime | Profile::Fast => "1.0",
         },
         match profile {
-            Profile::Film => "4.0",
+            Profile::Film => "3.0",
             Profile::Anime | Profile::Fast => "1.5",
         },
         match profile {
