@@ -329,15 +329,20 @@ fn build_aom_args_string(
     compat: Compat,
 ) -> String {
     format!(
-        " --cpu-used={} --end-usage=q --cq-level={} --lag-in-frames=48 --enable-fwd-kf=1 \
-         --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 \
-         --min-q=1 --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} \
-         --sharpness=2 --enable-dnl-denoising=0 --denoise-noise-level={} \
-         --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
-         --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
-         --matrix-coefficients={} --disable-kf --kf-max-dist=9999 {} ",
+        " --cpu-used={} --cq-level={} {} --lag-in-frames=48 --enable-fwd-kf=1 --deltaq-mode={} \
+         --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 --min-q=1 \
+         --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} --sharpness=2 \
+         --enable-dnl-denoising=0 --denoise-noise-level={} --disable-trellis-quant=0 \
+         --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
         speed.unwrap_or(4),
         crf,
+        if compat == Compat::Dxva {
+            "--profile=0 --end-usage=cq --target-bitrate=40000 --buf-initial-sz=4000 \
+             --buf-optimal-sz=5000 --buf-sz=6000"
+        } else {
+            "--end-usage=q"
+        },
         if is_hdr { 5 } else { 1 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
@@ -371,11 +376,6 @@ fn build_aom_args_string(
         } else {
             "bt601"
         },
-        if compat == Compat::Dxva {
-            "--profile=0 --target-seq-level-idx=0013"
-        } else {
-            ""
-        }
     )
 }
 
