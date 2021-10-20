@@ -338,7 +338,7 @@ fn build_aom_args_string(
         speed.unwrap_or(4),
         crf,
         if compat == Compat::Dxva {
-            "--profile=0 --end-usage=cq --target-bitrate=40000 --buf-initial-sz=4000 \
+            "--profile=0 --end-usage=cq --target-bitrate=70000 --buf-initial-sz=4000 \
              --buf-optimal-sz=5000 --buf-sz=6000"
         } else {
             "--end-usage=q"
