@@ -334,7 +334,8 @@ fn build_aom_args_string(
          --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} --sharpness=2 \
          --enable-dnl-denoising=0 --denoise-noise-level={} --disable-trellis-quant=0 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
-         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf ",
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf \
+         --kf-max-dist=9999 ",
         speed.unwrap_or(4),
         crf,
         if compat == Compat::Dxva {
