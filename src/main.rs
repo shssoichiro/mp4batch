@@ -319,9 +319,24 @@ fn process_file(
 ) -> Result<(), String> {
     eprintln!("Converting {}", input.to_string_lossy());
     let dims = get_video_dimensions(input)?;
+
+    let hdr_info = match encoder {
+        Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
+            Some(get_hdr_info(&find_source_file(input))?)
+        }
+        _ => None,
+    };
+
     if !skip_video {
         loop {
-            let result = convert_video_av1an(input, encoder, dims, keep_lossless, lossless_only);
+            let result = convert_video_av1an(
+                input,
+                encoder,
+                dims,
+                keep_lossless,
+                lossless_only,
+                hdr_info.as_ref(),
+            );
             // I hate this lazy workaround,
             // but this is due to a heisenbug in DFTTest
             // due to some sort of race condition,

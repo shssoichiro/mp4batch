@@ -62,27 +62,31 @@ impl FromStr for HdrMasteringPrimaries {
     }
 }
 
+// These are stored as integers representing 1e4 * the float value
 #[derive(Debug, Clone, Copy)]
 pub struct HdrMasteringLuminance {
-    pub min: f32,
-    pub max: f32,
+    pub min: u32,
+    pub max: u32,
 }
 
 impl FromStr for HdrMasteringLuminance {
     type Err = String;
     fn from_str(s: &str) -> std::result::Result<Self, <Self as std::str::FromStr>::Err> {
+        let parse_val = |val: &str| -> u32 {
+            if val.contains('.') {
+                assert!(val.split_once('.').unwrap().1.len() == 4);
+                val.replace('.', "").parse().unwrap()
+            } else {
+                val.parse::<u32>().unwrap() * 10000
+            }
+        };
+
         let (min, max) = s.split_once(", ").unwrap();
+        let min = min.replace("min: ", "").replace(" cd/m2", "");
+        let max = max.replace("max: ", "").replace(" cd/m2", "");
         Ok(HdrMasteringLuminance {
-            min: min
-                .replace("min: ", "")
-                .replace(" cd/m2", "")
-                .parse()
-                .unwrap(),
-            max: max
-                .replace("max: ", "")
-                .replace(" cd/m2", "")
-                .parse()
-                .unwrap(),
+            min: parse_val(&min),
+            max: parse_val(&max),
         })
     }
 }

@@ -214,6 +214,10 @@ fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>, String> 
 }
 
 pub fn find_source_file(input: &Path) -> PathBuf {
+    if input.extension().unwrap().to_string_lossy() != "vpy" {
+        return input.to_path_buf();
+    }
+
     let script = fs::read_to_string(input).unwrap();
     let (_, source) = script.split_once("source=").unwrap();
     // If you have a quotation mark in your filename then go to hell

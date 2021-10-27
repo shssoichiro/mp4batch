@@ -5,11 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{
-    find_source_file,
-    get_hdr_info,
-    input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions},
-};
+use crate::input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
@@ -140,15 +136,8 @@ pub fn convert_video_av1an(
     dimensions: VideoDimensions,
     keep_lossless: bool,
     lossless_only: bool,
+    hdr_info: Option<&HdrInfo>,
 ) -> Result<(), String> {
-    // Grab this early so we can fail fast if there's an error
-    let hdr_info = match encoder {
-        Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
-            Some(get_hdr_info(&find_source_file(input))?)
-        }
-        _ => None,
-    };
-
     create_lossless(input, dimensions)?;
     if lossless_only {
         exit(0);
@@ -297,7 +286,7 @@ impl Encoder {
     pub fn get_args_string(
         &self,
         dimensions: VideoDimensions,
-        hdr_info: Option<HdrInfo>,
+        hdr_info: Option<&HdrInfo>,
     ) -> String {
         match self {
             Encoder::Aom {
@@ -340,7 +329,7 @@ fn build_aom_args_string(
     speed: Option<u8>,
     dimensions: VideoDimensions,
     profile: Profile,
-    hdr_info: Option<HdrInfo>,
+    hdr_info: Option<&HdrInfo>,
     grain: u8,
     compat: Compat,
 ) -> String {
@@ -372,7 +361,7 @@ fn build_aom_args_string(
             0
         },
         if dimensions.width >= 2400 { 1 } else { 0 },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.primaries {
                 HdrPrimaries::Bt2020 => "bt2020",
             }
@@ -381,7 +370,7 @@ fn build_aom_args_string(
         } else {
             "bt601"
         },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.transfer {
                 HdrTransfer::Pq => "smpte2084",
             }
@@ -390,7 +379,7 @@ fn build_aom_args_string(
         } else {
             "bt601"
         },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.matrix {
                 HdrMatrix::Bt2020NonConstant => "bt2020ncl",
             }
@@ -406,7 +395,7 @@ fn build_rav1e_args_string(
     crf: u8,
     speed: Option<u8>,
     dimensions: VideoDimensions,
-    hdr_info: Option<HdrInfo>,
+    hdr_info: Option<&HdrInfo>,
 ) -> String {
     format!(
         " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
@@ -421,7 +410,7 @@ fn build_rav1e_args_string(
             1
         },
         if dimensions.width >= 2400 { 2 } else { 1 },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.primaries {
                 HdrPrimaries::Bt2020 => "BT2020",
             }
@@ -430,7 +419,7 @@ fn build_rav1e_args_string(
         } else {
             "BT601"
         },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.transfer {
                 HdrTransfer::Pq => "SMPTE2084",
             }
@@ -439,7 +428,7 @@ fn build_rav1e_args_string(
         } else {
             "BT601"
         },
-        if let Some(ref hdr_info) = hdr_info {
+        if let Some(hdr_info) = hdr_info {
             match hdr_info.matrix {
                 HdrMatrix::Bt2020NonConstant => "BT2020NCL",
             }
