@@ -1,6 +1,15 @@
-use std::{fmt, fmt::Display, path::Path, process::Command};
+pub mod hdr;
 
-use regex::Regex;
+use std::{
+    collections::HashMap,
+    fmt,
+    fmt::Display,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+pub use hdr::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
@@ -77,34 +86,32 @@ pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
 }
 
 fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String> {
-    let command = Command::new("mediainfo")
-        .arg(input)
-        .output()
-        .map_err(|e| format!("{}", e))?;
-    let output = String::from_utf8_lossy(&command.stdout);
+    let mediainfo = get_video_mediainfo(input)?;
 
-    // Raw videos only care about width, height, and FPS
-    let width_regex = Regex::new(r"Width\s+: ([\d ]+) pixels").unwrap();
-    let height_regex = Regex::new(r"Height\s+: ([\d ]+) pixels").unwrap();
-    let fps_regex = Regex::new(r"Frame rate\s+: (\d+\.\d+) FPS").unwrap();
-    let bit_depth_regex = Regex::new(r"Bit depth\s+: (\d+) bits").unwrap();
-
-    let width = width_regex.captures(&output).unwrap()[1]
+    let width = mediainfo
+        .get(&"Width".to_string())
+        .unwrap()
         .replace(' ', "")
         .parse()
         .unwrap();
-    let height = height_regex.captures(&output).unwrap()[1]
+    let height = mediainfo
+        .get(&"Height".to_string())
+        .unwrap()
         .replace(' ', "")
         .parse()
         .unwrap();
     let fps = (
-        fps_regex.captures(&output).unwrap()[1]
+        mediainfo
+            .get(&"Frame rate".to_string())
+            .unwrap()
             .parse::<f32>()
             .unwrap()
             .round() as u32,
         1,
     );
-    let bit_depth = bit_depth_regex.captures(&output).unwrap()[1]
+    let bit_depth = mediainfo
+        .get(&"Bit depth".to_string())
+        .unwrap()
         .parse()
         .unwrap();
 
@@ -185,4 +192,38 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
         colorspace: ColorSpace::from_dimensions(width, height),
         bit_depth,
     })
+}
+
+fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>, String> {
+    let command = Command::new("mediainfo")
+        .arg(input)
+        .output()
+        .map_err(|e| format!("{}", e))?;
+    let output = String::from_utf8_lossy(&command.stdout);
+
+    Ok(output
+        .lines()
+        .skip_while(|line| line.trim() != "Video")
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .map(|line| {
+            let (key, value) = line.split_once(':').unwrap();
+            (key.trim().to_string(), value.trim().to_string())
+        })
+        .collect())
+}
+
+pub fn find_source_file(input: &Path) -> PathBuf {
+    let script = fs::read_to_string(input).unwrap();
+    let (_, source) = script.split_once("source=").unwrap();
+    // If you have a quotation mark in your filename then go to hell
+    let source = source
+        .chars()
+        .skip(1)
+        .take_while(|&c| c != '"')
+        .collect::<String>();
+    // Handle relative or absolute paths
+    let mut output = input.to_path_buf();
+    output.push(&PathBuf::from(&source));
+    output
 }

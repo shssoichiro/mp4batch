@@ -5,7 +5,11 @@ use std::{
     str::FromStr,
 };
 
-use crate::input::{get_video_frame_count, PixelFormat, VideoDimensions};
+use crate::{
+    find_source_file,
+    get_hdr_info,
+    input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
@@ -137,6 +141,14 @@ pub fn convert_video_av1an(
     keep_lossless: bool,
     lossless_only: bool,
 ) -> Result<(), String> {
+    // Grab this early so we can fail fast if there's an error
+    let hdr_info = match encoder {
+        Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
+            Some(get_hdr_info(&find_source_file(input))?)
+        }
+        _ => None,
+    };
+
     create_lossless(input, dimensions)?;
     if lossless_only {
         exit(0);
@@ -152,7 +164,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions))
+        .arg(&encoder.get_args_string(dimensions, hdr_info))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -282,21 +294,25 @@ impl Encoder {
         }
     }
 
-    pub fn get_args_string(&self, dimensions: VideoDimensions) -> String {
+    pub fn get_args_string(
+        &self,
+        dimensions: VideoDimensions,
+        hdr_info: Option<HdrInfo>,
+    ) -> String {
         match self {
             Encoder::Aom {
                 crf,
                 speed,
                 profile,
-                is_hdr,
                 grain,
                 compat,
-            } => {
-                build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain, *compat)
+                ..
+            } => build_aom_args_string(
+                *crf, *speed, dimensions, *profile, hdr_info, *grain, *compat,
+            ),
+            Encoder::Rav1e { crf, speed, .. } => {
+                build_rav1e_args_string(*crf, *speed, dimensions, hdr_info)
             }
-            Encoder::Rav1e {
-                crf, speed, is_hdr, ..
-            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
             Encoder::X264 {
                 crf,
                 profile,
@@ -324,7 +340,7 @@ fn build_aom_args_string(
     speed: Option<u8>,
     dimensions: VideoDimensions,
     profile: Profile,
-    is_hdr: bool,
+    hdr_info: Option<HdrInfo>,
     grain: u8,
     compat: Compat,
 ) -> String {
@@ -344,7 +360,7 @@ fn build_aom_args_string(
         } else {
             "--end-usage=q"
         },
-        if is_hdr { 5 } else { 1 },
+        if hdr_info.is_some() { 5 } else { 1 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
@@ -356,22 +372,28 @@ fn build_aom_args_string(
             0
         },
         if dimensions.width >= 2400 { 1 } else { 0 },
-        if is_hdr {
-            "bt2020"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.primaries {
+                HdrPrimaries::Bt2020 => "bt2020",
+            }
         } else if dimensions.height >= 576 {
             "bt709"
         } else {
             "bt601"
         },
-        if is_hdr {
-            "bt2020-10bit"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.transfer {
+                HdrTransfer::Pq => "smpte2084",
+            }
         } else if dimensions.height >= 576 {
             "bt709"
         } else {
             "bt601"
         },
-        if is_hdr {
-            "bt2020ncl"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.matrix {
+                HdrMatrix::Bt2020NonConstant => "bt2020ncl",
+            }
         } else if dimensions.height >= 576 {
             "bt709"
         } else {
@@ -384,7 +406,7 @@ fn build_rav1e_args_string(
     crf: u8,
     speed: Option<u8>,
     dimensions: VideoDimensions,
-    is_hdr: bool,
+    hdr_info: Option<HdrInfo>,
 ) -> String {
     format!(
         " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
@@ -399,22 +421,28 @@ fn build_rav1e_args_string(
             1
         },
         if dimensions.width >= 2400 { 2 } else { 1 },
-        if is_hdr {
-            "BT2020"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.primaries {
+                HdrPrimaries::Bt2020 => "BT2020",
+            }
         } else if dimensions.height >= 576 {
             "BT709"
         } else {
             "BT601"
         },
-        if is_hdr {
-            "BT2020_10Bit"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.transfer {
+                HdrTransfer::Pq => "SMPTE2084",
+            }
         } else if dimensions.height >= 576 {
             "BT709"
         } else {
             "BT601"
         },
-        if is_hdr {
-            "BT2020NCL"
+        if let Some(ref hdr_info) = hdr_info {
+            match hdr_info.matrix {
+                HdrMatrix::Bt2020NonConstant => "BT2020NCL",
+            }
         } else if dimensions.height >= 576 {
             "BT709"
         } else {
