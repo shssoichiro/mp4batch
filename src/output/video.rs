@@ -365,7 +365,7 @@ fn build_aom_args_string(
             match hdr_info.primaries {
                 HdrPrimaries::Bt2020 => "bt2020",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "bt709"
         } else {
             "bt601"
@@ -374,7 +374,7 @@ fn build_aom_args_string(
             match hdr_info.transfer {
                 HdrTransfer::Pq => "smpte2084",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "bt709"
         } else {
             "bt601"
@@ -383,7 +383,7 @@ fn build_aom_args_string(
             match hdr_info.matrix {
                 HdrMatrix::Bt2020NonConstant => "bt2020ncl",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "bt709"
         } else {
             "bt601"
@@ -414,7 +414,7 @@ fn build_rav1e_args_string(
             match hdr_info.primaries {
                 HdrPrimaries::Bt2020 => "BT2020",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "BT709"
         } else {
             "BT601"
@@ -423,7 +423,7 @@ fn build_rav1e_args_string(
             match hdr_info.transfer {
                 HdrTransfer::Pq => "SMPTE2084",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "BT709"
         } else {
             "BT601"
@@ -432,7 +432,7 @@ fn build_rav1e_args_string(
             match hdr_info.matrix {
                 HdrMatrix::Bt2020NonConstant => "BT2020NCL",
             }
-        } else if dimensions.height >= 576 {
+        } else if dimensions.height >= 600 {
             "BT709"
         } else {
             "BT601"
