@@ -138,6 +138,13 @@ pub fn convert_video_av1an(
     lossless_only: bool,
     hdr_info: Option<&HdrInfo>,
 ) -> Result<(), String> {
+    if dimensions.width % 8 != 0 {
+        eprintln!("WARNING: Width {} is not divisble by 8", dimensions.width);
+    }
+    if dimensions.height % 8 != 0 {
+        eprintln!("WARNING: Height {} is not divisble by 8", dimensions.height);
+    }
+
     create_lossless(input, dimensions)?;
     if lossless_only {
         exit(0);
