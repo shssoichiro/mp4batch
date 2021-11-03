@@ -193,8 +193,10 @@ pub fn convert_video_av1an(
         .arg(
             std::cmp::max(
                 if encoder.has_tiling() {
-                    if dimensions.width >= 2400 {
+                    if dimensions.width >= 3000 {
                         num_cpus::get() / 4
+                    } else if dimensions.width >= 2400 {
+                        num_cpus::get() / 4 + num_cpus::get() / 8
                     } else if dimensions.width >= 1200 {
                         num_cpus::get() / 2 + num_cpus::get() / 8
                     } else {
@@ -360,14 +362,14 @@ fn build_aom_args_string(
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
-        if dimensions.width >= 2400 {
+        if dimensions.width >= 3000 {
             2
         } else if dimensions.width >= 1200 {
             1
         } else {
             0
         },
-        if dimensions.width >= 2400 { 1 } else { 0 },
+        if dimensions.height >= 1400 { 1 } else { 0 },
         if let Some(hdr_info) = hdr_info {
             match hdr_info.primaries {
                 HdrPrimaries::Bt2020 => "bt2020",
