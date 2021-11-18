@@ -462,7 +462,7 @@ fn build_x265_args_string(
     };
     format!(
         " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
-         --deblock {} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
+         --deblock {}:{} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
          --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} --frame-threads 1 --y4m {} ",
         crf,
@@ -476,7 +476,8 @@ fn build_x265_args_string(
         } else {
             "--no-sao"
         },
-        format!("{}:{}", deblock, deblock),
+        deblock,
+        deblock,
         match profile {
             Profile::Film => "1.5",
             Profile::Anime | Profile::Fast => "1.0",
@@ -489,10 +490,10 @@ fn build_x265_args_string(
             Profile::Film => "0.8",
             Profile::Anime | Profile::Fast => "0.7",
         },
-        dimensions.colorspace.to_string(),
-        dimensions.colorspace.to_string(),
-        dimensions.colorspace.to_string(),
-        dimensions.bit_depth.to_string(),
+        dimensions.colorspace,
+        dimensions.colorspace,
+        dimensions.colorspace,
+        dimensions.bit_depth,
         if compat == Compat::Dxva {
             if dimensions.bit_depth == 10 {
                 "--profile main10 --level-idc 5.1"
