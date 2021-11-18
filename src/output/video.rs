@@ -345,7 +345,7 @@ fn build_aom_args_string(
     format!(
         " --cpu-used={} --cq-level={} {} --lag-in-frames=48 --enable-fwd-kf=1 --deltaq-mode={} \
          --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 --min-q=1 \
-         --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} --sharpness=2 \
+         --enable-keyframe-filtering={} --arnr-strength={} --arnr-maxframes={} --sharpness=2 \
          --enable-dnl-denoising=0 --denoise-noise-level={} --disable-trellis-quant=0 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
          --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf \
@@ -359,6 +359,7 @@ fn build_aom_args_string(
             "--end-usage=q"
         },
         if hdr_info.is_some() { 5 } else { 1 },
+        if compat == Compat::None { 2 } else { 0 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
