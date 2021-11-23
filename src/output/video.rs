@@ -159,7 +159,6 @@ pub fn convert_video_av1an(
         .arg(input.with_extension("lossless.mkv"))
         .arg("-e")
         .arg(encoder.get_av1an_name())
-        .arg("-v")
         .arg(&encoder.get_args_string(dimensions, hdr_info))
         .arg("--sc-method")
         .arg("standard")
