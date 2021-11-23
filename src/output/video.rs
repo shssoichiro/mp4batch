@@ -159,6 +159,7 @@ pub fn convert_video_av1an(
         .arg(input.with_extension("lossless.mkv"))
         .arg("-e")
         .arg(encoder.get_av1an_name())
+        .arg("-v")
         .arg(&encoder.get_args_string(dimensions, hdr_info))
         .arg("--sc-method")
         .arg("standard")
@@ -230,7 +231,6 @@ pub fn convert_video_av1an(
             (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
         })
         .arg("-r")
-        .arg("--verbose")
         .arg("-o")
         .arg(input.with_extension("out.mkv"));
     if dimensions.height > 1200 {
