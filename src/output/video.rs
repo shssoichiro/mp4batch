@@ -163,6 +163,11 @@ pub fn convert_video_av1an(
         .arg(&encoder.get_args_string(dimensions, hdr_info))
         .arg("--sc-method")
         .arg("standard")
+        .arg("-c")
+        .arg(match encoder {
+            Encoder::Aom { compat, .. } if compat == Compat::None => "mkvmerge",
+            _ => "ffmpeg",
+        })
         .arg("-x")
         .arg(
             match encoder {
