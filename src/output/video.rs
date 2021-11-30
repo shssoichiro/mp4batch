@@ -1,7 +1,6 @@
 use std::{
-    fs,
     path::Path,
-    process::{exit, Command, Stdio},
+    process::{Command, Stdio},
     str::FromStr,
 };
 
@@ -56,7 +55,16 @@ impl FromStr for Compat {
     }
 }
 
-fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Filter {
+    Original,
+    Scaled {
+        resolution: Option<(u32, u32)>,
+        bit_depth: Option<u8>,
+    },
+}
+
+pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), String> {
     let lossless_filename = input.with_extension("lossless.mkv");
     let mut needs_encode = true;
     if lossless_filename.exists() {
@@ -134,8 +142,6 @@ pub fn convert_video_av1an(
     input: &Path,
     encoder: Encoder,
     dimensions: VideoDimensions,
-    keep_lossless: bool,
-    lossless_only: bool,
     hdr_info: Option<&HdrInfo>,
 ) -> Result<(), String> {
     if dimensions.width % 8 != 0 {
@@ -143,11 +149,6 @@ pub fn convert_video_av1an(
     }
     if dimensions.height % 8 != 0 {
         eprintln!("WARNING: Height {} is not divisble by 8", dimensions.height);
-    }
-
-    create_lossless(input, dimensions)?;
-    if lossless_only {
-        exit(0);
     }
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
@@ -246,9 +247,6 @@ pub fn convert_video_av1an(
         .map_err(|e| format!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
-        if !keep_lossless {
-            let _ = fs::remove_file(input.with_extension("lossless.mkv"));
-        }
         Ok(())
     } else {
         Err(format!(

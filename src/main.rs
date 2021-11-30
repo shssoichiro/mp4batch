@@ -6,7 +6,16 @@ extern crate dotenv_codegen;
 mod input;
 mod output;
 
-use std::{env, path::Path, str::FromStr};
+use std::{
+    cmp::Ordering,
+    env,
+    fs,
+    fs::File,
+    io::{BufWriter, Write},
+    path::Path,
+    process::exit,
+    str::FromStr,
+};
 
 use clap::{App, Arg};
 use glob::glob;
@@ -131,6 +140,16 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("scale")
+                .long("scale")
+                .value_name("FILTERS")
+                .help(
+                    "Takes a list of desired formats to output. Each filter is comma separated, \
+                     each output format is semicolon separated\n- orig: Output without scaling\n- \
+                     b#: Output bit depth\n- r#x#: Output resolution",
+                ),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input directory or file")
                 .required(true)
@@ -197,6 +216,91 @@ fn main() {
             compat,
         }
     };
+    let scale_filters = args
+        .value_of("scale")
+        .map(|scale| {
+            scale
+                .split(';')
+                .map(|chain| {
+                    if chain == "orig" {
+                        return Filter::Original;
+                    }
+
+                    let mut parsed = Filter::Scaled {
+                        resolution: None,
+                        bit_depth: None,
+                    };
+                    for filter in chain.split(',') {
+                        if let Some(filter) = filter.strip_prefix('r') {
+                            if let Filter::Scaled {
+                                resolution: Some(_),
+                                ..
+                            } = parsed
+                            {
+                                panic!(
+                                    "Each filter chain may only specify one resolution: {}",
+                                    chain
+                                );
+                            }
+                            let resolution = filter
+                                .split_once('x')
+                                .unwrap_or_else(|| panic!("Invalid resolution filter: {}", filter));
+                            let width = resolution.0.parse().unwrap_or_else(|_| {
+                                panic!("Invalid resolution filter: {}", filter)
+                            });
+                            let height = resolution.1.parse().unwrap_or_else(|_| {
+                                panic!("Invalid resolution filter: {}", filter)
+                            });
+                            if let Filter::Scaled {
+                                ref mut resolution, ..
+                            } = parsed
+                            {
+                                *resolution = Some((width, height));
+                            }
+                        } else if let Some(filter) = filter.strip_prefix('b') {
+                            if let Filter::Scaled {
+                                bit_depth: Some(_), ..
+                            } = parsed
+                            {
+                                panic!(
+                                    "Each filter chain may only specify one bit depth: {}",
+                                    chain
+                                );
+                            }
+                            let depth = filter
+                                .parse()
+                                .unwrap_or_else(|_| panic!("Invalid bit depth: {}", filter));
+                            if ![8, 10].contains(&depth) {
+                                panic!("Invalid bit depth: {}", filter);
+                            }
+                            if let Filter::Scaled {
+                                ref mut bit_depth, ..
+                            } = parsed
+                            {
+                                *bit_depth = Some(depth);
+                            }
+                        } else if filter == "orig" {
+                            panic!(
+                                "\"orig\" filter may not be specified with other filters: {}",
+                                chain
+                            );
+                        } else {
+                            panic!("Unrecognized filter argument: {}", filter);
+                        }
+                    }
+                    parsed
+                })
+                .unique()
+                .sorted_by(|a, _b| {
+                    if let Filter::Original = a {
+                        Ordering::Less
+                    } else {
+                        Ordering::Equal
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_else(|| vec![Filter::Original]);
     let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
     let audio_bitrate = args
         .value_of("audio_bitrate")
@@ -277,6 +381,7 @@ fn main() {
                 extension,
                 args.is_present("keep-lossless"),
                 args.is_present("lossless-only"),
+                &scale_filters,
             );
             if let Err(err) = result {
                 eprintln!(
@@ -300,6 +405,7 @@ fn main() {
             extension,
             args.is_present("keep-lossless"),
             args.is_present("lossless-only"),
+            &scale_filters,
         )
         .unwrap();
     }
@@ -316,43 +422,110 @@ fn process_file(
     extension: &str,
     keep_lossless: bool,
     lossless_only: bool,
+    scale_filters: &[Filter],
 ) -> Result<(), String> {
-    eprintln!("Converting {}", input.to_string_lossy());
-    let dims = get_video_dimensions(input)?;
+    for (i, filter_chain) in scale_filters.iter().enumerate() {
+        let orig_input = input;
+        eprintln!("Converting {}", input.to_string_lossy());
+        let dimensions = get_video_dimensions(input)?;
 
-    let hdr_info = match encoder {
-        Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
-            Some(get_hdr_info(&find_source_file(input))?)
-        }
-        _ => None,
-    };
+        let hdr_info = match encoder {
+            Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
+                Some(get_hdr_info(&find_source_file(orig_input))?)
+            }
+            _ => None,
+        };
 
-    if !skip_video {
-        loop {
-            let result = convert_video_av1an(
-                input,
-                encoder,
-                dims,
-                keep_lossless,
-                lossless_only,
-                hdr_info.as_ref(),
-            );
-            // I hate this lazy workaround,
-            // but this is due to a heisenbug in DFTTest
-            // due to some sort of race condition,
-            // which causes crashes often enough to be annoying.
-            //
-            // Essentially, we retry the encode until it works.
-            if result.is_ok() {
-                break;
+        if !skip_video {
+            loop {
+                if filter_chain == &Filter::Original || i == 0 {
+                    create_lossless(orig_input, dimensions)?;
+                    if lossless_only {
+                        exit(0);
+                    }
+                }
+
+                let input = match filter_chain {
+                    Filter::Original => orig_input.to_path_buf(),
+                    Filter::Scaled {
+                        resolution,
+                        bit_depth,
+                    } => {
+                        let input = orig_input.with_extension(&format!(
+                            "{}{}vpy",
+                            resolution
+                                .map(|(w, h)| format!("{}x{}.", w, h))
+                                .unwrap_or_else(String::new),
+                            bit_depth
+                                .map(|bd| format!("{}.", bd))
+                                .unwrap_or_else(String::new),
+                        ));
+                        let mut script = BufWriter::new(File::create(&input).unwrap());
+                        writeln!(&mut script, "import vapoursynth as vs").unwrap();
+                        writeln!(&mut script, "core = vs.get_core()").unwrap();
+                        writeln!(
+                            &mut script,
+                            "clip = core.lsmas.LWLibavSource(source=\"{}\")",
+                            escape_python_string(
+                                orig_input
+                                    .with_extension("lossless.mkv")
+                                    .canonicalize()
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap()
+                            )
+                        )
+                        .unwrap();
+                        // We downscale resolution first because it's more likely that
+                        // we would be going from 10 bit to 8 bit, rather than the other way.
+                        // So this gives the best quality.
+                        if let Some((w, h)) = resolution {
+                            writeln!(
+                                &mut script,
+                                "clip = core.resize.Spline36(clip, {}, {}, \
+                                 dither_type='error_diffusion')",
+                                w, h
+                            )
+                            .unwrap();
+                        }
+                        if let Some(bd) = bit_depth {
+                            writeln!(&mut script, "import vsutil").unwrap();
+                            writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
+                        }
+                        script.flush().unwrap();
+                        input
+                    }
+                };
+
+                let result = convert_video_av1an(&input, encoder, dimensions, hdr_info.as_ref());
+                // I hate this lazy workaround,
+                // but this is due to a heisenbug in DFTTest
+                // due to some sort of race condition,
+                // which causes crashes often enough to be annoying.
+                //
+                // Essentially, we retry the encode until it works.
+                if result.is_ok() {
+                    break;
+                }
             }
         }
+
+        convert_audio(
+            orig_input,
+            &input.with_extension("out.mka"),
+            audio_codec,
+            audio_track.clone(),
+            audio_bitrate,
+        )?;
+        mux_video(input, extension)?;
+
+        eprintln!("Finished converting {}", input.to_string_lossy());
     }
 
-    convert_audio(input, audio_codec, audio_track, audio_bitrate)?;
-    mux_video(input, extension)?;
+    if !keep_lossless {
+        let _ = fs::remove_file(input.with_extension("lossless.mkv"));
+    }
 
-    eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
 }
 
@@ -367,4 +540,8 @@ fn process_direct(
     mux_video_direct(input, audio_track, audio_codec, audio_bitrate, extension)?;
     eprintln!("Finished converting {}", input.to_string_lossy());
     Ok(())
+}
+
+fn escape_python_string(input: &str) -> String {
+    input.replace(r"\", r"\\").replace(r"'", r"\'")
 }

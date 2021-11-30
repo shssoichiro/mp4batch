@@ -29,6 +29,7 @@ pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
 
 pub fn convert_audio(
     input: &Path,
+    output: &Path,
     audio_codec: &str,
     audio_track: AudioTrack,
     audio_bitrate: u32,
@@ -99,7 +100,7 @@ pub fn convert_audio(
         ))
         .arg("-map_chapters")
         .arg("-1")
-        .arg(input.with_extension("out.mka"));
+        .arg(output);
 
     let status = command
         .status()
