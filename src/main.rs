@@ -229,6 +229,7 @@ fn main() {
                     let mut parsed = Filter::Scaled {
                         resolution: None,
                         bit_depth: None,
+                        quality: None,
                     };
                     for filter in chain.split(',') {
                         if let Some(filter) = filter.strip_prefix('r') {
@@ -278,6 +279,25 @@ fn main() {
                             } = parsed
                             {
                                 *bit_depth = Some(depth);
+                            }
+                        } else if let Some(filter) = filter.strip_prefix('q') {
+                            if let Filter::Scaled {
+                                quality: Some(_), ..
+                            } = parsed
+                            {
+                                panic!(
+                                    "Each filter chain may only specify one quality level: {}",
+                                    chain
+                                );
+                            }
+                            let q = filter
+                                .parse()
+                                .unwrap_or_else(|_| panic!("Invalid quality level: {}", filter));
+                            if let Filter::Scaled {
+                                ref mut quality, ..
+                            } = parsed
+                            {
+                                *quality = Some(q);
                             }
                         } else if filter == "orig" {
                             panic!(
@@ -445,11 +465,13 @@ fn process_file(
                     }
                 }
 
+                let mut encoder = encoder;
                 let input = match filter_chain {
                     Filter::Original => orig_input.to_path_buf(),
                     Filter::Scaled {
                         resolution,
                         bit_depth,
+                        quality,
                     } => {
                         let input = orig_input.with_extension(&format!(
                             "{}{}vpy",
@@ -493,6 +515,17 @@ fn process_file(
                             writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
                         }
                         script.flush().unwrap();
+
+                        if let Some(q) = quality {
+                            match encoder {
+                                Encoder::Aom { ref mut crf, .. }
+                                | Encoder::Rav1e { ref mut crf, .. }
+                                | Encoder::X264 { ref mut crf, .. }
+                                | Encoder::X265 { ref mut crf, .. } => {
+                                    *crf = *q;
+                                }
+                            }
+                        }
                         input
                     }
                 };

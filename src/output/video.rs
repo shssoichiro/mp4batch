@@ -61,6 +61,7 @@ pub enum Filter {
     Scaled {
         resolution: Option<(u32, u32)>,
         bit_depth: Option<u8>,
+        quality: Option<u8>,
     },
 }
 
