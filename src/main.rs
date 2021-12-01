@@ -424,6 +424,7 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
             }
             output.audio.kbps_per_channel = ab;
         }
+        "enc" => (),
         filter => panic!("Unrecognized filter: {}", filter),
     }
 }
