@@ -147,7 +147,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), 
 }
 
 pub fn convert_video_av1an(
-    input: &Path,
+    vpy_input: &Path,
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
@@ -169,7 +169,7 @@ pub fn convert_video_av1an(
     command
         .arg("av1an")
         .arg("-i")
-        .arg(input.with_extension("lossless.mkv"))
+        .arg(vpy_input)
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
