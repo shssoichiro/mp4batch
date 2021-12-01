@@ -148,6 +148,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), 
 
 pub fn convert_video_av1an(
     input: &Path,
+    output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
     hdr_info: Option<&HdrInfo>,
@@ -159,8 +160,7 @@ pub fn convert_video_av1an(
         eprintln!("WARNING: Height {} is not divisble by 8", dimensions.height);
     }
 
-    let output = input.with_extension("out.mkv");
-    if output.exists() && get_video_frame_count(&output)? == dimensions.frames {
+    if output.exists() && get_video_frame_count(output)? == dimensions.frames {
         return Ok(());
     }
 

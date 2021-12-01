@@ -188,6 +188,8 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
 ) -> Result<(), String> {
+    eprintln!("Converting {} lossless", input.to_string_lossy());
+
     let dimensions = get_video_dimensions(input)?;
     create_lossless(input, dimensions)?;
     if lossless_only {
@@ -196,8 +198,9 @@ fn process_file(
 
     let audio_track = find_external_audio(input, 0);
     for output in outputs {
-        let orig_input = input;
-        eprintln!("Converting {}", input.to_string_lossy());
+        let video_suffix = build_video_suffix(output);
+        let vpy_file = input.with_extension(&format!("{}.vpy", video_suffix));
+        eprintln!("Converting {}", vpy_file.to_string_lossy());
 
         let dimensions = get_video_dimensions(input)?;
         let hdr_info = match output.video.encoder {
@@ -206,17 +209,21 @@ fn process_file(
             | VideoEncoder::X265 { is_hdr, .. }
                 if is_hdr =>
             {
-                Some(get_hdr_info(&find_source_file(orig_input))?)
+                Some(get_hdr_info(&find_source_file(input))?)
             }
             _ => None,
         };
 
+        build_vpy_script(&vpy_file, input, output);
+        let video_out = vpy_file.with_extension("mkv");
         loop {
-            let input = build_vpy_filename(input, output);
-            build_vpy_script(&input, orig_input, output);
-
-            let result =
-                convert_video_av1an(&input, output.video.encoder, dimensions, hdr_info.as_ref());
+            let result = convert_video_av1an(
+                &vpy_file,
+                &video_out,
+                output.video.encoder,
+                dimensions,
+                hdr_info.as_ref(),
+            );
             // I hate this lazy workaround,
             // but this is due to a heisenbug in DFTTest
             // due to some sort of race condition,
@@ -228,16 +235,31 @@ fn process_file(
             }
         }
 
+        let audio_suffix = &format!(
+            "{}-{}kbpc",
+            output.audio.encoder, output.audio.kbps_per_channel
+        );
+        let audio_out = input.with_extension(&format!("{}.mka", audio_suffix));
         convert_audio(
-            orig_input,
-            &input.with_extension("out.mka"),
+            input,
+            &audio_out,
             output.audio.encoder,
             audio_track.clone(),
             output.audio.kbps_per_channel,
         )?;
-        mux_video(input, &output.video.output_ext)?;
+        let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
+        output_path.push(
+            input
+                .with_extension(&format!(
+                    "{}-{}.{}",
+                    video_suffix, audio_suffix, output.video.output_ext
+                ))
+                .file_name()
+                .unwrap(),
+        );
+        mux_video(&video_out, &audio_out, &output_path)?;
 
-        eprintln!("Finished converting {}", input.to_string_lossy());
+        eprintln!("Finished converting {}", vpy_file.to_string_lossy());
     }
 
     if !keep_lossless {
@@ -353,7 +375,7 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
         "ext" => {
             let arg = arg.to_lowercase();
             if arg == "mkv" || arg == "mp4" {
-                output.video.output_ext = arg.to_string();
+                output.video.output_ext = arg;
             } else {
                 panic!("Unrecognized output extension requested: {}", arg);
             }
@@ -405,8 +427,8 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
     }
 }
 
-fn build_vpy_filename(input: &Path, output: &Output) -> PathBuf {
-    let ext = match output.video.encoder {
+fn build_video_suffix(output: &Output) -> String {
+    match output.video.encoder {
         VideoEncoder::Aom {
             crf,
             speed,
@@ -457,8 +479,7 @@ fn build_vpy_filename(input: &Path, output: &Output) -> PathBuf {
             if is_hdr { "-hdr" } else { "" },
             if compat { "-compat" } else { "" }
         ),
-    };
-    input.with_extension(&format!("{}.vpy", ext))
+    }
 }
 
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {

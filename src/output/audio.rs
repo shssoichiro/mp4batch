@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -50,6 +51,21 @@ pub enum AudioEncoder {
     Opus,
 }
 
+impl Display for AudioEncoder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "{}",
+            match self {
+                AudioEncoder::Copy => "copy",
+                AudioEncoder::Aac => "aac",
+                AudioEncoder::Flac => "flac",
+                AudioEncoder::Opus => "opus",
+            }
+        )
+    }
+}
+
 pub fn convert_audio(
     input: &Path,
     output: &Path,
@@ -57,6 +73,11 @@ pub fn convert_audio(
     audio_track: AudioTrack,
     audio_bitrate: u32,
 ) -> Result<(), String> {
+    if output.exists() {
+        // TODO: Verify the audio output is complete
+        return Ok(());
+    }
+
     let mut command = Command::new("ffmpeg");
     command
         .arg("-hide_banner")

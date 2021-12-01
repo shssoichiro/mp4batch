@@ -1,10 +1,7 @@
 mod audio;
 mod video;
 
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{path::Path, process::Command};
 
 pub use self::{audio::*, video::*};
 
@@ -14,21 +11,19 @@ pub struct Output {
     pub audio: AudioOutput,
 }
 
-pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
-    let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
-    output_path.push(input.with_extension(extension).file_name().unwrap());
-
+pub fn mux_video(video: &Path, audio: &Path, output: &Path) -> Result<(), String> {
+    let extension = output.extension().unwrap().to_string_lossy();
     let status = if extension == "mkv" {
         Command::new("mkvmerge")
             .arg("-q")
             .arg("--ui-language")
             .arg("en_US")
             .arg("--output")
-            .arg(&output_path)
+            .arg(&output)
             .arg("--language")
             .arg("0:und")
             .arg("(")
-            .arg(input.with_extension("out.mkv"))
+            .arg(video)
             .arg(")")
             .arg("--language")
             .arg("0:en")
@@ -37,7 +32,7 @@ pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
             .arg("--default-track")
             .arg("0:yes")
             .arg("(")
-            .arg(input.with_extension("out.mka"))
+            .arg(audio)
             .arg(")")
             .arg("--track-order")
             .arg("0:0,1:0")
@@ -50,9 +45,9 @@ pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
             .arg("level+error")
             .arg("-stats")
             .arg("-i")
-            .arg(input.with_extension("out.mkv"))
+            .arg(video)
             .arg("-i")
-            .arg(input.with_extension("out.mka"))
+            .arg(audio)
             .arg("-vcodec")
             .arg("copy")
             .arg("-acodec")
@@ -65,7 +60,7 @@ pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
             .arg("-1")
             .arg("-movflags")
             .arg("+faststart")
-            .arg(output_path)
+            .arg(output)
             .status()
             .map_err(|e| format!("{}", e))?
     };
