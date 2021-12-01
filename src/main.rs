@@ -517,5 +517,6 @@ fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
         writeln!(&mut script, "import vsutil").unwrap();
         writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
     }
+    writeln!(&mut script, "clip.set_output()");
     script.flush().unwrap();
 }
