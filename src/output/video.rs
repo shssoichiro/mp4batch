@@ -1,10 +1,34 @@
 use std::{
+    fmt::Display,
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
 };
 
 use crate::input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VideoOutput {
+    pub encoder: VideoEncoder,
+    pub output_ext: String,
+    pub bit_depth: Option<u8>,
+    pub resolution: Option<(u32, u32)>,
+}
+
+impl Default for VideoOutput {
+    fn default() -> Self {
+        VideoOutput {
+            encoder: VideoEncoder::X264 {
+                crf: 18,
+                profile: Profile::Film,
+                compat: false,
+            },
+            output_ext: "mkv".to_string(),
+            bit_depth: None,
+            resolution: None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
@@ -34,35 +58,18 @@ impl FromStr for Profile {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Compat {
-    Dxva,
-    Normal,
-    None,
-}
-
-impl FromStr for Compat {
-    type Err = &'static str;
-    fn from_str(input: &str) -> std::result::Result<Self, <Self as std::str::FromStr>::Err> {
-        Ok(match input.to_lowercase().as_str() {
-            "dxva" => Compat::Dxva,
-            "normal" => Compat::Normal,
-            "none" => Compat::None,
-            _ => {
-                return Err("Valid compat values are 'dxva', 'normal', or 'none'");
+impl Display for Profile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "{}",
+            match self {
+                Profile::Film => "film",
+                Profile::Anime => "anime",
+                Profile::Fast => "fast",
             }
-        })
+        )
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Filter {
-    Original,
-    Scaled {
-        resolution: Option<(u32, u32)>,
-        bit_depth: Option<u8>,
-        quality: Option<u8>,
-    },
 }
 
 pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), String> {
@@ -141,7 +148,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), 
 
 pub fn convert_video_av1an(
     input: &Path,
-    encoder: Encoder,
+    encoder: VideoEncoder,
     dimensions: VideoDimensions,
     hdr_info: Option<&HdrInfo>,
 ) -> Result<(), String> {
@@ -152,8 +159,12 @@ pub fn convert_video_av1an(
         eprintln!("WARNING: Height {} is not divisble by 8", dimensions.height);
     }
 
-    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    let output = input.with_extension("out.mkv");
+    if output.exists() && get_video_frame_count(&output)? == dimensions.frames {
+        return Ok(());
+    }
 
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -165,18 +176,13 @@ pub fn convert_video_av1an(
         .arg(&encoder.get_args_string(dimensions, hdr_info))
         .arg("--sc-method")
         .arg("standard")
-        .arg("-c")
-        .arg(match encoder {
-            Encoder::Aom { compat, .. } if compat == Compat::None => "mkvmerge",
-            _ => "ffmpeg",
-        })
         .arg("-x")
         .arg(
             match encoder {
-                Encoder::Aom { profile, .. }
-                | Encoder::Rav1e { profile, .. }
-                | Encoder::X264 { profile, .. }
-                | Encoder::X265 { profile, .. } => match profile {
+                VideoEncoder::Aom { profile, .. }
+                | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::X264 { profile, .. }
+                | VideoEncoder::X265 { profile, .. } => match profile {
                     Profile::Film | Profile::Fast => fps * 10,
                     Profile::Anime => fps * 15,
                 },
@@ -186,10 +192,10 @@ pub fn convert_video_av1an(
         .arg("--min-scene-len")
         .arg(
             match encoder {
-                Encoder::Aom { profile, .. }
-                | Encoder::Rav1e { profile, .. }
-                | Encoder::X264 { profile, .. }
-                | Encoder::X265 { profile, .. } => match profile {
+                VideoEncoder::Aom { profile, .. }
+                | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::X264 { profile, .. }
+                | VideoEncoder::X265 { profile, .. } => match profile {
                     Profile::Film | Profile::Fast => fps,
                     Profile::Anime => fps / 2,
                 },
@@ -239,7 +245,7 @@ pub fn convert_video_av1an(
         })
         .arg("-r")
         .arg("-o")
-        .arg(input.with_extension("out.mkv"));
+        .arg(output);
     if dimensions.height > 1200 {
         command.arg("--sc-downscale-height").arg("1080");
     }
@@ -257,41 +263,42 @@ pub fn convert_video_av1an(
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Encoder {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoEncoder {
     Aom {
-        crf: u8,
-        speed: Option<u8>,
+        crf: i16,
+        speed: u8,
         profile: Profile,
         is_hdr: bool,
         grain: u8,
-        compat: Compat,
+        compat: bool,
     },
     Rav1e {
-        crf: u8,
-        speed: Option<u8>,
+        crf: i16,
+        speed: u8,
         profile: Profile,
         is_hdr: bool,
     },
     X264 {
-        crf: u8,
+        crf: i16,
         profile: Profile,
-        compat: Compat,
+        compat: bool,
     },
     X265 {
-        crf: u8,
+        crf: i16,
         profile: Profile,
-        compat: Compat,
+        compat: bool,
+        is_hdr: bool,
     },
 }
 
-impl Encoder {
+impl VideoEncoder {
     pub fn get_av1an_name(&self) -> &str {
         match self {
-            Encoder::Aom { .. } => "aom",
-            Encoder::Rav1e { .. } => "rav1e",
-            Encoder::X264 { .. } => "x264",
-            Encoder::X265 { .. } => "x265",
+            VideoEncoder::Aom { .. } => "aom",
+            VideoEncoder::Rav1e { .. } => "rav1e",
+            VideoEncoder::X264 { .. } => "x264",
+            VideoEncoder::X265 { .. } => "x265",
         }
     }
 
@@ -301,68 +308,58 @@ impl Encoder {
         hdr_info: Option<&HdrInfo>,
     ) -> String {
         match self {
-            Encoder::Aom {
+            VideoEncoder::Aom {
                 crf,
                 speed,
                 profile,
                 grain,
-                compat,
                 ..
-            } => build_aom_args_string(
-                *crf, *speed, dimensions, *profile, hdr_info, *grain, *compat,
-            ),
-            Encoder::Rav1e { crf, speed, .. } => {
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, hdr_info, *grain),
+            VideoEncoder::Rav1e { crf, speed, .. } => {
                 build_rav1e_args_string(*crf, *speed, dimensions, hdr_info)
             }
-            Encoder::X264 {
+            VideoEncoder::X264 {
                 crf,
                 profile,
                 compat,
             } => build_x264_args_string(*crf, dimensions, *profile, *compat),
-            Encoder::X265 {
+            VideoEncoder::X265 {
                 crf,
                 profile,
                 compat,
-            } => build_x265_args_string(*crf, dimensions, *profile, *compat),
+                ..
+            } => build_x265_args_string(*crf, dimensions, *profile, *compat, hdr_info),
         }
     }
 
     pub fn has_tiling(&self) -> bool {
-        matches!(self, Encoder::Aom { .. } | Encoder::Rav1e { .. })
+        matches!(self, VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. })
     }
 
     pub fn tons_of_lookahead(&self) -> bool {
-        matches!(self, Encoder::X264 { .. })
+        matches!(self, VideoEncoder::X264 { .. })
     }
 }
 
 fn build_aom_args_string(
-    crf: u8,
-    speed: Option<u8>,
+    crf: i16,
+    speed: u8,
     dimensions: VideoDimensions,
     profile: Profile,
     hdr_info: Option<&HdrInfo>,
     grain: u8,
-    compat: Compat,
 ) -> String {
     format!(
-        " --cpu-used={} --cq-level={} {} --lag-in-frames=48 --enable-fwd-kf=1 --deltaq-mode={} \
-         --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 --min-q=1 \
-         --enable-keyframe-filtering={} --arnr-strength={} --arnr-maxframes={} --sharpness=2 \
-         --enable-dnl-denoising=0 --denoise-noise-level={} --disable-trellis-quant=0 \
-         --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
-         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf \
-         --kf-max-dist=9999 ",
-        speed.unwrap_or(4),
+        " --cpu-used={} --cq-level={} --end-usage=q --lag-in-frames=48 --enable-fwd-kf=1 \
+         --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 \
+         --min-q=1 --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} \
+         --sharpness=2 --enable-dnl-denoising=0 --denoise-noise-level={} \
+         --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
+         --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
+         --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
+        speed,
         crf,
-        if compat == Compat::Dxva {
-            "--profile=0 --end-usage=cq --target-bitrate=80000 --buf-initial-sz=4000 \
-             --buf-optimal-sz=5000 --buf-sz=6000"
-        } else {
-            "--end-usage=q"
-        },
         if hdr_info.is_some() { 5 } else { 1 },
-        if compat == Compat::None { 2 } else { 0 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
         grain,
@@ -405,15 +402,15 @@ fn build_aom_args_string(
 }
 
 fn build_rav1e_args_string(
-    crf: u8,
-    speed: Option<u8>,
+    crf: i16,
+    speed: u8,
     dimensions: VideoDimensions,
     hdr_info: Option<&HdrInfo>,
 ) -> String {
     format!(
         " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
          --matrix={} --no-scene-detection --keyint 0 --min-keyint 0 ",
-        speed.unwrap_or(4),
+        speed,
         crf,
         if dimensions.width >= 2400 {
             4
@@ -454,11 +451,16 @@ fn build_rav1e_args_string(
 }
 
 fn build_x265_args_string(
-    crf: u8,
+    crf: i16,
     dimensions: VideoDimensions,
     profile: Profile,
-    compat: Compat,
+    compat: bool,
+    hdr_info: Option<&HdrInfo>,
 ) -> String {
+    if hdr_info.is_some() {
+        todo!("Implement HDR support for x265");
+    }
+
     let deblock = match profile {
         Profile::Film => -2,
         Profile::Anime | Profile::Fast => -1,
@@ -497,7 +499,7 @@ fn build_x265_args_string(
         dimensions.colorspace,
         dimensions.colorspace,
         dimensions.bit_depth,
-        if compat == Compat::Dxva {
+        if compat {
             if dimensions.bit_depth == 10 {
                 "--profile main10 --level-idc 5.1"
             } else {
@@ -510,10 +512,10 @@ fn build_x265_args_string(
 }
 
 fn build_x264_args_string(
-    crf: u8,
+    crf: i16,
     dimensions: VideoDimensions,
     profile: Profile,
-    compat: Compat,
+    compat: bool,
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
@@ -561,14 +563,10 @@ fn build_x264_args_string(
         dimensions.colorspace,
         dimensions.colorspace,
         dimensions.bit_depth,
-        match compat {
-            Compat::Dxva => {
-                "--level 4.1 --vbv-maxrate 50000 --vbv-bufsize 78125"
-            }
-            Compat::Normal => "",
-            Compat::None => {
-                "--open-gop"
-            }
+        if compat {
+            "--level 4.1 --vbv-maxrate 50000 --vbv-bufsize 78125"
+        } else {
+            ""
         },
         match dimensions.pixel_format {
             PixelFormat::Yuv422 => {

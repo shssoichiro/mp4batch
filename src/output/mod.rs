@@ -8,6 +8,12 @@ use std::{
 
 pub use self::{audio::*, video::*};
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Output {
+    pub video: VideoOutput,
+    pub audio: AudioOutput,
+}
+
 pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
     let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
     output_path.push(input.with_extension(extension).file_name().unwrap());
@@ -66,70 +72,6 @@ pub fn mux_video(input: &Path, extension: &str) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute mkvmerge".to_owned())
-    }
-}
-
-pub fn mux_video_direct(
-    input: &Path,
-    audio_track: AudioTrack,
-    audio_codec: &str,
-    audio_bitrate: u32,
-    extension: &str,
-) -> Result<(), String> {
-    let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
-    output_path.push(input.with_extension(extension).file_name().unwrap());
-
-    let mut command = Command::new("ffmpeg");
-    command
-        .arg("-hide_banner")
-        .arg("-loglevel")
-        .arg("level+error")
-        .arg("-stats")
-        .arg("-i")
-        .arg(input);
-    if let AudioTrack::External(ref path, _) = audio_track {
-        command.arg("-i").arg(path);
-    }
-    command.arg("-vcodec").arg("copy").arg("-acodec");
-    match audio_codec {
-        "copy" => {
-            command.arg("copy");
-        }
-        "aac" => {
-            command
-                .arg("libfdk_aac")
-                .arg("-vbr")
-                .arg(match audio_bitrate {
-                    0..=31 => "1",
-                    32..=43 => "2",
-                    44..=59 => "3",
-                    60..=83 => "4",
-                    _ => "5",
-                })
-                .arg("-af")
-                .arg("aformat=channel_layouts=7.1|5.1|stereo");
-        }
-        "flac" => {
-            command.arg("flac");
-        }
-        _ => unreachable!(),
-    };
-    command
-        .arg("-map")
-        .arg("0:v:0")
-        .arg("-map")
-        .arg(match audio_track {
-            AudioTrack::FromVideo(ref track) => format!("0:a:{}", track),
-            AudioTrack::External(_, ref track) => format!("1:a:{}", track),
-        })
-        .arg("-map_chapters")
-        .arg("-1")
-        .arg(output_path);
-    let status = command.status().map_err(|e| format!("{}", e))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Failed to execute ffmpeg".to_owned())
+        Err("Failed to mux video".to_owned())
     }
 }

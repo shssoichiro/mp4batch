@@ -27,10 +27,33 @@ pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
     AudioTrack::External(input_audio, from_video)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AudioOutput {
+    pub encoder: AudioEncoder,
+    pub kbps_per_channel: u32,
+}
+
+impl Default for AudioOutput {
+    fn default() -> Self {
+        AudioOutput {
+            encoder: AudioEncoder::Copy,
+            kbps_per_channel: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioEncoder {
+    Copy,
+    Aac,
+    Flac,
+    Opus,
+}
+
 pub fn convert_audio(
     input: &Path,
     output: &Path,
-    audio_codec: &str,
+    audio_codec: AudioEncoder,
     audio_track: AudioTrack,
     audio_bitrate: u32,
 ) -> Result<(), String> {
@@ -48,10 +71,10 @@ pub fn convert_audio(
         })
         .arg("-acodec");
     match audio_codec {
-        "copy" => {
+        AudioEncoder::Copy => {
             command.arg("copy");
         }
-        "aac" => {
+        AudioEncoder::Aac => {
             command
                 .arg("libfdk_aac")
                 .arg("-vbr")
@@ -65,7 +88,7 @@ pub fn convert_audio(
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
         }
-        "opus" => {
+        AudioEncoder::Opus => {
             command
                 .arg("libopus")
                 .arg("-b:a")
@@ -84,10 +107,9 @@ pub fn convert_audio(
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
         }
-        "flac" => {
+        AudioEncoder::Flac => {
             command.arg("flac");
         }
-        _ => unreachable!(),
     };
     command
         .arg("-map")

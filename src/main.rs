@@ -7,19 +7,16 @@ mod input;
 mod output;
 
 use std::{
-    cmp::Ordering,
     env,
     fs,
     fs::File,
     io::{BufWriter, Write},
-    path::Path,
-    process::exit,
-    str::FromStr,
+    path::{Path, PathBuf},
 };
 
 use clap::{App, Arg};
-use glob::glob;
 use itertools::Itertools;
+use walkdir::WalkDir;
 
 use self::{input::*, output::*};
 
@@ -28,80 +25,6 @@ fn main() {
     let args = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .arg(
-            Arg::with_name("profile")
-                .short("p")
-                .long("profile")
-                .value_name("VALUE")
-                .help("Sets a custom profile (default: film, available: film, anime, fast)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("crf")
-                .short("c")
-                .long("crf")
-                .value_name("VALUE")
-                .help("Sets a CRF value to use (default: 18)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("av1")
-                .long("av1")
-                .help("Encode to AV1 using aomenc (default QP: 30)"),
-        )
-        .arg(
-            Arg::with_name("rav1e")
-                .long("rav1e")
-                .help("Encode to AV1 using rav1e (default QP: 60)"),
-        )
-        .arg(
-            Arg::with_name("x265")
-                .long("x265")
-                .help("Encode to x265 (default QP: 30)"),
-        )
-        .arg(
-            Arg::with_name("direct")
-                .short("d")
-                .long("direct")
-                .value_name("A_TRACK")
-                .help("remux mkv to mp4; will convert audio streams to aac without touching video")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("audio_track")
-                .short("A")
-                .long("audio-track")
-                .value_name("A_TRACK")
-                .help("define which audio track to use when doing a full conversion")
-                .default_value("0")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("audio_bitrate")
-                .long("ab")
-                .value_name("VALUE")
-                .help("Audio bitrate per channel in kbps (Default: 96 kbps/channel)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("hdr")
-                .long("hdr")
-                .help("this video should be encoded as HDR"),
-        )
-        .arg(
-            Arg::with_name("acodec")
-                .short("a")
-                .long("acodec")
-                .help("codec to use for audio")
-                .takes_value(true)
-                .default_value("copy")
-                .possible_values(&["copy", "aac", "flac", "opus"]),
-        )
-        .arg(
-            Arg::with_name("skip-video")
-                .long("skip-video")
-                .help("assume the video has already been encoded (will use .out.mkv files)"),
-        )
         .arg(
             Arg::with_name("keep-lossless")
                 .long("keep-lossless")
@@ -113,40 +36,30 @@ fn main() {
                 .help("quit after making the lossless video"),
         )
         .arg(
-            Arg::with_name("mp4")
-                .long("mp4")
-                .help("output to mp4 instead of mkv"),
-        )
-        .arg(
-            Arg::with_name("speed")
-                .long("speed")
-                .short("s")
-                .help("the speed level to use for aomenc (default: 4) or rav1e (default: 5)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("compat")
-                .long("compat")
-                .help("defines the compatibility level to use for encoding")
-                .takes_value(true)
-                .possible_values(&["dxva", "normal", "none"])
-                .default_value("normal"),
-        )
-        .arg(
-            Arg::with_name("grain")
-                .long("grain")
-                .value_name("VALUE")
-                .help("Grain synthesis noise level (0-50, aomenc only)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("scale")
-                .long("scale")
+            Arg::with_name("formats")
+                .long("formats")
                 .value_name("FILTERS")
                 .help(
-                    "Takes a list of desired formats to output. Each filter is comma separated, \
-                     each output format is semicolon separated\n- orig: Output without scaling\n- \
-                     b#: Output bit depth\n- r#x#: Output resolution",
+                    r#"Takes a list of desired formats to output.
+Each filter is comma separated, each output is semicolon separated.
+
+Video encoder options:
+- enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
+- q=#: QP or CRF [default: varies by encoder]
+- speed=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
+- p=str: Encoder settings to use [default: film] [options: film, anime, fast]
+- grain=#: Grain synth level [aom only] [default: 0]
+- compat=0/1: Enable extra playback compatibility/DXVA options [default: 0]
+- hdr=0/1: Enable HDR encoding features [default: 0]
+- ext=mkv/mp4: Output file format [default: mkv]
+
+Video filters (any unset will leave the input unchanged):
+- bd=#: Output bit depth
+- res=#x#: Output resolution
+
+Audio encoder options:
+- aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
+- ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]"#,
                 ),
         )
         .arg(
@@ -157,400 +70,172 @@ fn main() {
         )
         .get_matches();
 
-    const INPUT_PATH_ERROR: &str = "No input path provided";
-    const CRF_PARSE_ERROR: &str = "CRF must be a number between 0-51";
-
-    let input = args.value_of("input").expect(INPUT_PATH_ERROR);
-    let profile = Profile::from_str(args.value_of("profile").unwrap_or("film"))
-        .expect("Invalid profile given");
-    let compat = Compat::from_str(args.value_of("compat").unwrap_or("normal")).unwrap();
-    let encoder = if args.is_present("av1") {
-        Encoder::Aom {
-            crf: args
-                .value_of("crf")
-                .unwrap_or("30")
-                .parse::<u8>()
-                .expect(CRF_PARSE_ERROR),
-            speed: args
-                .value_of("speed")
-                .map(|val| val.parse::<u8>().unwrap_or(4)),
-            profile,
-            is_hdr: args.is_present("hdr"),
-            grain: args
-                .value_of("grain")
-                .map(|val| val.parse::<u8>().unwrap())
-                .unwrap_or(0),
-            compat,
-        }
-    } else if args.is_present("rav1e") {
-        Encoder::Rav1e {
-            crf: args
-                .value_of("crf")
-                .unwrap_or("60")
-                .parse::<u8>()
-                .expect(CRF_PARSE_ERROR),
-            speed: args
-                .value_of("speed")
-                .map(|val| val.parse::<u8>().unwrap_or(5)),
-            profile,
-            is_hdr: args.is_present("hdr"),
-        }
-    } else if args.is_present("x265") {
-        Encoder::X265 {
-            crf: args
-                .value_of("crf")
-                .unwrap_or("18")
-                .parse::<u8>()
-                .expect(CRF_PARSE_ERROR),
-            profile,
-            compat,
-        }
-    } else {
-        Encoder::X264 {
-            crf: args
-                .value_of("crf")
-                .unwrap_or("18")
-                .parse::<u8>()
-                .expect(CRF_PARSE_ERROR),
-            profile,
-            compat,
-        }
-    };
-    let scale_filters = args
-        .value_of("scale")
-        .map(|scale| {
-            scale
+    let input = args.value_of("input").expect("No input path provided");
+    let outputs = args
+        .value_of("formats")
+        .map(|formats| {
+            let formats = formats.trim();
+            if formats.is_empty() {
+                return vec![Output::default()];
+            }
+            formats
                 .split(';')
-                .map(|chain| {
-                    if chain == "orig" {
-                        return Filter::Original;
-                    }
-
-                    let mut parsed = Filter::Scaled {
-                        resolution: None,
-                        bit_depth: None,
-                        quality: None,
-                    };
-                    for filter in chain.split(',') {
-                        if let Some(filter) = filter.strip_prefix('r') {
-                            if let Filter::Scaled {
-                                resolution: Some(_),
-                                ..
-                            } = parsed
-                            {
-                                panic!(
-                                    "Each filter chain may only specify one resolution: {}",
-                                    chain
-                                );
-                            }
-                            let resolution = filter
-                                .split_once('x')
-                                .unwrap_or_else(|| panic!("Invalid resolution filter: {}", filter));
-                            let width = resolution.0.parse().unwrap_or_else(|_| {
-                                panic!("Invalid resolution filter: {}", filter)
-                            });
-                            let height = resolution.1.parse().unwrap_or_else(|_| {
-                                panic!("Invalid resolution filter: {}", filter)
-                            });
-                            if let Filter::Scaled {
-                                ref mut resolution, ..
-                            } = parsed
-                            {
-                                *resolution = Some((width, height));
-                            }
-                        } else if let Some(filter) = filter.strip_prefix('b') {
-                            if let Filter::Scaled {
-                                bit_depth: Some(_), ..
-                            } = parsed
-                            {
-                                panic!(
-                                    "Each filter chain may only specify one bit depth: {}",
-                                    chain
-                                );
-                            }
-                            let depth = filter
-                                .parse()
-                                .unwrap_or_else(|_| panic!("Invalid bit depth: {}", filter));
-                            if ![8, 10].contains(&depth) {
-                                panic!("Invalid bit depth: {}", filter);
-                            }
-                            if let Filter::Scaled {
-                                ref mut bit_depth, ..
-                            } = parsed
-                            {
-                                *bit_depth = Some(depth);
-                            }
-                        } else if let Some(filter) = filter.strip_prefix('q') {
-                            if let Filter::Scaled {
-                                quality: Some(_), ..
-                            } = parsed
-                            {
-                                panic!(
-                                    "Each filter chain may only specify one quality level: {}",
-                                    chain
-                                );
-                            }
-                            let q = filter
-                                .parse()
-                                .unwrap_or_else(|_| panic!("Invalid quality level: {}", filter));
-                            if let Filter::Scaled {
-                                ref mut quality, ..
-                            } = parsed
-                            {
-                                *quality = Some(q);
-                            }
-                        } else if filter == "orig" {
-                            panic!(
-                                "\"orig\" filter may not be specified with other filters: {}",
-                                chain
-                            );
-                        } else {
-                            panic!("Unrecognized filter argument: {}", filter);
+                .enumerate()
+                .map(|(i, format)| {
+                    let mut output = Output::default();
+                    let filters = format
+                        .split(',')
+                        .map(|filter| {
+                            filter.trim().split_once('=').unwrap_or_else(|| {
+                                panic!("Invalid filter in output {}: {}", i, filter)
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    for (filter, group) in filters.iter().group_by(|(filter, _)| filter).into_iter()
+                    {
+                        if group.count() > 1 {
+                            panic!("Duplicate filter in output {}: {}", i, filter);
                         }
                     }
-                    parsed
-                })
-                .unique()
-                .sorted_by(|a, _b| {
-                    if let Filter::Original = a {
-                        Ordering::Less
-                    } else {
-                        Ordering::Equal
+                    if let Some((_, encoder)) = filters.iter().find(|(filter, _)| filter == &"enc")
+                    {
+                        match encoder.to_lowercase().as_str() {
+                            "x264" => {
+                                // This is the default, do nothing
+                            }
+                            "x265" => {
+                                output.video.encoder = VideoEncoder::X265 {
+                                    crf: 18,
+                                    profile: Profile::Film,
+                                    compat: false,
+                                    is_hdr: true,
+                                }
+                            }
+                            "aom" => {
+                                output.video.encoder = VideoEncoder::Aom {
+                                    crf: 16,
+                                    speed: 4,
+                                    profile: Profile::Film,
+                                    is_hdr: false,
+                                    grain: 0,
+                                    compat: false,
+                                }
+                            }
+                            "rav1e" => {
+                                output.video.encoder = VideoEncoder::Rav1e {
+                                    crf: 40,
+                                    speed: 5,
+                                    profile: Profile::Film,
+                                    is_hdr: false,
+                                }
+                            }
+                            enc => panic!("Unrecognized encoder: {}", enc),
+                        }
                     }
+                    for (filter, arg) in &filters {
+                        parse_filter(filter, arg, &mut output);
+                    }
+                    output
                 })
                 .collect()
         })
-        .unwrap_or_else(|| vec![Filter::Original]);
-    let audio_track = args.value_of("audio_track").unwrap().parse().unwrap();
-    let audio_bitrate = args
-        .value_of("audio_bitrate")
-        .unwrap_or("96")
-        .parse::<u32>()
-        .unwrap();
-    let extension = if args.is_present("mp4") { "mp4" } else { "mkv" };
+        .unwrap_or_else(|| vec![Output::default()]);
 
     let input = Path::new(input);
     assert!(input.exists(), "Input path does not exist");
 
-    if args.is_present("direct") {
-        let track: u8 = args
-            .value_of("direct")
-            .map(|t| t.parse().unwrap())
-            .unwrap_or(0);
-        if input.is_dir() {
-            for entry in glob(&format!("{}/**/*.mkv", input.to_string_lossy()))
-                .unwrap()
-                .filter_map(Result::ok)
-                .sorted()
-            {
-                let audio_track = find_external_audio(&entry, track);
-                let result = process_direct(
-                    &entry,
-                    audio_track,
-                    args.value_of("acodec").unwrap_or("copy"),
-                    audio_bitrate,
-                    extension,
-                );
-                if let Err(err) = result {
-                    eprintln!(
-                        "An error occurred for {}: {}",
-                        entry.as_os_str().to_string_lossy(),
-                        err
-                    );
-                }
-                eprintln!();
-                eprintln!();
-            }
-        } else {
-            assert_eq!(
-                input
-                    .extension()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default(),
-                "mkv",
-                "Input file must be a matroska file"
-            );
-            let audio_track = find_external_audio(input, audio_track);
-            process_direct(
-                input,
-                audio_track,
-                args.value_of("acodec").unwrap_or("copy"),
-                audio_bitrate,
-                extension,
-            )
-            .unwrap();
-        }
-        return;
-    }
-
-    if input.is_dir() {
-        for entry in glob(&format!("{}/**/*.vpy", input.to_string_lossy()))
-            .unwrap()
+    let inputs = if input.is_file() {
+        vec![input.to_path_buf()]
+    } else if input.is_dir() {
+        WalkDir::new(input)
+            .into_iter()
             .filter_map(|e| e.ok())
-            .sorted()
-        {
-            let audio_track = find_external_audio(&entry, audio_track);
-            let result = process_file(
-                &entry,
-                encoder,
-                args.value_of("acodec").unwrap_or("copy"),
-                args.is_present("skip-video"),
-                audio_track,
-                audio_bitrate,
-                extension,
-                args.is_present("keep-lossless"),
-                args.is_present("lossless-only"),
-                &scale_filters,
-            );
-            if let Err(err) = result {
-                eprintln!(
-                    "An error occurred for {}: {}",
-                    entry.as_os_str().to_string_lossy(),
-                    err
-                );
-            }
-            eprintln!();
-            eprintln!();
-        }
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext.to_string_lossy().to_string())
+                    == Some("vpy".to_string())
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect()
     } else {
-        let audio_track = find_external_audio(input, audio_track);
-        process_file(
-            input,
-            encoder,
-            args.value_of("acodec").unwrap_or("copy"),
-            args.is_present("skip-video"),
-            audio_track,
-            audio_bitrate,
-            extension,
+        panic!("Input is neither a file nor a directory");
+    };
+
+    for input in inputs {
+        let result = process_file(
+            &input,
+            &outputs,
             args.is_present("keep-lossless"),
             args.is_present("lossless-only"),
-            &scale_filters,
-        )
-        .unwrap();
+        );
+        if let Err(err) = result {
+            eprintln!(
+                "An error occurred for {}: {}",
+                input.as_os_str().to_string_lossy(),
+                err
+            );
+        }
+        eprintln!();
+        eprintln!();
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn process_file(
     input: &Path,
-    encoder: Encoder,
-    audio_codec: &str,
-    skip_video: bool,
-    audio_track: AudioTrack,
-    audio_bitrate: u32,
-    extension: &str,
+    outputs: &[Output],
     keep_lossless: bool,
     lossless_only: bool,
-    scale_filters: &[Filter],
 ) -> Result<(), String> {
-    for (i, filter_chain) in scale_filters.iter().enumerate() {
+    let dimensions = get_video_dimensions(input)?;
+    create_lossless(input, dimensions)?;
+    if lossless_only {
+        return Ok(());
+    }
+
+    let audio_track = find_external_audio(input, 0);
+    for output in outputs {
         let orig_input = input;
         eprintln!("Converting {}", input.to_string_lossy());
-        let dimensions = get_video_dimensions(input)?;
 
-        let hdr_info = match encoder {
-            Encoder::Aom { is_hdr, .. } | Encoder::Rav1e { is_hdr, .. } if is_hdr => {
+        let dimensions = get_video_dimensions(input)?;
+        let hdr_info = match output.video.encoder {
+            VideoEncoder::Aom { is_hdr, .. }
+            | VideoEncoder::Rav1e { is_hdr, .. }
+            | VideoEncoder::X265 { is_hdr, .. }
+                if is_hdr =>
+            {
                 Some(get_hdr_info(&find_source_file(orig_input))?)
             }
             _ => None,
         };
 
-        if !skip_video {
-            loop {
-                if filter_chain == &Filter::Original || i == 0 {
-                    create_lossless(orig_input, dimensions)?;
-                    if lossless_only {
-                        exit(0);
-                    }
-                }
+        loop {
+            let input = build_vpy_filename(input, output);
+            build_vpy_script(&input, orig_input, output);
 
-                let mut encoder = encoder;
-                let input = match filter_chain {
-                    Filter::Original => orig_input.to_path_buf(),
-                    Filter::Scaled {
-                        resolution,
-                        bit_depth,
-                        quality,
-                    } => {
-                        let input = orig_input.with_extension(&format!(
-                            "{}{}vpy",
-                            resolution
-                                .map(|(w, h)| format!("{}x{}.", w, h))
-                                .unwrap_or_else(String::new),
-                            bit_depth
-                                .map(|bd| format!("{}.", bd))
-                                .unwrap_or_else(String::new),
-                        ));
-                        let mut script = BufWriter::new(File::create(&input).unwrap());
-                        writeln!(&mut script, "import vapoursynth as vs").unwrap();
-                        writeln!(&mut script, "core = vs.get_core()").unwrap();
-                        writeln!(
-                            &mut script,
-                            "clip = core.lsmas.LWLibavSource(source=\"{}\")",
-                            escape_python_string(
-                                orig_input
-                                    .with_extension("lossless.mkv")
-                                    .canonicalize()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap()
-                            )
-                        )
-                        .unwrap();
-                        // We downscale resolution first because it's more likely that
-                        // we would be going from 10 bit to 8 bit, rather than the other way.
-                        // So this gives the best quality.
-                        if let Some((w, h)) = resolution {
-                            writeln!(
-                                &mut script,
-                                "clip = core.resize.Spline36(clip, {}, {}, \
-                                 dither_type='error_diffusion')",
-                                w, h
-                            )
-                            .unwrap();
-                        }
-                        if let Some(bd) = bit_depth {
-                            writeln!(&mut script, "import vsutil").unwrap();
-                            writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
-                        }
-                        script.flush().unwrap();
-
-                        if let Some(q) = quality {
-                            match encoder {
-                                Encoder::Aom { ref mut crf, .. }
-                                | Encoder::Rav1e { ref mut crf, .. }
-                                | Encoder::X264 { ref mut crf, .. }
-                                | Encoder::X265 { ref mut crf, .. } => {
-                                    *crf = *q;
-                                }
-                            }
-                        }
-                        input
-                    }
-                };
-
-                let result = convert_video_av1an(&input, encoder, dimensions, hdr_info.as_ref());
-                // I hate this lazy workaround,
-                // but this is due to a heisenbug in DFTTest
-                // due to some sort of race condition,
-                // which causes crashes often enough to be annoying.
-                //
-                // Essentially, we retry the encode until it works.
-                if result.is_ok() {
-                    break;
-                }
+            let result =
+                convert_video_av1an(&input, output.video.encoder, dimensions, hdr_info.as_ref());
+            // I hate this lazy workaround,
+            // but this is due to a heisenbug in DFTTest
+            // due to some sort of race condition,
+            // which causes crashes often enough to be annoying.
+            //
+            // Essentially, we retry the encode until it works.
+            if result.is_ok() {
+                break;
             }
         }
 
         convert_audio(
             orig_input,
             &input.with_extension("out.mka"),
-            audio_codec,
+            output.audio.encoder,
             audio_track.clone(),
-            audio_bitrate,
+            output.audio.kbps_per_channel,
         )?;
-        mux_video(input, extension)?;
+        mux_video(input, &output.video.output_ext)?;
 
         eprintln!("Finished converting {}", input.to_string_lossy());
     }
@@ -562,19 +247,252 @@ fn process_file(
     Ok(())
 }
 
-fn process_direct(
-    input: &Path,
-    audio_track: AudioTrack,
-    audio_codec: &str,
-    audio_bitrate: u32,
-    extension: &str,
-) -> Result<(), String> {
-    eprintln!("Converting {}", input.to_string_lossy());
-    mux_video_direct(input, audio_track, audio_codec, audio_bitrate, extension)?;
-    eprintln!("Finished converting {}", input.to_string_lossy());
-    Ok(())
-}
-
 fn escape_python_string(input: &str) -> String {
     input.replace(r"\", r"\\").replace(r"'", r"\'")
+}
+
+fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
+    match filter {
+        "q" => {
+            let arg = arg
+                .parse()
+                .unwrap_or_else(|_| panic!("Invalid value provided for 'q': {}", arg));
+            let range = match output.video.encoder {
+                VideoEncoder::X264 { ref mut crf, .. } => {
+                    *crf = arg;
+                    (-12, 51)
+                }
+                VideoEncoder::X265 { ref mut crf, .. } => {
+                    *crf = arg;
+                    (0, 51)
+                }
+                VideoEncoder::Aom { ref mut crf, .. } => {
+                    *crf = arg;
+                    (0, 63)
+                }
+                VideoEncoder::Rav1e { ref mut crf, .. } => {
+                    *crf = arg;
+                    (0, 255)
+                }
+            };
+            if arg < range.0 || arg > range.1 {
+                panic!(
+                    "'q' must be between {} and {}, received {}",
+                    range.0, range.1, arg
+                );
+            }
+        }
+        "speed" => match output.video.encoder {
+            VideoEncoder::Aom { ref mut speed, .. } | VideoEncoder::Rav1e { ref mut speed, .. } => {
+                let arg = arg
+                    .parse()
+                    .unwrap_or_else(|_| panic!("Invalid value provided for 'speed': {}", arg));
+                if arg > 10 {
+                    panic!("'speed' must be between 0 and 10, received {}", arg);
+                }
+                *speed = arg;
+            }
+            _ => (),
+        },
+        "p" => match output.video.encoder {
+            VideoEncoder::X264 {
+                ref mut profile, ..
+            }
+            | VideoEncoder::X265 {
+                ref mut profile, ..
+            }
+            | VideoEncoder::Aom {
+                ref mut profile, ..
+            }
+            | VideoEncoder::Rav1e {
+                ref mut profile, ..
+            } => {
+                *profile = match arg {
+                    "film" => Profile::Film,
+                    "anime" => Profile::Anime,
+                    "fast" => Profile::Fast,
+                    arg => panic!("Invalid value provided for 'profile': {}", arg),
+                };
+            }
+        },
+        "grain" => {
+            if let VideoEncoder::Aom { ref mut grain, .. } = output.video.encoder {
+                let arg = arg
+                    .parse()
+                    .unwrap_or_else(|_| panic!("Invalid value provided for 'grain': {}", arg));
+                if arg > 50 {
+                    panic!("'grain' must be between 0 and 50, received {}", arg);
+                }
+                *grain = arg;
+            }
+        }
+        "compat" => match arg {
+            "1" => match output.video.encoder {
+                VideoEncoder::X264 { ref mut compat, .. }
+                | VideoEncoder::X265 { ref mut compat, .. }
+                | VideoEncoder::Aom { ref mut compat, .. } => {
+                    *compat = true;
+                }
+                _ => (),
+            },
+            "0" => (),
+            arg => panic!("Invalid value provided for 'compat': {}", arg),
+        },
+        "hdr" => match arg {
+            "1" => match output.video.encoder {
+                VideoEncoder::X265 { ref mut is_hdr, .. }
+                | VideoEncoder::Aom { ref mut is_hdr, .. }
+                | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
+                    *is_hdr = true;
+                }
+                _ => panic!("Attempted to use HDR with an unsupported encoder"),
+            },
+            "0" => (),
+            arg => panic!("Invalid value provided for 'hdr': {}", arg),
+        },
+        "ext" => {
+            let arg = arg.to_lowercase();
+            if arg == "mkv" || arg == "mp4" {
+                output.video.output_ext = arg.to_string();
+            } else {
+                panic!("Unrecognized output extension requested: {}", arg);
+            }
+        }
+        "bd" => {
+            output.video.bit_depth = Some(match arg {
+                "8" => 8,
+                "10" => 10,
+                arg => panic!("Invalid value provided for 'bd': {}", arg),
+            });
+        }
+        "res" => {
+            let (width, height) = arg
+                .split_once('x')
+                .unwrap_or_else(|| panic!("Invalid value provided for 'res': {}", arg));
+            let width = width
+                .parse()
+                .unwrap_or_else(|_| panic!("Invalid value provided for 'res': {}", arg));
+            let height = height
+                .parse()
+                .unwrap_or_else(|_| panic!("Invalid value provided for 'res': {}", arg));
+            if width < 64 || height < 64 {
+                panic!("Resolution must be at least 64x64 pixels, got {}", arg);
+            }
+            if width % 2 != 0 || height % 2 != 0 {
+                panic!("Resolution must be mod 2, got {}", arg);
+            }
+            output.video.resolution = Some((width, height));
+        }
+        "aenc" => {
+            output.audio.encoder = match arg.to_lowercase().as_str() {
+                "copy" => AudioEncoder::Copy,
+                "flac" => AudioEncoder::Flac,
+                "aac" => AudioEncoder::Aac,
+                "opus" => AudioEncoder::Opus,
+                arg => panic!("Invalid value provided for 'aenc': {}", arg),
+            }
+        }
+        "ab" => {
+            let ab = arg
+                .parse()
+                .unwrap_or_else(|_| panic!("Invalid value provided for 'ab': {}", arg));
+            if ab == 0 {
+                panic!("'ab' must be greater than 0, got {}", arg);
+            }
+            output.audio.kbps_per_channel = ab;
+        }
+        filter => panic!("Unrecognized filter: {}", filter),
+    }
+}
+
+fn build_vpy_filename(input: &Path, output: &Output) -> PathBuf {
+    let ext = match output.video.encoder {
+        VideoEncoder::Aom {
+            crf,
+            speed,
+            profile,
+            is_hdr,
+            grain,
+            compat,
+        } => format!(
+            "aom-q{}-s{}-{}{}-g{}{}",
+            crf,
+            speed,
+            profile,
+            if is_hdr { "-hdr" } else { "" },
+            grain,
+            if compat { "-compat" } else { "" }
+        ),
+        VideoEncoder::Rav1e {
+            crf,
+            speed,
+            profile,
+            is_hdr,
+        } => format!(
+            "rav1e-q{}-s{}-{}{}",
+            crf,
+            speed,
+            profile,
+            if is_hdr { "-hdr" } else { "" }
+        ),
+        VideoEncoder::X264 {
+            crf,
+            profile,
+            compat,
+        } => format!(
+            "x264-q{}-{}{}",
+            crf,
+            profile,
+            if compat { "-compat" } else { "" }
+        ),
+        VideoEncoder::X265 {
+            crf,
+            profile,
+            compat,
+            is_hdr,
+        } => format!(
+            "x265-q{}-{}{}{}",
+            crf,
+            profile,
+            if is_hdr { "-hdr" } else { "" },
+            if compat { "-compat" } else { "" }
+        ),
+    };
+    input.with_extension(&format!("{}.vpy", ext))
+}
+
+fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
+    let mut script = BufWriter::new(File::create(&filename).unwrap());
+    writeln!(&mut script, "import vapoursynth as vs").unwrap();
+    writeln!(&mut script, "core = vs.get_core()").unwrap();
+    writeln!(
+        &mut script,
+        "clip = core.lsmas.LWLibavSource(source=\"{}\")",
+        escape_python_string(
+            input
+                .with_extension("lossless.mkv")
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+        )
+    )
+    .unwrap();
+
+    // We downscale resolution first because it's more likely that
+    // we would be going from 10 bit to 8 bit, rather than the other way.
+    // So this gives the best quality.
+    if let Some((w, h)) = output.video.resolution {
+        writeln!(
+            &mut script,
+            "clip = core.resize.Spline36(clip, {}, {}, dither_type='error_diffusion')",
+            w, h
+        )
+        .unwrap();
+    }
+    if let Some(bd) = output.video.bit_depth {
+        writeln!(&mut script, "import vsutil").unwrap();
+        writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
+    }
+    script.flush().unwrap();
 }
