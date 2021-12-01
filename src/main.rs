@@ -47,7 +47,7 @@ Each filter is comma separated, each output is semicolon separated.
 Video encoder options:
 - enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
 - q=#: QP or CRF [default: varies by encoder]
-- speed=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
+- s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
 - p=str: Encoder settings to use [default: film] [options: film, anime, fast]
 - grain=#: Grain synth level [aom only] [default: 0]
 - compat=0/1: Enable extra playback compatibility/DXVA options [default: 0]
@@ -275,8 +275,8 @@ fn escape_python_string(input: &str) -> String {
 }
 
 fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
-    match filter {
-        "q" => {
+    match filter.to_lowercase().as_str() {
+        "q" | "qp" | "crf" => {
             let arg = arg
                 .parse()
                 .unwrap_or_else(|_| panic!("Invalid value provided for 'q': {}", arg));
@@ -305,19 +305,19 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
                 );
             }
         }
-        "speed" => match output.video.encoder {
+        "s" | "speed" => match output.video.encoder {
             VideoEncoder::Aom { ref mut speed, .. } | VideoEncoder::Rav1e { ref mut speed, .. } => {
                 let arg = arg
                     .parse()
-                    .unwrap_or_else(|_| panic!("Invalid value provided for 'speed': {}", arg));
+                    .unwrap_or_else(|_| panic!("Invalid value provided for 's': {}", arg));
                 if arg > 10 {
-                    panic!("'speed' must be between 0 and 10, received {}", arg);
+                    panic!("'s' must be between 0 and 10, received {}", arg);
                 }
                 *speed = arg;
             }
             _ => (),
         },
-        "p" => match output.video.encoder {
+        "p" | "profile" => match output.video.encoder {
             VideoEncoder::X264 {
                 ref mut profile, ..
             }
