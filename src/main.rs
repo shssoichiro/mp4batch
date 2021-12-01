@@ -487,7 +487,7 @@ fn build_video_suffix(output: &Output) -> String {
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
     let mut script = BufWriter::new(File::create(&filename).unwrap());
     writeln!(&mut script, "import vapoursynth as vs").unwrap();
-    writeln!(&mut script, "core = vs.get_core()").unwrap();
+    writeln!(&mut script, "core = vs.core").unwrap();
     writeln!(
         &mut script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
