@@ -38,6 +38,7 @@ fn main() {
         .arg(
             Arg::with_name("formats")
                 .long("formats")
+                .short("f")
                 .value_name("FILTERS")
                 .help(
                     r#"Takes a list of desired formats to output.
