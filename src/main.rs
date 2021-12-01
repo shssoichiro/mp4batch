@@ -157,6 +157,13 @@ Audio encoder options:
                     .map(|ext| ext.to_string_lossy().to_string())
                     == Some("vpy".to_string())
             })
+            .filter(|e| {
+                let filestem = e.path().file_stem().unwrap().to_string_lossy();
+                !(filestem.contains(".aom-q")
+                    || filestem.contains(".rav1e-q")
+                    || filestem.contains(".x264-q")
+                    || filestem.contains(".x265-q"))
+            })
             .map(|e| e.path().to_path_buf())
             .collect()
     } else {
