@@ -168,7 +168,6 @@ pub fn convert_video_av1an(
     let mut command = Command::new("nice");
     command
         .arg("av1an")
-        .arg("--verbose")
         .arg("-i")
         .arg(vpy_input)
         .arg("-e")
