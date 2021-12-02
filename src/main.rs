@@ -185,7 +185,6 @@ Audio encoder options:
             );
         }
         eprintln!();
-        eprintln!();
     }
 }
 
@@ -203,6 +202,7 @@ fn process_file(
     if lossless_only {
         return Ok(());
     }
+    eprintln!();
 
     let audio_track = find_external_audio(input, 0);
     for output in outputs {
@@ -268,6 +268,7 @@ fn process_file(
         mux_video(&video_out, &audio_out, &output_path)?;
 
         eprintln!("Finished converting {}", vpy_file.to_string_lossy());
+        eprintln!();
     }
 
     if !keep_lossless {
