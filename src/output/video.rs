@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use ansi_term::Colour::{Green, Yellow};
 use tempfile::NamedTempFile;
 
 use crate::input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions};
@@ -76,74 +77,81 @@ impl Display for Profile {
 
 pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), String> {
     let lossless_filename = input.with_extension("lossless.mkv");
-    let mut needs_encode = true;
     if lossless_filename.exists() {
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
             if lossless_frames == dimensions.frames {
-                needs_encode = false;
-                eprintln!("Lossless already exists");
+                eprintln!(
+                    "{} {}",
+                    Green.bold().paint("[Success]"),
+                    Green.paint("Lossless already exists"),
+                );
+                return Ok(());
             }
         }
     }
 
-    if needs_encode {
-        // Print the info once
+    // Print the info once
+    Command::new("vspipe")
+        .arg("-i")
+        .arg(input)
+        .arg("-")
+        .status()
+        .map_err(|e| format!("Failed to execute vspipe -i: {}", e))?;
+
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
-            .arg("-i")
+            .arg("-c")
+            .arg("y4m")
             .arg(input)
             .arg("-")
-            .status()
-            .map_err(|e| format!("Failed to execute vspipe -i: {}", e))?;
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+    let mut command = Command::new("nice");
+    let status = command
+        .arg("ffmpeg")
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-y")
+        .arg("-i")
+        .arg("-")
+        .arg("-vcodec")
+        .arg("ffv1")
+        .arg("-level")
+        .arg("3")
+        .arg("-threads")
+        .arg("8")
+        .arg("-slices")
+        .arg("12")
+        .arg(&lossless_filename)
+        .stdin(pipe.stdout.unwrap())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
+    if !status.success() {
+        return Err(format!(
+            "Failed to execute ffmpeg: Exited with code {:x}",
+            status.code().unwrap()
+        ));
+    }
 
-        let filename = input.file_name().unwrap().to_str().unwrap();
-        let pipe = if filename.ends_with(".vpy") {
-            Command::new("vspipe")
-                .arg("-c")
-                .arg("y4m")
-                .arg(input)
-                .arg("-")
-                .stdout(Stdio::piped())
-                .spawn()
-                .unwrap()
-        } else {
-            panic!("Unrecognized input type");
-        };
-        let mut command = Command::new("nice");
-        let status = command
-            .arg("ffmpeg")
-            .arg("-hide_banner")
-            .arg("-loglevel")
-            .arg("level+error")
-            .arg("-stats")
-            .arg("-y")
-            .arg("-i")
-            .arg("-")
-            .arg("-vcodec")
-            .arg("ffv1")
-            .arg("-level")
-            .arg("3")
-            .arg("-threads")
-            .arg("8")
-            .arg("-slices")
-            .arg("12")
-            .arg(&lossless_filename)
-            .stdin(pipe.stdout.unwrap())
-            .stderr(Stdio::inherit())
-            .status()
-            .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
-        if !status.success() {
-            return Err(format!(
-                "Failed to execute ffmpeg: Exited with code {:x}",
-                status.code().unwrap()
-            ));
-        }
-
-        if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
-            if lossless_frames != dimensions.frames {
-                return Err("Incomlete lossless encode".to_string());
-            }
+    if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+        if lossless_frames != dimensions.frames {
+            return Err("Incomlete lossless encode".to_string());
         }
     }
+
+    eprintln!(
+        "{} {}",
+        Green.bold().paint("[Success]"),
+        Green.paint("Finished encoding lossless"),
+    );
 
     Ok(())
 }
@@ -156,10 +164,22 @@ pub fn convert_video_av1an(
     hdr_info: Option<&HdrInfo>,
 ) -> Result<(), String> {
     if dimensions.width % 8 != 0 {
-        eprintln!("WARNING: Width {} is not divisble by 8", dimensions.width);
+        eprintln!(
+            "{} {} {} {}",
+            Yellow.bold().paint("[Warning]"),
+            Yellow.paint("Width"),
+            Yellow.paint(dimensions.width.to_string()),
+            Yellow.paint("is not divisble by 8")
+        );
     }
     if dimensions.height % 8 != 0 {
-        eprintln!("WARNING: Height {} is not divisble by 8", dimensions.height);
+        eprintln!(
+            "{} {} {} {}",
+            Yellow.bold().paint("[Warning]"),
+            Yellow.paint("Height"),
+            Yellow.paint(dimensions.height.to_string()),
+            Yellow.paint("is not divisble by 8")
+        );
     }
 
     if output.exists() && get_video_frame_count(output)? == dimensions.frames {
@@ -373,8 +393,12 @@ fn build_aom_args_string(
         } else {
             if grain > 0 {
                 eprintln!(
-                    "Warning: Photon film grain not supported, falling back to aom grain \
-                     synthesis mode. Ensure photon_noise_table is in PATH."
+                    "{} {}",
+                    Yellow.bold().paint("[Warning]"),
+                    Yellow.paint(
+                        "Photon film grain not supported, falling back to aom grain synthesis \
+                         mode. Ensure photon_noise_table is in PATH."
+                    )
                 );
             }
             format!("--denoise-noise-level={}", grain * 3)

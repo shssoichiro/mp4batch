@@ -14,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ansi_term::Colour::{Blue, Green, Red};
 use clap::{App, Arg};
 use itertools::Itertools;
 use walkdir::WalkDir;
@@ -179,9 +180,10 @@ Audio encoder options:
         );
         if let Err(err) = result {
             eprintln!(
-                "An error occurred for {}: {}",
-                input.as_os_str().to_string_lossy(),
-                err
+                "{} {}: {}",
+                Red.bold().paint("[Error]"),
+                Red.paint(input.as_os_str().to_string_lossy()),
+                Red.paint(err)
             );
         }
         eprintln!();
@@ -195,7 +197,13 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
 ) -> Result<(), String> {
-    eprintln!("Converting {} lossless", input.to_string_lossy());
+    eprintln!(
+        "{} {} {} {}",
+        Blue.bold().paint("[Info]"),
+        Blue.paint("Encoding"),
+        Blue.paint(input.to_string_lossy()),
+        Blue.paint("lossless")
+    );
 
     let dimensions = get_video_dimensions(input)?;
     create_lossless(input, dimensions)?;
@@ -208,7 +216,12 @@ fn process_file(
     for output in outputs {
         let video_suffix = build_video_suffix(output);
         let vpy_file = input.with_extension(&format!("{}.vpy", video_suffix));
-        eprintln!("Converting {}", vpy_file.to_string_lossy());
+        eprintln!(
+            "{} {} {}",
+            Blue.bold().paint("[Info]"),
+            Blue.paint("Encoding"),
+            Blue.paint(vpy_file.to_string_lossy())
+        );
 
         let dimensions = get_video_dimensions(input)?;
         let hdr_info = match output.video.encoder {
@@ -267,7 +280,12 @@ fn process_file(
         );
         mux_video(&video_out, &audio_out, &output_path)?;
 
-        eprintln!("Finished converting {}", vpy_file.to_string_lossy());
+        eprintln!(
+            "{} {} {}",
+            Green.bold().paint("[Success]"),
+            Green.paint("Finished encoding"),
+            Green.paint(vpy_file.to_string_lossy())
+        );
         eprintln!();
     }
 
