@@ -182,7 +182,7 @@ Audio encoder options:
             eprintln!(
                 "{} {}: {}",
                 Red.bold().paint("[Error]"),
-                Red.paint(input.as_os_str().to_string_lossy()),
+                Red.paint(input.file_name().unwrap().to_string_lossy()),
                 Red.paint(err)
             );
         }
@@ -201,7 +201,7 @@ fn process_file(
         "{} {} {} {}",
         Blue.bold().paint("[Info]"),
         Blue.paint("Encoding"),
-        Blue.paint(input.to_string_lossy()),
+        Blue.paint(input.file_name().unwrap().to_string_lossy()),
         Blue.paint("lossless")
     );
 
@@ -220,7 +220,7 @@ fn process_file(
             "{} {} {}",
             Blue.bold().paint("[Info]"),
             Blue.paint("Encoding"),
-            Blue.paint(vpy_file.to_string_lossy())
+            Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
 
         let dimensions = get_video_dimensions(input)?;
@@ -284,7 +284,7 @@ fn process_file(
             "{} {} {}",
             Green.bold().paint("[Success]"),
             Green.paint("Finished encoding"),
-            Green.paint(vpy_file.to_string_lossy())
+            Green.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
         eprintln!();
     }
