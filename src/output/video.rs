@@ -1,9 +1,11 @@
 use std::{
     fmt::Display,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
 };
+
+use tempfile::NamedTempFile;
 
 use crate::input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions};
 
@@ -353,16 +355,30 @@ fn build_aom_args_string(
         " --cpu-used={} --cq-level={} --end-usage=q --lag-in-frames=48 --enable-fwd-kf=1 \
          --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 --qm-min=0 \
          --min-q=1 --enable-keyframe-filtering=0 --arnr-strength={} --arnr-maxframes={} \
-         --sharpness=2 --enable-dnl-denoising=0 --denoise-noise-level={} \
-         --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
-         --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
-         --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
+         --sharpness=2 --enable-dnl-denoising=0 {} --disable-trellis-quant=0 \
+         --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=4 --row-mt=0 \
+         --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} --disable-kf \
+         --kf-max-dist=9999 ",
         speed,
         crf,
         if hdr_info.is_some() { 5 } else { 1 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
-        grain,
+        if let Some(grain_table) = get_grain_table(grain as u32, dimensions, hdr_info.is_some()) {
+            format!(
+                "--denoise-noise-level={} --film-grain-table={}",
+                0,
+                grain_table.to_string_lossy()
+            )
+        } else {
+            if grain > 0 {
+                eprintln!(
+                    "Warning: Photon film grain not supported, falling back to aom grain \
+                     synthesis mode. Ensure photon_noise_table is in PATH."
+                );
+            }
+            format!("--denoise-noise-level={}", grain * 3)
+        },
         if dimensions.width >= 3000 {
             2
         } else if dimensions.width >= 1200 {
@@ -399,6 +415,42 @@ fn build_aom_args_string(
             "bt601"
         },
     )
+}
+
+fn get_grain_table(grain: u32, dims: VideoDimensions, hdr: bool) -> Option<PathBuf> {
+    if grain == 0 {
+        return None;
+    }
+    let grain = if grain <= 10 {
+        grain * 50
+    } else if grain <= 25 {
+        500 + (grain - 10) * 75
+    } else {
+        1625 + (grain - 25) * (6400 - 1625) / 25
+    };
+    let filename = NamedTempFile::new().unwrap().keep().unwrap().1;
+    Command::new("photon_noise_table")
+        .arg("--width")
+        .arg(dims.width.to_string())
+        .arg("--height")
+        .arg(dims.height.to_string())
+        .arg("--iso")
+        .arg(grain.to_string())
+        .arg("--transfer-function")
+        .arg(if hdr {
+            "smpte2084"
+        } else if dims.height >= 600 {
+            "srgb"
+        } else {
+            "bt470bg"
+        })
+        .arg(&format!(
+            "--output={}",
+            filename.canonicalize().unwrap().to_string_lossy()
+        ))
+        .status()
+        .ok()?;
+    Some(filename)
 }
 
 fn build_rav1e_args_string(

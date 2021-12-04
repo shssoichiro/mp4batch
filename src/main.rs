@@ -49,9 +49,9 @@ Video encoder options:
 - q=#: QP or CRF [default: varies by encoder]
 - s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
 - p=str: Encoder settings to use [default: film] [options: film, anime, fast]
-- grain=#: Grain synth level [aom only] [default: 0]
-- compat=0/1: Enable extra playback compatibility/DXVA options [default: 0]
-- hdr=0/1: Enable HDR encoding features [default: 0]
+- grain=#: Grain synth level [aom only] [0-50, 0 = disabled]
+- compat=0/1: Enable extra playback compatibility/DXVA options
+- hdr=0/1: Enable HDR encoding features
 - ext=mkv/mp4: Output file format [default: mkv]
 
 Video filters (any unset will leave the input unchanged):
