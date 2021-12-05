@@ -70,6 +70,16 @@ Audio encoder options:
                 .required(true)
                 .index(1),
         )
+        .arg(
+            Arg::with_name("output-dir")
+                .long("output")
+                .short("o")
+                .value_name("DIR")
+                .help(&format!(
+                    "Override the default output directory [default on this machine: {}]",
+                    dotenv!("OUTPUT_PATH")
+                )),
+        )
         .get_matches();
 
     let input = args.value_of("input").expect("No input path provided");
@@ -175,6 +185,7 @@ Audio encoder options:
         let result = process_file(
             &input,
             &outputs,
+            args.value_of("output-dir"),
             args.is_present("keep-lossless"),
             args.is_present("lossless-only"),
         );
@@ -194,6 +205,7 @@ Audio encoder options:
 fn process_file(
     input: &Path,
     outputs: &[Output],
+    output_dir: Option<&str>,
     keep_lossless: bool,
     lossless_only: bool,
 ) -> Result<(), String> {
@@ -268,7 +280,7 @@ fn process_file(
             audio_track.clone(),
             output.audio.kbps_per_channel,
         )?;
-        let mut output_path = PathBuf::from(dotenv!("OUTPUT_PATH"));
+        let mut output_path = PathBuf::from(output_dir.unwrap_or(dotenv!("OUTPUT_PATH")));
         output_path.push(
             input
                 .with_extension(&format!(
