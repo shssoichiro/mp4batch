@@ -456,7 +456,7 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
 }
 
 fn build_video_suffix(output: &Output) -> String {
-    match output.video.encoder {
+    let mut codec_str = match output.video.encoder {
         VideoEncoder::Aom {
             crf,
             speed,
@@ -507,7 +507,14 @@ fn build_video_suffix(output: &Output) -> String {
             if is_hdr { "-hdr" } else { "" },
             if compat { "-compat" } else { "" }
         ),
+    };
+    if let Some(res) = output.video.resolution {
+        codec_str.push_str(&format!("-{}x{}", res.0, res.1));
     }
+    if let Some(bd) = output.video.bit_depth {
+        codec_str.push_str(&format!("-{}b", bd));
+    }
+    codec_str
 }
 
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
