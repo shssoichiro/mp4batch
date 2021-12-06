@@ -454,20 +454,19 @@ fn get_grain_table(grain: u32, dims: VideoDimensions, hdr: bool) -> Option<PathB
     };
     let filename = NamedTempFile::new().unwrap().keep().unwrap().1;
     Command::new("photon_noise_table")
-        .arg("--width")
-        .arg(dims.width.to_string())
-        .arg("--height")
-        .arg(dims.height.to_string())
-        .arg("--iso")
-        .arg(grain.to_string())
-        .arg("--transfer-function")
-        .arg(if hdr {
-            "smpte2084"
-        } else if dims.height >= 600 {
-            "srgb"
-        } else {
-            "bt470bg"
-        })
+        .arg(&format!("--width={}", dims.width))
+        .arg(&format!("--height={}", dims.height))
+        .arg(&format!("--iso={}", grain))
+        .arg(&format!(
+            "--transfer-function={}",
+            if hdr {
+                "smpte2084"
+            } else if dims.height >= 600 {
+                "srgb"
+            } else {
+                "bt470bg"
+            }
+        ))
         .arg(&format!(
             "--output={}",
             filename.canonicalize().unwrap().to_string_lossy()
