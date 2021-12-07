@@ -205,7 +205,6 @@ Audio encoder options:
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn process_file(
     input: &Path,
     outputs: &[Output],
