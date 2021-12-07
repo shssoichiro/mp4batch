@@ -17,6 +17,7 @@ use std::{
 use ansi_term::Colour::{Blue, Green, Red};
 use clap::{App, Arg};
 use itertools::Itertools;
+use lexical_sort::natural_lexical_cmp;
 use walkdir::WalkDir;
 
 use self::{input::*, output::*};
@@ -176,6 +177,9 @@ Audio encoder options:
                     || filestem.contains(".x265-q"))
             })
             .map(|e| e.path().to_path_buf())
+            .sorted_unstable_by(|a, b| {
+                natural_lexical_cmp(&a.to_string_lossy(), &b.to_string_lossy())
+            })
             .collect()
     } else {
         panic!("Input is neither a file nor a directory");
