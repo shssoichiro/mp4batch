@@ -30,6 +30,7 @@ fn main() {
         .arg(
             Arg::with_name("verbose")
                 .long("verbose")
+                .short("v")
                 .help("print more stats"),
         )
         .arg(
