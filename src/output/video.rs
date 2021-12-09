@@ -162,6 +162,7 @@ pub fn convert_video_av1an(
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
     hdr_info: Option<&HdrInfo>,
+    verbose: bool,
 ) -> Result<(), String> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -270,6 +271,9 @@ pub fn convert_video_av1an(
         .arg(output);
     if dimensions.height > 1200 {
         command.arg("--sc-downscale-height").arg("1080");
+    }
+    if verbose {
+        command.arg("--verbose");
     }
     let status = command
         .status()

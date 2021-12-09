@@ -28,6 +28,11 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .arg(
+            Arg::with_name("verbose")
+                .long("verbose")
+                .help("print more stats"),
+        )
+        .arg(
             Arg::with_name("keep-lossless")
                 .long("keep-lossless")
                 .help("don't delete the lossless intermediate encode"),
@@ -192,6 +197,7 @@ Audio encoder options:
             args.value_of("output-dir"),
             args.is_present("keep-lossless"),
             args.is_present("lossless-only"),
+            args.is_present("verbose"),
         );
         if let Err(err) = result {
             eprintln!(
@@ -211,6 +217,7 @@ fn process_file(
     output_dir: Option<&str>,
     keep_lossless: bool,
     lossless_only: bool,
+    verbose: bool,
 ) -> Result<(), String> {
     eprintln!(
         "{} {} {} {}",
@@ -259,6 +266,7 @@ fn process_file(
                 output.video.encoder,
                 dimensions,
                 hdr_info.as_ref(),
+                verbose,
             );
             // I hate this lazy workaround,
             // but this is due to a heisenbug in DFTTest
