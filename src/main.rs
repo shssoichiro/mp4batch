@@ -246,7 +246,7 @@ fn process_file(
             Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
 
-        let dimensions = get_video_dimensions(input)?;
+        let dimensions = get_video_dimensions(&vpy_file)?;
         let hdr_info = match output.video.encoder {
             VideoEncoder::Aom { is_hdr, .. }
             | VideoEncoder::Rav1e { is_hdr, .. }
