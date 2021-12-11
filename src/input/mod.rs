@@ -1,5 +1,3 @@
-pub mod hdr;
-
 use std::{
     collections::HashMap,
     fmt,
@@ -8,8 +6,6 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-
-pub use hdr::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {

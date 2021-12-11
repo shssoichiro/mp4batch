@@ -246,17 +246,6 @@ fn process_file(
             Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
 
-        let hdr_info = match output.video.encoder {
-            VideoEncoder::Aom { is_hdr, .. }
-            | VideoEncoder::Rav1e { is_hdr, .. }
-            | VideoEncoder::X265 { is_hdr, .. }
-                if is_hdr =>
-            {
-                Some(get_hdr_info(&find_source_file(input))?)
-            }
-            _ => None,
-        };
-
         build_vpy_script(&vpy_file, input, output);
         let video_out = vpy_file.with_extension("mkv");
         let dimensions = get_video_dimensions(&vpy_file)?;
@@ -266,7 +255,6 @@ fn process_file(
                 &video_out,
                 output.video.encoder,
                 dimensions,
-                hdr_info.as_ref(),
                 verbose,
             );
             // I hate this lazy workaround,

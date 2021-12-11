@@ -8,7 +8,7 @@ use std::{
 use ansi_term::Colour::{Green, Yellow};
 use tempfile::NamedTempFile;
 
-use crate::input::{get_video_frame_count, hdr::*, PixelFormat, VideoDimensions};
+use crate::input::{get_video_frame_count, PixelFormat, VideoDimensions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VideoOutput {
@@ -161,7 +161,6 @@ pub fn convert_video_av1an(
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
-    hdr_info: Option<&HdrInfo>,
     verbose: bool,
 ) -> Result<(), String> {
     if dimensions.width % 8 != 0 {
@@ -196,7 +195,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions, hdr_info))
+        .arg(&encoder.get_args_string(dimensions))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -328,22 +327,19 @@ impl VideoEncoder {
         }
     }
 
-    pub fn get_args_string(
-        &self,
-        dimensions: VideoDimensions,
-        hdr_info: Option<&HdrInfo>,
-    ) -> String {
+    pub fn get_args_string(&self, dimensions: VideoDimensions) -> String {
         match self {
             VideoEncoder::Aom {
                 crf,
                 speed,
                 profile,
                 grain,
+                is_hdr,
                 ..
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, hdr_info, *grain),
-            VideoEncoder::Rav1e { crf, speed, .. } => {
-                build_rav1e_args_string(*crf, *speed, dimensions, hdr_info)
-            }
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain),
+            VideoEncoder::Rav1e {
+                crf, speed, is_hdr, ..
+            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -353,8 +349,9 @@ impl VideoEncoder {
                 crf,
                 profile,
                 compat,
+                is_hdr,
                 ..
-            } => build_x265_args_string(*crf, dimensions, *profile, *compat, hdr_info),
+            } => build_x265_args_string(*crf, dimensions, *profile, *compat, *is_hdr),
         }
     }
 
@@ -372,7 +369,7 @@ fn build_aom_args_string(
     speed: u8,
     dimensions: VideoDimensions,
     profile: Profile,
-    hdr_info: Option<&HdrInfo>,
+    is_hdr: bool,
     grain: u8,
 ) -> String {
     format!(
@@ -385,10 +382,10 @@ fn build_aom_args_string(
          --kf-max-dist=9999 ",
         speed,
         crf,
-        if hdr_info.is_some() { 5 } else { 1 },
+        if is_hdr { 5 } else { 1 },
         if profile == Profile::Film { 3 } else { 4 },
         if profile == Profile::Anime { 15 } else { 7 },
-        if let Some(grain_table) = get_grain_table(grain as u32, dimensions, hdr_info.is_some()) {
+        if let Some(grain_table) = get_grain_table(grain as u32, dimensions, is_hdr) {
             format!(
                 "--denoise-noise-level={} --film-grain-table={}",
                 0,
@@ -415,28 +412,22 @@ fn build_aom_args_string(
             0
         },
         if dimensions.height >= 1400 { 1 } else { 0 },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.primaries {
-                HdrPrimaries::Bt2020 => "bt2020",
-            }
+        if is_hdr {
+            "bt2020"
         } else if dimensions.height >= 600 {
             "bt709"
         } else {
             "bt601"
         },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.transfer {
-                HdrTransfer::Pq => "smpte2084",
-            }
+        if is_hdr {
+            "smpte2084"
         } else if dimensions.height >= 600 {
             "bt709"
         } else {
             "bt601"
         },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.matrix {
-                HdrMatrix::Bt2020NonConstant => "bt2020ncl",
-            }
+        if is_hdr {
+            "bt2020ncl"
         } else if dimensions.height >= 600 {
             "bt709"
         } else {
@@ -484,8 +475,9 @@ fn build_rav1e_args_string(
     crf: i16,
     speed: u8,
     dimensions: VideoDimensions,
-    hdr_info: Option<&HdrInfo>,
+    is_hdr: bool,
 ) -> String {
+    // TODO: Add proper HDR metadata
     format!(
         " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
          --matrix={} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
@@ -499,28 +491,22 @@ fn build_rav1e_args_string(
             1
         },
         if dimensions.width >= 2400 { 2 } else { 1 },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.primaries {
-                HdrPrimaries::Bt2020 => "BT2020",
-            }
+        if is_hdr {
+            "BT2020"
         } else if dimensions.height >= 600 {
             "BT709"
         } else {
             "BT601"
         },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.transfer {
-                HdrTransfer::Pq => "SMPTE2084",
-            }
+        if is_hdr {
+            "SMPTE2084"
         } else if dimensions.height >= 600 {
             "BT709"
         } else {
             "BT601"
         },
-        if let Some(hdr_info) = hdr_info {
-            match hdr_info.matrix {
-                HdrMatrix::Bt2020NonConstant => "BT2020NCL",
-            }
+        if is_hdr {
+            "BT2020NCL"
         } else if dimensions.height >= 600 {
             "BT709"
         } else {
@@ -534,9 +520,9 @@ fn build_x265_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     compat: bool,
-    hdr_info: Option<&HdrInfo>,
+    is_hdr: bool,
 ) -> String {
-    if hdr_info.is_some() {
+    if is_hdr {
         todo!("Implement HDR support for x265");
     }
 
