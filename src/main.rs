@@ -246,7 +246,6 @@ fn process_file(
             Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
 
-        let dimensions = get_video_dimensions(&vpy_file)?;
         let hdr_info = match output.video.encoder {
             VideoEncoder::Aom { is_hdr, .. }
             | VideoEncoder::Rav1e { is_hdr, .. }
@@ -260,6 +259,7 @@ fn process_file(
 
         build_vpy_script(&vpy_file, input, output);
         let video_out = vpy_file.with_extension("mkv");
+        let dimensions = get_video_dimensions(&vpy_file)?;
         loop {
             let result = convert_video_av1an(
                 &vpy_file,
@@ -270,7 +270,7 @@ fn process_file(
                 verbose,
             );
             // I hate this lazy workaround,
-            // but this is due to a heisenbug in DFTTest
+            // but this is due to a heisenbug in Vapoursynth
             // due to some sort of race condition,
             // which causes crashes often enough to be annoying.
             //
