@@ -188,7 +188,7 @@ Subtitle options:
 
     for input in inputs {
         let result = process_file(
-            &find_source_file(&input),
+            &input,
             &outputs,
             args.value_of("output-dir"),
             args.is_present("keep-lossless"),
@@ -310,7 +310,7 @@ fn process_file(
         }
 
         mux_video(
-            input,
+            &find_source_file(input),
             &video_out,
             &audio_outputs,
             &subtitle_outputs,

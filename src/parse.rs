@@ -66,7 +66,7 @@ pub fn parse_filters<'a, 'b>(input: &'a str, in_file: &'b Path) -> Vec<ParsedFil
             .or_else(|_| parse_subtitle_tracks(input, in_file))
             .unwrap();
         filters.push(result);
-        input = next_input.trim_end().trim_start_matches(';').trim_start();
+        input = next_input.trim_end().trim_start_matches(',').trim_start();
     }
     filters
 }
@@ -123,7 +123,7 @@ fn parse_hdr(input: &str) -> IResult<&str, ParsedFilter> {
 }
 
 fn parse_extension(input: &str) -> IResult<&str, ParsedFilter> {
-    preceded(tag("ext="), alpha1)(input).map(|(input, token)| {
+    preceded(tag("ext="), alphanumeric1)(input).map(|(input, token)| {
         if token == "mp4" || token == "mkv" {
             (input, ParsedFilter::Extension(token))
         } else {
@@ -179,7 +179,7 @@ fn parse_audio_tracks<'a, 'b>(
     preceded(
         tag("at="),
         separated_list1(
-            char(','),
+            char('|'),
             tuple((alphanumeric1, opt(char('e')), opt(char('f')))),
         ),
     )(input)
@@ -214,7 +214,7 @@ fn parse_subtitle_tracks<'a, 'b>(
     preceded(
         tag("st="),
         separated_list1(
-            char(','),
+            char('|'),
             tuple((alphanumeric1, opt(char('e')), opt(char('f')))),
         ),
     )(input)
