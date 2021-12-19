@@ -1,32 +1,8 @@
-use std::{
-    fmt::Display,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{fmt::Display, path::Path, process::Command};
 
 use anyhow::{anyhow, Result};
 
-#[derive(Debug, Clone)]
-pub enum AudioTrack {
-    FromVideo(u8),
-    External(PathBuf, u8),
-}
-
-pub fn find_external_audio(input: &Path, from_video: u8) -> AudioTrack {
-    const TRY_EXTENSIONS: &[&str] = &[
-        "flac", "wav", "aac", "ac3", "dts", "mka", "mkv", "avi", "mp4", "flv", "m2ts", "ts", "wmv",
-    ];
-    let mut i = 0;
-    let mut input_audio = input.with_extension(TRY_EXTENSIONS[i]);
-    while !input_audio.exists() {
-        i += 1;
-        if i >= TRY_EXTENSIONS.len() {
-            return AudioTrack::FromVideo(from_video);
-        }
-        input_audio = input.with_extension(TRY_EXTENSIONS[i]);
-    }
-    AudioTrack::External(input_audio, from_video)
-}
+use crate::parse::{Track, TrackSource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioOutput {
@@ -66,11 +42,17 @@ impl Display for AudioEncoder {
     }
 }
 
+impl AudioEncoder {
+    pub const fn supported_encoders() -> &'static [&'static str] {
+        &["copy", "aac", "flac", "opus"]
+    }
+}
+
 pub fn convert_audio(
     input: &Path,
     output: &Path,
     audio_codec: AudioEncoder,
-    audio_track: AudioTrack,
+    audio_track: &Track,
     audio_bitrate: u32,
 ) -> Result<(), String> {
     if output.exists() {
@@ -86,9 +68,9 @@ pub fn convert_audio(
         .arg("-stats")
         .arg("-y")
         .arg("-i")
-        .arg(match audio_track {
-            AudioTrack::FromVideo(_) => input,
-            AudioTrack::External(ref path, _) => path,
+        .arg(match audio_track.source {
+            TrackSource::FromVideo(_) => input,
+            TrackSource::External(ref path) => path,
         })
         .arg("-acodec");
     match audio_codec {
@@ -117,11 +99,11 @@ pub fn convert_audio(
                     "{}k",
                     audio_bitrate
                         * get_channel_count(
-                            match audio_track {
-                                AudioTrack::FromVideo(_) => input,
-                                AudioTrack::External(ref path, _) => path,
+                            match audio_track.source {
+                                TrackSource::FromVideo(_) => input,
+                                TrackSource::External(ref path) => path,
                             },
-                            &audio_track
+                            audio_track
                         )
                         .map_err(|e| e.to_string())?
                 ))
@@ -136,9 +118,9 @@ pub fn convert_audio(
         .arg("-map")
         .arg(format!(
             "0:a:{}",
-            match audio_track {
-                AudioTrack::FromVideo(ref track) => *track,
-                AudioTrack::External(_, ref track) => *track,
+            match audio_track.source {
+                TrackSource::FromVideo(id) => id,
+                TrackSource::External(_) => 0,
             }
         ))
         .arg("-map_chapters")
@@ -155,16 +137,16 @@ pub fn convert_audio(
     }
 }
 
-fn get_channel_count(path: &Path, audio_track: &AudioTrack) -> Result<u32> {
+fn get_channel_count(path: &Path, audio_track: &Track) -> Result<u32> {
     let output = Command::new("ffprobe")
         .arg("-v")
         .arg("error")
         .arg("-select_streams")
         .arg(format!(
             "a:{}",
-            match audio_track {
-                AudioTrack::FromVideo(ref track) => *track,
-                AudioTrack::External(_, ref track) => *track,
+            match audio_track.source {
+                TrackSource::FromVideo(id) => id,
+                TrackSource::External(_) => 0,
             }
         ))
         .arg("-show_entries")

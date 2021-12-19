@@ -47,7 +47,7 @@ impl Default for Profile {
 }
 
 impl FromStr for Profile {
-    type Err = String;
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_ref() {
@@ -55,7 +55,7 @@ impl FromStr for Profile {
             "anime" => Profile::Anime,
             "fast" => Profile::Fast,
             _ => {
-                return Err("Invalid profile given".to_owned());
+                return Err("Unrecognized profile");
             }
         })
     }
@@ -318,7 +318,11 @@ pub enum VideoEncoder {
 }
 
 impl VideoEncoder {
-    pub fn get_av1an_name(&self) -> &str {
+    pub const fn supported_encoders() -> &'static [&'static str] {
+        &["aom", "rav1e", "x264", "x265"]
+    }
+
+    pub const fn get_av1an_name(&self) -> &str {
         match self {
             VideoEncoder::Aom { .. } => "aom",
             VideoEncoder::Rav1e { .. } => "rav1e",
@@ -355,11 +359,11 @@ impl VideoEncoder {
         }
     }
 
-    pub fn has_tiling(&self) -> bool {
+    pub const fn has_tiling(&self) -> bool {
         matches!(self, VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. })
     }
 
-    pub fn tons_of_lookahead(&self) -> bool {
+    pub const fn tons_of_lookahead(&self) -> bool {
         matches!(self, VideoEncoder::X264 { .. })
     }
 }

@@ -5,6 +5,7 @@ extern crate dotenv_codegen;
 
 mod input;
 mod output;
+mod parse;
 
 use std::{
     env,
@@ -21,6 +22,7 @@ use lexical_sort::natural_lexical_cmp;
 use walkdir::WalkDir;
 
 use self::{input::*, output::*};
+use crate::parse::{parse_filters, ParsedFilter, Track, TrackSource};
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
@@ -68,7 +70,11 @@ Video filters (any unset will leave the input unchanged):
 
 Audio encoder options:
 - aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
-- ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]"#,
+- ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
+- at=#[e][f]: Audio tracks, comma separated [default: 1, e=enabled, f=forced]
+
+Subtitle options:
+- st=#[e][f]: Subtitle tracks, comma separated [default: None, e=enabled, f=forced]"#,
                 ),
         )
         .arg(
@@ -89,7 +95,8 @@ Audio encoder options:
         )
         .get_matches();
 
-    let input = args.value_of("input").expect("No input path provided");
+    let input = Path::new(args.value_of("input").expect("No input path provided"));
+    assert!(input.exists(), "Input path does not exist");
     let outputs = args
         .value_of("formats")
         .map(|formats| {
@@ -99,25 +106,16 @@ Audio encoder options:
             }
             formats
                 .split(';')
-                .enumerate()
-                .map(|(i, format)| {
+                .map(|format| {
                     let mut output = Output::default();
-                    let filters = format
-                        .split(',')
-                        .map(|filter| {
-                            filter.trim().split_once('=').unwrap_or_else(|| {
-                                panic!("Invalid filter in output {}: {}", i, filter)
-                            })
-                        })
-                        .collect::<Vec<_>>();
-                    for (filter, group) in filters.iter().group_by(|(filter, _)| filter).into_iter()
-                    {
-                        if group.count() > 1 {
-                            panic!("Duplicate filter in output {}: {}", i, filter);
+                    let filters = parse_filters(format, input);
+                    if let Some(encoder) = filters.iter().find_map(|filter| {
+                        if let ParsedFilter::VideoEncoder(encoder) = filter {
+                            Some(encoder)
+                        } else {
+                            None
                         }
-                    }
-                    if let Some((_, encoder)) = filters.iter().find(|(filter, _)| filter == &"enc")
-                    {
+                    }) {
                         match encoder.to_lowercase().as_str() {
                             "x264" => {
                                 // This is the default, do nothing
@@ -151,17 +149,14 @@ Audio encoder options:
                             enc => panic!("Unrecognized encoder: {}", enc),
                         }
                     }
-                    for (filter, arg) in &filters {
-                        parse_filter(filter, arg, &mut output);
+                    for filter in &filters {
+                        apply_filter(filter, &mut output);
                     }
                     output
                 })
                 .collect()
         })
         .unwrap_or_else(|| vec![Output::default()]);
-
-    let input = Path::new(input);
-    assert!(input.exists(), "Input path does not exist");
 
     let inputs = if input.is_file() {
         vec![input.to_path_buf()]
@@ -193,7 +188,7 @@ Audio encoder options:
 
     for input in inputs {
         let result = process_file(
-            &input,
+            &find_source_file(&input),
             &outputs,
             args.value_of("output-dir"),
             args.is_present("keep-lossless"),
@@ -235,7 +230,6 @@ fn process_file(
     }
     eprintln!();
 
-    let audio_track = find_external_audio(input, 0);
     for output in outputs {
         let video_suffix = build_video_suffix(output);
         let vpy_file = input.with_extension(&format!("{}.vpy", video_suffix));
@@ -268,18 +262,34 @@ fn process_file(
             }
         }
 
-        let audio_suffix = &format!(
-            "{}-{}kbpc",
-            output.audio.encoder, output.audio.kbps_per_channel
-        );
-        let audio_out = input.with_extension(&format!("{}.mka", audio_suffix));
-        convert_audio(
-            input,
-            &audio_out,
-            output.audio.encoder,
-            audio_track.clone(),
-            output.audio.kbps_per_channel,
-        )?;
+        let audio_tracks = if output.audio_tracks.is_empty() {
+            vec![Track {
+                source: TrackSource::FromVideo(0),
+                enabled: true,
+                forced: false,
+            }]
+        } else {
+            output.audio_tracks.clone()
+        };
+        let mut audio_outputs = Vec::new();
+        let mut audio_suffixes = Vec::new();
+        for (i, audio_track) in audio_tracks.iter().enumerate() {
+            let audio_suffix = format!(
+                "{}-{}kbpc-at{}",
+                output.audio.encoder, output.audio.kbps_per_channel, i
+            );
+            let audio_out = input.with_extension(&format!("{}.mka", audio_suffix));
+            convert_audio(
+                input,
+                &audio_out,
+                output.audio.encoder,
+                audio_track,
+                output.audio.kbps_per_channel,
+            )?;
+            audio_outputs.push((audio_out, audio_track.enabled, audio_track.forced));
+            audio_suffixes.push(audio_suffix);
+        }
+        let audio_suffix = audio_suffixes.join("-");
         let mut output_path = PathBuf::from(output_dir.unwrap_or(dotenv!("OUTPUT_PATH")));
         output_path.push(
             input
@@ -290,7 +300,22 @@ fn process_file(
                 .file_name()
                 .unwrap(),
         );
-        mux_video(&video_out, &audio_out, &output_path)?;
+
+        let mut subtitle_outputs = Vec::new();
+        if !output.sub_tracks.is_empty() {
+            for (i, subtitle) in output.sub_tracks.iter().enumerate() {
+                let subtitle_out = input.with_extension(&format!("-{}.ass", i));
+                subtitle_outputs.push((subtitle_out, subtitle.enabled, subtitle.forced));
+            }
+        }
+
+        mux_video(
+            input,
+            &video_out,
+            &audio_outputs,
+            &subtitle_outputs,
+            &output_path,
+        )?;
 
         eprintln!(
             "{} {} {}",
@@ -312,12 +337,11 @@ fn escape_python_string(input: &str) -> String {
     input.replace(r"\", r"\\").replace(r"'", r"\'")
 }
 
-fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
-    match filter.to_lowercase().as_str() {
-        "q" | "qp" | "crf" => {
-            let arg = arg
-                .parse()
-                .unwrap_or_else(|_| panic!("Invalid value provided for 'q': {}", arg));
+fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
+    match filter {
+        ParsedFilter::VideoEncoder(_) => (),
+        ParsedFilter::Quantizer(arg) => {
+            let arg = *arg;
             let range = match output.video.encoder {
                 VideoEncoder::X264 { ref mut crf, .. } => {
                     *crf = arg;
@@ -343,11 +367,9 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
                 );
             }
         }
-        "s" | "speed" => match output.video.encoder {
+        ParsedFilter::Speed(arg) => match output.video.encoder {
             VideoEncoder::Aom { ref mut speed, .. } | VideoEncoder::Rav1e { ref mut speed, .. } => {
-                let arg = arg
-                    .parse()
-                    .unwrap_or_else(|_| panic!("Invalid value provided for 's': {}", arg));
+                let arg = *arg;
                 if arg > 10 {
                     panic!("'s' must be between 0 and 10, received {}", arg);
                 }
@@ -355,7 +377,7 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
             }
             _ => (),
         },
-        "p" | "profile" => match output.video.encoder {
+        ParsedFilter::Profile(arg) => match output.video.encoder {
             VideoEncoder::X264 {
                 ref mut profile, ..
             }
@@ -368,83 +390,44 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
             | VideoEncoder::Rav1e {
                 ref mut profile, ..
             } => {
-                *profile = match arg {
-                    "film" => Profile::Film,
-                    "anime" => Profile::Anime,
-                    "fast" => Profile::Fast,
-                    arg => panic!("Invalid value provided for 'profile': {}", arg),
-                };
+                *profile = *arg;
             }
         },
-        "grain" => {
+        ParsedFilter::Grain(arg) => {
             if let VideoEncoder::Aom { ref mut grain, .. } = output.video.encoder {
-                let arg = arg
-                    .parse()
-                    .unwrap_or_else(|_| panic!("Invalid value provided for 'grain': {}", arg));
+                let arg = *arg;
                 if arg > 50 {
                     panic!("'grain' must be between 0 and 50, received {}", arg);
                 }
                 *grain = arg;
             }
         }
-        "compat" => match arg {
-            "1" => match output.video.encoder {
-                VideoEncoder::X264 { ref mut compat, .. }
-                | VideoEncoder::X265 { ref mut compat, .. }
-                | VideoEncoder::Aom { ref mut compat, .. } => {
-                    *compat = true;
-                }
-                _ => (),
-            },
-            "0" => (),
-            arg => panic!("Invalid value provided for 'compat': {}", arg),
+        ParsedFilter::Compat(arg) => match output.video.encoder {
+            VideoEncoder::X264 { ref mut compat, .. }
+            | VideoEncoder::X265 { ref mut compat, .. }
+            | VideoEncoder::Aom { ref mut compat, .. } => {
+                *compat = *arg;
+            }
+            _ => (),
         },
-        "hdr" => match arg {
-            "1" => match output.video.encoder {
-                VideoEncoder::X265 { ref mut is_hdr, .. }
-                | VideoEncoder::Aom { ref mut is_hdr, .. }
-                | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
-                    *is_hdr = true;
-                }
-                _ => panic!("Attempted to use HDR with an unsupported encoder"),
-            },
-            "0" => (),
-            arg => panic!("Invalid value provided for 'hdr': {}", arg),
+        ParsedFilter::Hdr(arg) => match output.video.encoder {
+            VideoEncoder::X265 { ref mut is_hdr, .. }
+            | VideoEncoder::Aom { ref mut is_hdr, .. }
+            | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
+                *is_hdr = *arg;
+            }
+            _ => panic!("Attempted to use HDR with an unsupported encoder"),
         },
-        "ext" => {
-            let arg = arg.to_lowercase();
-            if arg == "mkv" || arg == "mp4" {
-                output.video.output_ext = arg;
-            } else {
-                panic!("Unrecognized output extension requested: {}", arg);
-            }
+        ParsedFilter::Extension(arg) => {
+            output.video.output_ext = arg.to_string();
         }
-        "bd" => {
-            output.video.bit_depth = Some(match arg {
-                "8" => 8,
-                "10" => 10,
-                arg => panic!("Invalid value provided for 'bd': {}", arg),
-            });
+        ParsedFilter::BitDepth(arg) => {
+            output.video.bit_depth = Some(*arg);
         }
-        "res" => {
-            let (width, height) = arg
-                .split_once('x')
-                .unwrap_or_else(|| panic!("Invalid value provided for 'res': {}", arg));
-            let width = width
-                .parse()
-                .unwrap_or_else(|_| panic!("Invalid value provided for 'res': {}", arg));
-            let height = height
-                .parse()
-                .unwrap_or_else(|_| panic!("Invalid value provided for 'res': {}", arg));
-            if width < 64 || height < 64 {
-                panic!("Resolution must be at least 64x64 pixels, got {}", arg);
-            }
-            if width % 2 != 0 || height % 2 != 0 {
-                panic!("Resolution must be mod 2, got {}", arg);
-            }
-            output.video.resolution = Some((width, height));
+        ParsedFilter::Resolution { width, height } => {
+            output.video.resolution = Some((*width, *height));
         }
-        "aenc" => {
+        ParsedFilter::AudioEncoder(arg) => {
             output.audio.encoder = match arg.to_lowercase().as_str() {
                 "copy" => AudioEncoder::Copy,
                 "flac" => AudioEncoder::Flac,
@@ -453,17 +436,19 @@ fn parse_filter(filter: &str, arg: &str, output: &mut Output) {
                 arg => panic!("Invalid value provided for 'aenc': {}", arg),
             }
         }
-        "ab" => {
-            let ab = arg
-                .parse()
-                .unwrap_or_else(|_| panic!("Invalid value provided for 'ab': {}", arg));
-            if ab == 0 {
+        ParsedFilter::AudioBitrate(arg) => {
+            let arg = *arg;
+            if arg == 0 {
                 panic!("'ab' must be greater than 0, got {}", arg);
             }
-            output.audio.kbps_per_channel = ab;
+            output.audio.kbps_per_channel = arg;
         }
-        "enc" => (),
-        filter => panic!("Unrecognized filter: {}", filter),
+        ParsedFilter::AudioTracks(args) => {
+            output.audio_tracks = args.clone();
+        }
+        ParsedFilter::SubtitleTracks(args) => {
+            output.sub_tracks = args.clone();
+        }
     }
 }
 

@@ -1,69 +1,104 @@
 mod audio;
 mod video;
 
-use std::{path::Path, process::Command};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+use ansi_term::Colour::Yellow;
 
 pub use self::{audio::*, video::*};
+use crate::parse::Track;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub struct Output {
     pub video: VideoOutput,
     pub audio: AudioOutput,
+    pub audio_tracks: Vec<Track>,
+    pub sub_tracks: Vec<Track>,
 }
 
-pub fn mux_video(video: &Path, audio: &Path, output: &Path) -> Result<(), String> {
-    let extension = output.extension().unwrap().to_string_lossy();
-    let status = if extension == "mkv" {
-        Command::new("mkvmerge")
-            .arg("-q")
-            .arg("--ui-language")
-            .arg("en_US")
-            .arg("--output")
-            .arg(&output)
-            .arg("--language")
-            .arg("0:und")
-            .arg("(")
-            .arg(video)
-            .arg(")")
-            .arg("--language")
-            .arg("0:en")
-            .arg("--track-name")
-            .arg("0:Audio")
-            .arg("--default-track")
-            .arg("0:yes")
-            .arg("(")
-            .arg(audio)
-            .arg(")")
-            .arg("--track-order")
-            .arg("0:0,1:0")
-            .status()
-            .map_err(|e| format!("{}", e))?
-    } else {
-        Command::new("ffmpeg")
-            .arg("-hide_banner")
-            .arg("-loglevel")
-            .arg("level+error")
-            .arg("-stats")
-            .arg("-i")
-            .arg(video)
-            .arg("-i")
-            .arg(audio)
-            .arg("-vcodec")
-            .arg("copy")
-            .arg("-acodec")
-            .arg("copy")
+pub fn mux_video(
+    input: &Path,
+    video: &Path,
+    audios: &[(PathBuf, bool, bool)],
+    subtitles: &[(PathBuf, bool, bool)],
+    output: &Path,
+) -> Result<(), String> {
+    let mut extension = output.extension().unwrap().to_string_lossy();
+
+    if extension != "mkv" && !subtitles.is_empty() {
+        eprintln!(
+            "{} {}",
+            Yellow.bold().paint("[Warning]"),
+            Yellow.paint("Subtitles present, forcing mkv"),
+        );
+        extension = Cow::Borrowed("mkv");
+    }
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-i")
+        .arg(video);
+    for audio in audios {
+        command.arg("-i").arg(&audio.0);
+    }
+    for subtitle in subtitles {
+        command.arg("-i").arg(&subtitle.0);
+    }
+    if !subtitles.is_empty() {
+        command.arg("-i").arg(input);
+    }
+    command
+        .arg("-vcodec")
+        .arg("copy")
+        .arg("-acodec")
+        .arg("copy");
+    if !subtitles.is_empty() {
+        command.arg("-c:s").arg("copy");
+    }
+    command.arg("-map").arg("0:v:0");
+    let mut i = 1;
+    for (j, audio) in audios.iter().enumerate() {
+        command.arg("-map").arg(&format!("{}:a:0", i));
+        if audio.2 {
+            command.arg(&format!("-disposition:a:{}", j)).arg("forced");
+        } else if audio.1 {
+            command.arg(&format!("-disposition:a:{}", j)).arg("default");
+        }
+        i += 1;
+    }
+    for (j, subtitle) in subtitles.iter().enumerate() {
+        command.arg("-map").arg(&format!("{}:s:0", i));
+        if subtitle.2 {
+            command.arg(&format!("-disposition:s:{}", j)).arg("forced");
+        } else if subtitle.1 {
+            command.arg(&format!("-disposition:s:{}", j)).arg("default");
+        }
+        i += 1;
+    }
+    if !subtitles.is_empty() {
+        command
             .arg("-map")
-            .arg("0:v:0")
-            .arg("-map")
-            .arg("1:a:0")
-            .arg("-map_chapters")
-            .arg("-1")
-            .arg("-movflags")
-            .arg("+faststart")
-            .arg(output)
-            .status()
-            .map_err(|e| format!("{}", e))?
-    };
+            .arg(&format!("{}:t", 1 + audios.len() + subtitles.len()));
+    }
+    let fonts_dir = input.parent().unwrap().join("fonts");
+    if fonts_dir.is_dir() {
+        let fonts = fonts_dir.read_dir().unwrap();
+        for font in fonts {
+            command.arg("-attach").arg(font.unwrap().path());
+        }
+    }
+    if extension == "mp4" {
+        command.arg("-movflags").arg("+faststart");
+    }
+
+    let status = command.arg(output).status().map_err(|e| format!("{}", e))?;
     if status.success() {
         Ok(())
     } else {
