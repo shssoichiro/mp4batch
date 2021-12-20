@@ -305,7 +305,7 @@ fn process_file(
         let mut subtitle_outputs = Vec::new();
         if !output.sub_tracks.is_empty() {
             for (i, subtitle) in output.sub_tracks.iter().enumerate() {
-                let subtitle_out = input.with_extension(&format!("-{}.ass", i));
+                let subtitle_out = input.with_extension(&format!("{}.ass", i));
                 extract_subtitles(&find_source_file(input), i as u8, &subtitle_out)?;
                 subtitle_outputs.push((subtitle_out, subtitle.enabled, subtitle.forced));
             }

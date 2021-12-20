@@ -86,7 +86,7 @@ pub fn mux_video(
     if !subtitles.is_empty() {
         command
             .arg("-map")
-            .arg(&format!("{}:t", 1 + audios.len() + subtitles.len()));
+            .arg(&format!("{}:t?", 1 + audios.len() + subtitles.len()));
     }
     let fonts_dir = input.parent().unwrap().join("fonts");
     if fonts_dir.is_dir() {
@@ -114,6 +114,7 @@ pub fn extract_subtitles(input: &Path, track: u8, output: &Path) -> Result<()> {
         .arg("-loglevel")
         .arg("level+error")
         .arg("-stats")
+        .arg("-y")
         .arg("-i")
         .arg(input)
         .arg("-c:s")
