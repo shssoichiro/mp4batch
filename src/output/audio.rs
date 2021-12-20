@@ -2,7 +2,10 @@ use std::{fmt::Display, path::Path, process::Command};
 
 use anyhow::{anyhow, Result};
 
-use crate::parse::{Track, TrackSource};
+use crate::{
+    find_source_file,
+    parse::{Track, TrackSource},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioOutput {
@@ -69,8 +72,8 @@ pub fn convert_audio(
         .arg("-y")
         .arg("-i")
         .arg(match audio_track.source {
-            TrackSource::FromVideo(_) => input,
-            TrackSource::External(ref path) => path,
+            TrackSource::FromVideo(_) => find_source_file(input),
+            TrackSource::External(ref path) => path.to_path_buf(),
         })
         .arg("-acodec");
     match audio_codec {
@@ -99,9 +102,9 @@ pub fn convert_audio(
                     "{}k",
                     audio_bitrate
                         * get_channel_count(
-                            match audio_track.source {
-                                TrackSource::FromVideo(_) => input,
-                                TrackSource::External(ref path) => path,
+                            &match audio_track.source {
+                                TrackSource::FromVideo(_) => find_source_file(input),
+                                TrackSource::External(ref path) => path.to_path_buf(),
                             },
                             audio_track
                         )
