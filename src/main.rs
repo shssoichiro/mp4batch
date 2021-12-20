@@ -16,6 +16,7 @@ use std::{
 };
 
 use ansi_term::Colour::{Blue, Green, Red};
+use anyhow::Result;
 use clap::{App, Arg};
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
@@ -200,7 +201,7 @@ Subtitle options:
                 "{} {}: {}",
                 Red.bold().paint("[Error]"),
                 Red.paint(input.file_name().unwrap().to_string_lossy()),
-                Red.paint(err)
+                Red.paint(err.to_string())
             );
         }
         eprintln!();
@@ -214,7 +215,7 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     verbose: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     eprintln!(
         "{} {} {} {}",
         Blue.bold().paint("[Info]"),
@@ -305,6 +306,7 @@ fn process_file(
         if !output.sub_tracks.is_empty() {
             for (i, subtitle) in output.sub_tracks.iter().enumerate() {
                 let subtitle_out = input.with_extension(&format!("-{}.ass", i));
+                extract_subtitles(&find_source_file(input), i as u8, &subtitle_out)?;
                 subtitle_outputs.push((subtitle_out, subtitle.enabled, subtitle.forced));
             }
         }

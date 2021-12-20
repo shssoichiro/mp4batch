@@ -6,6 +6,7 @@ use std::{
 };
 
 use ansi_term::Colour::{Green, Yellow};
+use anyhow::Result;
 use tempfile::NamedTempFile;
 
 use crate::input::{get_video_frame_count, PixelFormat, VideoDimensions};
@@ -75,7 +76,7 @@ impl Display for Profile {
     }
 }
 
-pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), String> {
+pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
@@ -96,7 +97,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), 
         .arg(input)
         .arg("-")
         .status()
-        .map_err(|e| format!("Failed to execute vspipe -i: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i: {}", e))?;
 
     let filename = input.file_name().unwrap().to_str().unwrap();
     let pipe = if filename.ends_with(".vpy") {
@@ -133,17 +134,17 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<(), 
         .stdin(pipe.stdout.unwrap())
         .stderr(Stdio::inherit())
         .status()
-        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     if !status.success() {
-        return Err(format!(
+        anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",
             status.code().unwrap()
-        ));
+        );
     }
 
     if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
         if lossless_frames != dimensions.frames {
-            return Err("Incomlete lossless encode".to_string());
+            anyhow::bail!("Incomlete lossless encode");
         }
     }
 
@@ -162,7 +163,7 @@ pub fn convert_video_av1an(
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
     verbose: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
             "{} {} {} {}",
@@ -276,12 +277,12 @@ pub fn convert_video_av1an(
     }
     let status = command
         .status()
-        .map_err(|e| format!("Failed to execute av1an: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
 
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
+        Err(anyhow::anyhow!(
             "Failed to execute av1an: Exited with code {:x}",
             status.code().unwrap()
         ))

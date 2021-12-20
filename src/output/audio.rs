@@ -1,6 +1,6 @@
 use std::{fmt::Display, path::Path, process::Command};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 use crate::{
     find_source_file,
@@ -57,7 +57,7 @@ pub fn convert_audio(
     audio_codec: AudioEncoder,
     audio_track: &Track,
     audio_bitrate: u32,
-) -> Result<(), String> {
+) -> Result<()> {
     if output.exists() {
         // TODO: Verify the audio output is complete
         return Ok(());
@@ -107,8 +107,7 @@ pub fn convert_audio(
                                 TrackSource::External(ref path) => path.to_path_buf(),
                             },
                             audio_track
-                        )
-                        .map_err(|e| e.to_string())?
+                        )?
                 ))
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
@@ -132,11 +131,11 @@ pub fn convert_audio(
 
     let status = command
         .status()
-        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to execute ffmpeg".to_owned())
+        anyhow::bail!("Failed to execute ffmpeg");
     }
 }
 
@@ -158,11 +157,13 @@ fn get_channel_count(path: &Path, audio_track: &Track) -> Result<u32> {
         .arg("compact=p=0:nk=1")
         .arg(path.as_os_str())
         .output()
-        .map_err(|e| anyhow!("Failed to run ffprobe on {}: {}", path.to_string_lossy(), e))?;
+        .map_err(|e| {
+            anyhow::anyhow!("Failed to run ffprobe on {}: {}", path.to_string_lossy(), e)
+        })?;
     let output = String::from_utf8_lossy(&output.stdout)
         .lines()
         .find(|line| !line.is_empty())
-        .ok_or_else(|| anyhow!("No output from ffprobe"))?
+        .ok_or_else(|| anyhow::anyhow!("No output from ffprobe"))?
         .to_string();
     Ok(output.parse()?)
 }

@@ -7,6 +7,8 @@ use std::{
     process::Command,
 };
 
+use anyhow::Result;
+
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
     pub width: u32,
@@ -72,7 +74,7 @@ impl ColorSpace {
     }
 }
 
-pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
+pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions> {
     let filename = input.file_name().unwrap().to_str().unwrap();
     if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
@@ -81,7 +83,7 @@ pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions, String> {
     }
 }
 
-fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String> {
+fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
     let mediainfo = get_video_mediainfo(input)?;
 
     let width = mediainfo
@@ -122,23 +124,21 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions, String>
     })
 }
 
-pub fn get_video_frame_count(input: &Path) -> Result<u32, String> {
+pub fn get_video_frame_count(input: &Path) -> Result<u32> {
     let command = Command::new("mediainfo")
         .arg("--Output=Video;%FrameCount%")
         .arg(input)
-        .output()
-        .map_err(|e| format!("{}", e))?;
+        .output()?;
     let output = String::from_utf8_lossy(&command.stdout);
     Ok(output.trim().parse().unwrap())
 }
 
-fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
+fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     let command = Command::new("vspipe")
         .arg("-i")
         .arg(input)
         .arg("-")
-        .output()
-        .map_err(|e| format!("{}", e))?;
+        .output()?;
     // Width: 1280
     // Height: 720
     // Frames: 17982
@@ -153,16 +153,8 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
     let output = String::from_utf8_lossy(&command.stdout);
 
     let lines = output.lines().collect::<Vec<_>>();
-    let width = lines[0]
-        .replace("Width: ", "")
-        .trim()
-        .parse()
-        .map_err(|e| format!("{}", e))?;
-    let height = lines[1]
-        .replace("Height: ", "")
-        .trim()
-        .parse()
-        .map_err(|e| format!("{}", e))?;
+    let width = lines[0].replace("Width: ", "").trim().parse()?;
+    let height = lines[1].replace("Height: ", "").trim().parse()?;
     let fps: Vec<_> = lines[3]
         .replace("FPS: ", "")
         .split_whitespace()
@@ -175,26 +167,16 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions, String> {
     Ok(VideoDimensions {
         width,
         height,
-        frames: lines[2]
-            .replace("Frames: ", "")
-            .trim()
-            .parse()
-            .map_err(|e| format!("{}", e))?,
-        fps: (
-            *fps[0].as_ref().map_err(|e| format!("{}", e))?,
-            *fps[1].as_ref().map_err(|e| format!("{}", e))?,
-        ),
+        frames: lines[2].replace("Frames: ", "").trim().parse()?,
+        fps: (fps[0].clone()?, fps[1].clone()?),
         pixel_format: PixelFormat::from_vapoursynth_format(&lines[4].replace("Format Name: ", "")),
         colorspace: ColorSpace::from_dimensions(width, height),
         bit_depth,
     })
 }
 
-fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>, String> {
-    let command = Command::new("mediainfo")
-        .arg(input)
-        .output()
-        .map_err(|e| format!("{}", e))?;
+fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
+    let command = Command::new("mediainfo").arg(input).output()?;
     let output = String::from_utf8_lossy(&command.stdout);
 
     Ok(output

@@ -8,6 +8,7 @@ use std::{
 };
 
 use ansi_term::Colour::Yellow;
+use anyhow::Result;
 
 pub use self::{audio::*, video::*};
 use crate::parse::Track;
@@ -26,7 +27,7 @@ pub fn mux_video(
     audios: &[(PathBuf, bool, bool)],
     subtitles: &[(PathBuf, bool, bool)],
     output: &Path,
-) -> Result<(), String> {
+) -> Result<()> {
     let mut extension = output.extension().unwrap().to_string_lossy();
 
     if extension != "mkv" && !subtitles.is_empty() {
@@ -98,10 +99,32 @@ pub fn mux_video(
         command.arg("-movflags").arg("+faststart");
     }
 
-    let status = command.arg(output).status().map_err(|e| format!("{}", e))?;
+    let status = command.arg(output).status()?;
     if status.success() {
         Ok(())
     } else {
-        Err("Failed to mux video".to_owned())
+        anyhow::bail!("Failed to mux video");
+    }
+}
+
+pub fn extract_subtitles(input: &Path, track: u8, output: &Path) -> Result<()> {
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-i")
+        .arg(input)
+        .arg("-c:s")
+        .arg("copy")
+        .arg("-map")
+        .arg(&format!("0:s:{}", track))
+        .arg(output);
+    let status = command.arg(output).status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        anyhow::bail!("Failed to extract subtitles");
     }
 }
