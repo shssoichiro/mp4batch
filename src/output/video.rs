@@ -387,7 +387,7 @@ fn build_aom_args_string(
         speed,
         crf,
         if is_hdr { 5 } else { 1 },
-        if profile == Profile::Film { 3 } else { 4 },
+        if profile == Profile::Film { 1 } else { 2 },
         if profile == Profile::Anime { 15 } else { 7 },
         if let Some(grain_table) = get_grain_table(grain as u32, dimensions, is_hdr) {
             format!(
