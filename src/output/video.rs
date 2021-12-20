@@ -268,7 +268,7 @@ pub fn convert_video_av1an(
         .arg("-r")
         .arg("-o")
         .arg(output);
-    if dimensions.height > 1200 {
+    if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
     if verbose {
