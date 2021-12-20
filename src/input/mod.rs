@@ -56,7 +56,7 @@ pub enum ColorSpace {
 }
 
 impl Display for ColorSpace {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> ::std::result::Result<(), fmt::Error> {
         match *self {
             ColorSpace::Bt709 => write!(f, "bt709"),
             ColorSpace::Smpte170m => write!(f, "smpte170m"),
@@ -90,28 +90,21 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
         .get(&"Width".to_string())
         .unwrap()
         .replace(' ', "")
-        .parse()
-        .unwrap();
+        .parse()?;
     let height = mediainfo
         .get(&"Height".to_string())
         .unwrap()
         .replace(' ', "")
-        .parse()
-        .unwrap();
+        .parse()?;
     let fps = (
         mediainfo
             .get(&"Frame rate".to_string())
             .unwrap()
-            .parse::<f32>()
-            .unwrap()
+            .parse::<f32>()?
             .round() as u32,
         1,
     );
-    let bit_depth = mediainfo
-        .get(&"Bit depth".to_string())
-        .unwrap()
-        .parse()
-        .unwrap();
+    let bit_depth = mediainfo.get(&"Bit depth".to_string()).unwrap().parse()?;
 
     Ok(VideoDimensions {
         width,
@@ -130,7 +123,7 @@ pub fn get_video_frame_count(input: &Path) -> Result<u32> {
         .arg(input)
         .output()?;
     let output = String::from_utf8_lossy(&command.stdout);
-    Ok(output.trim().parse().unwrap())
+    Ok(output.trim().parse()?)
 }
 
 fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
