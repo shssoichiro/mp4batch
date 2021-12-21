@@ -180,7 +180,7 @@ fn parse_audio_tracks<'a, 'b>(
         tag("at="),
         separated_list1(
             char('|'),
-            tuple((alphanumeric1, opt(char('e')), opt(char('f')))),
+            tuple((alphanumeric1, opt(preceded(char('-'), alpha1)))),
         ),
     )(input)
     .map(|(input, tokens)| {
@@ -189,17 +189,20 @@ fn parse_audio_tracks<'a, 'b>(
             ParsedFilter::AudioTracks(
                 tokens
                     .into_iter()
-                    .map(|(id, e, f)| Track {
-                        source: match id.parse() {
-                            Ok(id) => TrackSource::FromVideo(id),
-                            Err(_) => {
-                                let source = in_file.with_extension(id);
-                                assert!(source.exists());
-                                TrackSource::External(source)
-                            }
-                        },
-                        enabled: e.is_some(),
-                        forced: f.is_some(),
+                    .map(|(id, tags)| {
+                        let tags = tags.unwrap_or("");
+                        Track {
+                            source: match id.parse() {
+                                Ok(id) => TrackSource::FromVideo(id),
+                                Err(_) => {
+                                    let source = in_file.with_extension(id);
+                                    assert!(source.exists());
+                                    TrackSource::External(source)
+                                }
+                            },
+                            enabled: tags.contains('d') || tags.contains('e'),
+                            forced: tags.contains('f'),
+                        }
                     })
                     .collect(),
             ),
@@ -215,7 +218,7 @@ fn parse_subtitle_tracks<'a, 'b>(
         tag("st="),
         separated_list1(
             char('|'),
-            tuple((alphanumeric1, opt(char('e')), opt(char('f')))),
+            tuple((alphanumeric1, opt(preceded(char('-'), alpha1)))),
         ),
     )(input)
     .map(|(input, tokens)| {
@@ -224,17 +227,20 @@ fn parse_subtitle_tracks<'a, 'b>(
             ParsedFilter::SubtitleTracks(
                 tokens
                     .into_iter()
-                    .map(|(id, e, f)| Track {
-                        source: match id.parse() {
-                            Ok(id) => TrackSource::FromVideo(id),
-                            Err(_) => {
-                                let source = in_file.with_extension(id);
-                                assert!(source.exists());
-                                TrackSource::External(source)
-                            }
-                        },
-                        enabled: e.is_some(),
-                        forced: f.is_some(),
+                    .map(|(id, tags)| {
+                        let tags = tags.unwrap_or("");
+                        Track {
+                            source: match id.parse() {
+                                Ok(id) => TrackSource::FromVideo(id),
+                                Err(_) => {
+                                    let source = in_file.with_extension(id);
+                                    assert!(source.exists());
+                                    TrackSource::External(source)
+                                }
+                            },
+                            enabled: tags.contains('d') || tags.contains('e'),
+                            forced: tags.contains('f'),
+                        }
                     })
                     .collect(),
             ),
