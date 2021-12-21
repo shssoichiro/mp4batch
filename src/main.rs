@@ -98,66 +98,6 @@ Subtitle options:
 
     let input = Path::new(args.value_of("input").expect("No input path provided"));
     assert!(input.exists(), "Input path does not exist");
-    let outputs = args
-        .value_of("formats")
-        .map(|formats| {
-            let formats = formats.trim();
-            if formats.is_empty() {
-                return vec![Output::default()];
-            }
-            formats
-                .split(';')
-                .map(|format| {
-                    let mut output = Output::default();
-                    let filters = parse_filters(format, input);
-                    if let Some(encoder) = filters.iter().find_map(|filter| {
-                        if let ParsedFilter::VideoEncoder(encoder) = filter {
-                            Some(encoder)
-                        } else {
-                            None
-                        }
-                    }) {
-                        match encoder.to_lowercase().as_str() {
-                            "x264" => {
-                                // This is the default, do nothing
-                            }
-                            "x265" => {
-                                output.video.encoder = VideoEncoder::X265 {
-                                    crf: 18,
-                                    profile: Profile::Film,
-                                    compat: false,
-                                    is_hdr: true,
-                                }
-                            }
-                            "aom" => {
-                                output.video.encoder = VideoEncoder::Aom {
-                                    crf: 16,
-                                    speed: 4,
-                                    profile: Profile::Film,
-                                    is_hdr: false,
-                                    grain: 0,
-                                    compat: false,
-                                }
-                            }
-                            "rav1e" => {
-                                output.video.encoder = VideoEncoder::Rav1e {
-                                    crf: 40,
-                                    speed: 5,
-                                    profile: Profile::Film,
-                                    is_hdr: false,
-                                }
-                            }
-                            enc => panic!("Unrecognized encoder: {}", enc),
-                        }
-                    }
-                    for filter in &filters {
-                        apply_filter(filter, &mut output);
-                    }
-                    output
-                })
-                .collect()
-        })
-        .unwrap_or_else(|| vec![Output::default()]);
 
     let inputs = if input.is_file() {
         vec![input.to_path_buf()]
@@ -188,6 +128,67 @@ Subtitle options:
     };
 
     for input in inputs {
+        let outputs = args
+            .value_of("formats")
+            .map(|formats| {
+                let formats = formats.trim();
+                if formats.is_empty() {
+                    return vec![Output::default()];
+                }
+                formats
+                    .split(';')
+                    .map(|format| {
+                        let mut output = Output::default();
+                        let filters = parse_filters(format, &input);
+                        if let Some(encoder) = filters.iter().find_map(|filter| {
+                            if let ParsedFilter::VideoEncoder(encoder) = filter {
+                                Some(encoder)
+                            } else {
+                                None
+                            }
+                        }) {
+                            match encoder.to_lowercase().as_str() {
+                                "x264" => {
+                                    // This is the default, do nothing
+                                }
+                                "x265" => {
+                                    output.video.encoder = VideoEncoder::X265 {
+                                        crf: 18,
+                                        profile: Profile::Film,
+                                        compat: false,
+                                        is_hdr: true,
+                                    }
+                                }
+                                "aom" => {
+                                    output.video.encoder = VideoEncoder::Aom {
+                                        crf: 16,
+                                        speed: 4,
+                                        profile: Profile::Film,
+                                        is_hdr: false,
+                                        grain: 0,
+                                        compat: false,
+                                    }
+                                }
+                                "rav1e" => {
+                                    output.video.encoder = VideoEncoder::Rav1e {
+                                        crf: 40,
+                                        speed: 5,
+                                        profile: Profile::Film,
+                                        is_hdr: false,
+                                    }
+                                }
+                                enc => panic!("Unrecognized encoder: {}", enc),
+                            }
+                        }
+                        for filter in &filters {
+                            apply_filter(filter, &mut output);
+                        }
+                        output
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| vec![Output::default()]);
+
         let result = process_file(
             &input,
             &outputs,
