@@ -26,6 +26,7 @@ pub fn mux_video(
     video: &Path,
     audios: &[(PathBuf, bool, bool)],
     subtitles: &[(PathBuf, bool, bool)],
+    copy_fonts: bool,
     output: &Path,
 ) -> Result<()> {
     let mut extension = output.extension().unwrap().to_string_lossy();
@@ -52,7 +53,7 @@ pub fn mux_video(
     for subtitle in subtitles {
         command.arg("-i").arg(&subtitle.0);
     }
-    if !subtitles.is_empty() {
+    if copy_fonts {
         command.arg("-i").arg(input);
     }
     command
@@ -83,16 +84,49 @@ pub fn mux_video(
         }
         i += 1;
     }
-    if !subtitles.is_empty() {
+    if copy_fonts {
         command
             .arg("-map")
             .arg(&format!("{}:t?", 1 + audios.len() + subtitles.len()));
-    }
-    let fonts_dir = input.parent().unwrap().join("fonts");
-    if fonts_dir.is_dir() {
-        let fonts = fonts_dir.read_dir().unwrap();
-        for font in fonts {
-            command.arg("-attach").arg(font.unwrap().path());
+    } else {
+        let fonts_dir = input.parent().unwrap().join("fonts");
+        if fonts_dir.is_dir() {
+            let fonts = fonts_dir.read_dir().unwrap();
+            let mut i = 0;
+            for font in fonts {
+                let font = font.unwrap();
+                let mimetype = match font
+                    .path()
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.to_lowercase())
+                    .unwrap_or_else(String::new)
+                    .as_str()
+                {
+                    "ttf" => "font/ttf",
+                    "otf" => "font/otf",
+                    "eot" => "application/vnd.ms-fontobject",
+                    "woff" => "font/woff",
+                    "woff2" => "font/woff2",
+                    _ => {
+                        eprintln!(
+                            "{} {}",
+                            Yellow.bold().paint("[Warning]"),
+                            Yellow.paint(&format!(
+                                "Attachment with unrecognized extension skipped: {}",
+                                font.path().to_string_lossy()
+                            )),
+                        );
+                        continue;
+                    }
+                };
+                command
+                    .arg("-attach")
+                    .arg(font.path())
+                    .arg(&format!("-metadata:s:t:{}", i))
+                    .arg(&format!("mimetype={}", mimetype));
+                i += 1;
+            }
         }
     }
     if extension == "mp4" {
