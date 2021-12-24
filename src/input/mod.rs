@@ -198,7 +198,11 @@ pub fn find_source_file(input: &Path) -> PathBuf {
         .take_while(|&c| c != '"')
         .collect::<String>();
     // Handle relative or absolute paths
-    let mut output = input.to_path_buf();
+    let mut output = if input.is_dir() {
+        input.to_path_buf()
+    } else {
+        input.parent().unwrap().to_path_buf()
+    };
     output.push(&PathBuf::from(&source));
     output
 }
