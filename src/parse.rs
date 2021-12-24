@@ -133,7 +133,7 @@ fn parse_extension(input: &str) -> IResult<&str, ParsedFilter> {
 }
 
 fn parse_bit_depth(input: &str) -> IResult<&str, ParsedFilter> {
-    preceded(tag("bd="), alpha1)(input).map(|(input, token)| {
+    preceded(tag("bd="), digit1)(input).map(|(input, token)| {
         if token == "8" || token == "10" {
             (input, ParsedFilter::BitDepth(token.parse().unwrap()))
         } else {
