@@ -544,7 +544,7 @@ fn build_x265_args_string(
         " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
          --deblock {}:{} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
          --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} --frame-threads 1 --y4m {} ",
+         --transfer {} --output-depth {} --frame-threads 1 --y4m {} {} ",
         crf,
         match profile {
             Profile::Film => 5,
@@ -582,7 +582,8 @@ fn build_x265_args_string(
             }
         } else {
             ""
-        }
+        },
+        if is_hdr { "--hdr10-opt" } else { "" }
     )
 }
 
