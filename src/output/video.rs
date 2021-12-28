@@ -381,7 +381,7 @@ fn build_aom_args_string(
         " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=48 \
          --enable-fwd-kf=1 --aq-mode=1 --deltaq-mode={} --enable-chroma-deltaq=1 \
          --quant-b-adapt=1 --enable-qm=1 --min-q=1 --enable-keyframe-filtering=0 \
-         --arnr-strength={} --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 {} \
+         --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 {} \
          --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
          --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
          --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
@@ -393,7 +393,6 @@ fn build_aom_args_string(
             "psy"
         },
         if is_hdr { 5 } else { 1 },
-        if profile == Profile::Film { 1 } else { 2 },
         if profile == Profile::Anime { 15 } else { 7 },
         if let Some(grain_table) = get_grain_table(grain as u32, dimensions, is_hdr) {
             format!(
