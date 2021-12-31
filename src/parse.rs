@@ -104,7 +104,7 @@ fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
 }
 
 fn parse_grain(input: &str) -> IResult<&str, ParsedFilter> {
-    preceded(tag("grain="), digit1)(input)
+    preceded(alt((tag("g="), tag("grain="))), digit1)(input)
         .map(|(input, token)| (input, ParsedFilter::Grain(token.parse().unwrap())))
 }
 
