@@ -272,8 +272,8 @@ pub fn convert_video_av1an(
         command.arg("--sc-downscale-height").arg("1080");
     }
     match encoder {
-        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } => {
-            command.arg("--set-thread-affinity").arg("2");
+        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } if dimensions.width < 1200 => {
+            command.arg("--set-thread-affinity").arg("1");
         }
         _ => (),
     }
