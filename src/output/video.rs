@@ -271,6 +271,12 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
+    match encoder {
+        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } => {
+            command.arg("--set-thread-affinity").arg("2");
+        }
+        _ => (),
+    }
     if let VideoEncoder::Aom { grain, .. } = encoder {
         if grain > 0 {
             command.arg("--photon-noise").arg(grain.to_string());
