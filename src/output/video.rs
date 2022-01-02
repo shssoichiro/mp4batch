@@ -1,13 +1,12 @@
 use std::{
     fmt::Display,
-    path::{Path, PathBuf},
+    path::Path,
     process::{Command, Stdio},
     str::FromStr,
 };
 
 use ansi_term::Colour::{Green, Yellow};
 use anyhow::Result;
-use tempfile::NamedTempFile;
 
 use crate::input::{get_video_frame_count, PixelFormat, VideoDimensions};
 
@@ -272,6 +271,11 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
+    if let VideoEncoder::Aom { grain, .. } = encoder {
+        if grain > 0 {
+            command.arg("--photon-noise").arg(grain.to_string());
+        }
+    }
     if verbose {
         command.arg("--verbose");
     }
@@ -338,10 +342,9 @@ impl VideoEncoder {
                 crf,
                 speed,
                 profile,
-                grain,
                 is_hdr,
                 ..
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, *grain),
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr),
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
@@ -375,13 +378,12 @@ fn build_aom_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
-    grain: u8,
 ) -> String {
     format!(
         " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=48 \
          --enable-fwd-kf=1 --aq-mode=1 --deltaq-mode={} --enable-chroma-deltaq=1 \
          --quant-b-adapt=1 --enable-qm=1 --min-q=1 --enable-keyframe-filtering=0 \
-         --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 {} \
+         --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --tune=image_perceptual_quality --tile-columns={} \
          --tile-rows={} --threads=4 --row-mt=0 --color-primaries={} --transfer-characteristics={} \
          --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
@@ -394,25 +396,6 @@ fn build_aom_args_string(
         },
         if is_hdr { 5 } else { 1 },
         if profile == Profile::Anime { 15 } else { 7 },
-        if let Some(grain_table) = get_grain_table(grain as u32, dimensions, is_hdr) {
-            format!(
-                "--denoise-noise-level={} --film-grain-table={}",
-                0,
-                grain_table.to_string_lossy()
-            )
-        } else {
-            if grain > 0 {
-                eprintln!(
-                    "{} {}",
-                    Yellow.bold().paint("[Warning]"),
-                    Yellow.paint(
-                        "Photon film grain not supported, falling back to aom grain synthesis \
-                         mode. Ensure photon_noise_table is in PATH."
-                    )
-                );
-            }
-            format!("--denoise-noise-level={}", grain * 3)
-        },
         if dimensions.width >= 3000 {
             2
         } else if dimensions.width >= 1200 {
@@ -443,41 +426,6 @@ fn build_aom_args_string(
             "bt601"
         },
     )
-}
-
-fn get_grain_table(grain: u32, dims: VideoDimensions, hdr: bool) -> Option<PathBuf> {
-    if grain == 0 {
-        return None;
-    }
-    let grain = if grain <= 10 {
-        grain * 50
-    } else if grain <= 25 {
-        500 + (grain - 10) * 75
-    } else {
-        1625 + (grain - 25) * (6400 - 1625) / 25
-    };
-    let filename = NamedTempFile::new().unwrap().keep().unwrap().1;
-    Command::new("photon_noise_table")
-        .arg(&format!("--width={}", dims.width))
-        .arg(&format!("--height={}", dims.height))
-        .arg(&format!("--iso={}", grain))
-        .arg(&format!(
-            "--transfer-function={}",
-            if hdr {
-                "smpte2084"
-            } else if dims.height >= 600 {
-                "srgb"
-            } else {
-                "bt470bg"
-            }
-        ))
-        .arg(&format!(
-            "--output={}",
-            filename.canonicalize().unwrap().to_string_lossy()
-        ))
-        .status()
-        .ok()?;
-    Some(filename)
 }
 
 fn build_rav1e_args_string(

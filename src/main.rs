@@ -410,8 +410,8 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
         ParsedFilter::Grain(arg) => {
             if let VideoEncoder::Aom { ref mut grain, .. } = output.video.encoder {
                 let arg = *arg;
-                if arg > 50 {
-                    panic!("'grain' must be between 0 and 50, received {}", arg);
+                if arg > 64 {
+                    panic!("'grain' must be between 0 and 64, received {}", arg);
                 }
                 *grain = arg;
             }
