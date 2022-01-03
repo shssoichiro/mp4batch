@@ -72,10 +72,10 @@ Video filters (any unset will leave the input unchanged):
 Audio encoder options:
 - aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
 - ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
-- at=#[e][f]: Audio tracks, comma separated [default: 1, e=enabled, f=forced]
+- at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled, f=forced]
 
 Subtitle options:
-- st=#[e][f]: Subtitle tracks, comma separated [default: None, e=enabled, f=forced]"#,
+- st=#-[e][f]: Subtitle tracks, pipe separated [default: None, e=enabled, f=forced]"#,
                 ),
         )
         .arg(
