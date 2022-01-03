@@ -228,24 +228,26 @@ pub fn convert_video_av1an(
         .arg(
             std::cmp::max(
                 if encoder.has_tiling() {
-                    if dimensions.width >= 3000 {
+                    if dimensions.width >= 2880 {
                         num_cpus::get() / 4
-                    } else if dimensions.width >= 2400 {
+                    } else if dimensions.height >= 1440 {
                         num_cpus::get() / 4 + num_cpus::get() / 8
-                    } else if dimensions.width >= 1200 {
+                    } else if dimensions.width >= 1440 {
                         num_cpus::get() / 2 + num_cpus::get() / 8
                     } else {
                         num_cpus::get()
                     }
                 } else if encoder.tons_of_lookahead() {
-                    if dimensions.width >= 1440 {
+                    if dimensions.height >= 1440 {
+                        std::cmp::min(4, num_cpus::get())
+                    } else if dimensions.width >= 1440 {
                         std::cmp::min(6, num_cpus::get())
                     } else if dimensions.width >= 1024 {
                         std::cmp::min(10, num_cpus::get())
                     } else {
                         num_cpus::get()
                     }
-                } else if dimensions.width >= 2400 {
+                } else if dimensions.width >= 2880 {
                     std::cmp::min(6, num_cpus::get())
                 } else if dimensions.width >= 1440 {
                     std::cmp::min(10, num_cpus::get())
@@ -404,31 +406,31 @@ fn build_aom_args_string(
         },
         if is_hdr { 5 } else { 1 },
         if profile == Profile::Anime { 15 } else { 7 },
-        if dimensions.width >= 3000 {
+        if dimensions.width >= 2880 {
             2
-        } else if dimensions.width >= 1200 {
+        } else if dimensions.width >= 1440 {
             1
         } else {
             0
         },
-        if dimensions.height >= 1400 { 1 } else { 0 },
+        if dimensions.height >= 1440 { 1 } else { 0 },
         if is_hdr {
             "bt2020"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "bt709"
         } else {
             "bt601"
         },
         if is_hdr {
             "smpte2084"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "bt709"
         } else {
             "bt601"
         },
         if is_hdr {
             "bt2020ncl"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "bt709"
         } else {
             "bt601"
@@ -448,31 +450,31 @@ fn build_rav1e_args_string(
          --matrix={} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
         speed,
         crf,
-        if dimensions.width >= 2400 {
+        if dimensions.width >= 2880 {
             4
-        } else if dimensions.width >= 1200 {
+        } else if dimensions.width >= 1440 {
             2
         } else {
             1
         },
-        if dimensions.width >= 2400 { 2 } else { 1 },
+        if dimensions.height >= 1440 { 2 } else { 1 },
         if is_hdr {
             "BT2020"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "BT709"
         } else {
             "BT601"
         },
         if is_hdr {
             "SMPTE2084"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "BT709"
         } else {
             "BT601"
         },
         if is_hdr {
             "BT2020NCL"
-        } else if dimensions.height >= 600 {
+        } else if dimensions.height > 576 {
             "BT709"
         } else {
             "BT601"
