@@ -400,7 +400,7 @@ fn build_aom_args_string(
         speed,
         crf,
         if profile == Profile::Anime {
-            "anime"
+            "animation"
         } else {
             "psy"
         },
