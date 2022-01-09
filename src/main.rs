@@ -289,13 +289,19 @@ fn process_file(
         let mut subtitle_outputs = Vec::new();
         if !output.sub_tracks.is_empty() {
             for (i, subtitle) in output.sub_tracks.iter().enumerate() {
-                let subtitle_out = input.with_extension(&format!("{}.ass", i));
+                let mut subtitle_out;
                 match &subtitle.source {
                     TrackSource::External(path) => {
+                        let ext = path.extension().unwrap().to_str().unwrap();
+                        subtitle_out = input.with_extension(&format!("{}.{}", i, ext));
                         fs::copy(path, &subtitle_out)?;
                     }
                     TrackSource::FromVideo(j) => {
-                        extract_subtitles(&find_source_file(input), *j, &subtitle_out)?;
+                        subtitle_out = input.with_extension(&format!("{}.ass", i));
+                        if extract_subtitles(&find_source_file(input), *j, &subtitle_out).is_err() {
+                            subtitle_out = input.with_extension(&format!("{}.srt", i));
+                            extract_subtitles(&find_source_file(input), *j, &subtitle_out)?;
+                        }
                     }
                 }
                 subtitle_outputs.push((subtitle_out, subtitle.enabled, subtitle.forced));

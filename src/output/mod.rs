@@ -4,7 +4,7 @@ mod video;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use ansi_term::Colour::Yellow;
@@ -144,6 +144,7 @@ pub fn mux_video(
 pub fn extract_subtitles(input: &Path, track: u8, output: &Path) -> Result<()> {
     let mut command = Command::new("ffmpeg");
     command
+        .stderr(Stdio::null())
         .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")
