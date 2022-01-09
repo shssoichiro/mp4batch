@@ -17,7 +17,7 @@ use std::{
 
 use ansi_term::Colour::{Blue, Green, Red};
 use anyhow::Result;
-use clap::{App, Arg};
+use clap::Parser;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
 use walkdir::WalkDir;
@@ -25,78 +25,60 @@ use walkdir::WalkDir;
 use self::{input::*, output::*};
 use crate::parse::{parse_filters, ParsedFilter, Track, TrackSource};
 
+#[derive(Parser, Debug)]
+struct InputArgs {
+    /// Sets the input directory or file
+    pub input: String,
+
+    /// Override the default output directory
+    #[clap(short, long, value_name = "DIR")]
+    pub output: Option<String>,
+
+    /// Takes a list of desired formats to output.
+    /// Each filter is comma separated, each output is semicolon separated.
+    ///
+    /// Video encoder options:
+    /// - enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
+    /// - q=#: QP or CRF [default: varies by encoder]
+    /// - s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
+    /// - p=str: Encoder settings to use [default: film] [options: film, anime, fast]
+    /// - grain=#: Grain synth level [aom only] [0-50, 0 = disabled]
+    /// - compat=0/1: Enable extra playback compatibility/DXVA options
+    /// - hdr=0/1: Enable HDR encoding features
+    /// - ext=mkv/mp4: Output file format [default: mkv]
+    ///
+    /// Video filters (any unset will leave the input unchanged):
+    /// - bd=#: Output bit depth
+    /// - res=#x#: Output resolution
+    ///
+    /// Audio encoder options:
+    /// - aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
+    /// - ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
+    /// - at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled, f=forced]
+    ///
+    /// Subtitle options:
+    /// - st=#-[e][f]: Subtitle tracks, pipe separated [default: None, e=enabled, f=forced]
+    #[clap(short, long, value_name = "FILTERS")]
+    pub formats: Option<String>,
+
+    /// Print more stats
+    #[clap(short, long)]
+    pub verbose: bool,
+
+    /// Don't delete the lossless intermediate encode
+    #[clap(long)]
+    pub keep_lossless: bool,
+
+    /// Quit after making the lossless video
+    #[clap(long)]
+    pub lossless_only: bool,
+}
+
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-    let args = App::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
-        .arg(
-            Arg::with_name("verbose")
-                .long("verbose")
-                .short("v")
-                .help("print more stats"),
-        )
-        .arg(
-            Arg::with_name("keep-lossless")
-                .long("keep-lossless")
-                .help("don't delete the lossless intermediate encode"),
-        )
-        .arg(
-            Arg::with_name("lossless-only")
-                .long("lossless-only")
-                .help("quit after making the lossless video"),
-        )
-        .arg(
-            Arg::with_name("formats")
-                .long("formats")
-                .short("f")
-                .value_name("FILTERS")
-                .help(
-                    r#"Takes a list of desired formats to output.
-Each filter is comma separated, each output is semicolon separated.
+    let args = InputArgs::parse();
 
-Video encoder options:
-- enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
-- q=#: QP or CRF [default: varies by encoder]
-- s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
-- p=str: Encoder settings to use [default: film] [options: film, anime, fast]
-- grain=#: Grain synth level [aom only] [0-50, 0 = disabled]
-- compat=0/1: Enable extra playback compatibility/DXVA options
-- hdr=0/1: Enable HDR encoding features
-- ext=mkv/mp4: Output file format [default: mkv]
-
-Video filters (any unset will leave the input unchanged):
-- bd=#: Output bit depth
-- res=#x#: Output resolution
-
-Audio encoder options:
-- aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
-- ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
-- at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled, f=forced]
-
-Subtitle options:
-- st=#-[e][f]: Subtitle tracks, pipe separated [default: None, e=enabled, f=forced]"#,
-                ),
-        )
-        .arg(
-            Arg::with_name("input")
-                .help("Sets the input directory or file")
-                .required(true)
-                .index(1),
-        )
-        .arg(
-            Arg::with_name("output-dir")
-                .long("output")
-                .short("o")
-                .value_name("DIR")
-                .help(&format!(
-                    "Override the default output directory [default on this machine: {}]",
-                    dotenv!("OUTPUT_PATH")
-                )),
-        )
-        .get_matches();
-
-    let input = Path::new(args.value_of("input").expect("No input path provided"));
+    let input = Path::new(&args.input);
     assert!(input.exists(), "Input path does not exist");
 
     let inputs = if input.is_file() {
@@ -129,7 +111,8 @@ Subtitle options:
 
     for input in inputs {
         let outputs = args
-            .value_of("formats")
+            .formats
+            .as_ref()
             .map(|formats| {
                 let formats = formats.trim();
                 if formats.is_empty() {
@@ -192,10 +175,10 @@ Subtitle options:
         let result = process_file(
             &input,
             &outputs,
-            args.value_of("output-dir"),
-            args.is_present("keep-lossless"),
-            args.is_present("lossless-only"),
-            args.is_present("verbose"),
+            args.output.as_deref(),
+            args.keep_lossless,
+            args.lossless_only,
+            args.verbose,
         );
         if let Err(err) = result {
             eprintln!(
