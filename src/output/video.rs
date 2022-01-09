@@ -187,6 +187,32 @@ pub fn convert_video_av1an(
     }
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    let workers = std::cmp::max(
+        if encoder.has_tiling() {
+            if dimensions.width >= 2880 {
+                num_cpus::get() / 4
+            } else if dimensions.width >= 1440 {
+                num_cpus::get() / 2
+            } else {
+                num_cpus::get()
+            }
+        } else if encoder.tons_of_lookahead() {
+            if dimensions.height >= 1440 {
+                std::cmp::min(4, num_cpus::get())
+            } else if dimensions.width >= 1024 {
+                std::cmp::min(8, num_cpus::get())
+            } else {
+                num_cpus::get()
+            }
+        } else if dimensions.width >= 2880 {
+            std::cmp::min(4, num_cpus::get())
+        } else if dimensions.width >= 1440 {
+            std::cmp::min(8, num_cpus::get())
+        } else {
+            num_cpus::get()
+        },
+        1,
+    );
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -225,39 +251,7 @@ pub fn convert_video_av1an(
             .to_string(),
         )
         .arg("-w")
-        .arg(
-            std::cmp::max(
-                if encoder.has_tiling() {
-                    if dimensions.width >= 2880 {
-                        num_cpus::get() / 4
-                    } else if dimensions.height >= 1440 {
-                        num_cpus::get() / 4 + num_cpus::get() / 8
-                    } else if dimensions.width >= 1440 {
-                        num_cpus::get() / 2 + num_cpus::get() / 8
-                    } else {
-                        num_cpus::get()
-                    }
-                } else if encoder.tons_of_lookahead() {
-                    if dimensions.height >= 1440 {
-                        std::cmp::min(4, num_cpus::get())
-                    } else if dimensions.width >= 1440 {
-                        std::cmp::min(6, num_cpus::get())
-                    } else if dimensions.width >= 1024 {
-                        std::cmp::min(10, num_cpus::get())
-                    } else {
-                        num_cpus::get()
-                    }
-                } else if dimensions.width >= 2880 {
-                    std::cmp::min(6, num_cpus::get())
-                } else if dimensions.width >= 1440 {
-                    std::cmp::min(10, num_cpus::get())
-                } else {
-                    num_cpus::get()
-                },
-                1,
-            )
-            .to_string(),
-        )
+        .arg(workers.to_string())
         .arg("--pix-format")
         .arg(match (dimensions.bit_depth, dimensions.pixel_format) {
             (8, PixelFormat::Yuv420) => "yuv420p".to_string(),
@@ -275,11 +269,10 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
-    match encoder {
-        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } if dimensions.width < 1200 => {
-            command.arg("--set-thread-affinity").arg("1");
-        }
-        _ => (),
+    if num_cpus::get() % workers == 0 {
+        command
+            .arg("--set-thread-affinity")
+            .arg((num_cpus::get() / workers).to_string());
     }
     if let VideoEncoder::Aom { grain, .. } = encoder {
         if grain > 0 {
