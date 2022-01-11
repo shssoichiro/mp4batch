@@ -196,14 +196,6 @@ pub fn convert_video_av1an(
             } else {
                 num_cpus::get()
             }
-        } else if encoder.tons_of_lookahead() {
-            if dimensions.height >= 1440 {
-                std::cmp::min(4, num_cpus::get())
-            } else if dimensions.width >= 1024 {
-                std::cmp::min(8, num_cpus::get())
-            } else {
-                num_cpus::get()
-            }
         } else if dimensions.width >= 2880 {
             std::cmp::min(4, num_cpus::get())
         } else if dimensions.width >= 1440 {
@@ -368,10 +360,6 @@ impl VideoEncoder {
 
     pub const fn has_tiling(&self) -> bool {
         matches!(self, VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. })
-    }
-
-    pub const fn tons_of_lookahead(&self) -> bool {
-        matches!(self, VideoEncoder::X264 { .. })
     }
 }
 
@@ -545,8 +533,8 @@ fn build_x264_args_string(
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
-         250 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
-         1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
+         96 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
+         --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
         if profile == Profile::Fast {
