@@ -258,6 +258,9 @@ pub fn convert_video_av1an(
         .arg("-r")
         .arg("-o")
         .arg(output);
+    if output.extension().unwrap() == "mkv" {
+        command.arg("-c").arg("mkvmerge");
+    }
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
