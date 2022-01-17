@@ -256,6 +256,7 @@ pub fn convert_video_av1an(
         .arg("--chunk-order")
         .arg("random")
         .arg("-r")
+        .arg("--verbose")
         .arg("-o")
         .arg(output);
     if output.extension().unwrap() == "mkv" {
