@@ -187,24 +187,9 @@ pub fn convert_video_av1an(
     }
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
-    let workers = std::cmp::max(
-        if encoder.has_tiling() {
-            if dimensions.height >= 1440 || dimensions.width >= 2800 {
-                num_cpus::get() / 4
-            } else if dimensions.width >= 1440 {
-                num_cpus::get() / 2
-            } else {
-                num_cpus::get()
-            }
-        } else if dimensions.height >= 1440 || dimensions.width >= 2800 {
-            std::cmp::min(4, num_cpus::get())
-        } else if dimensions.width >= 1440 {
-            std::cmp::min(8, num_cpus::get())
-        } else {
-            num_cpus::get()
-        },
-        1,
-    );
+    let tiles = if dimensions.height >= 1600 { 2 } else { 1 }
+        + if dimensions.width >= 1600 { 2 } else { 1 };
+    let workers = std::cmp::max(num_cpus::get() / tiles, 1);
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -265,7 +250,7 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
-    if num_cpus::get() % workers == 0 {
+    if num_cpus::get() % workers == 0 && encoder.has_tiling() {
         command
             .arg("--set-thread-affinity")
             .arg((num_cpus::get() / workers).to_string());
@@ -391,14 +376,8 @@ fn build_aom_args_string(
         },
         if is_hdr { 5 } else { 1 },
         if profile == Profile::Anime { 15 } else { 7 },
-        if dimensions.width >= 2880 {
-            2
-        } else if dimensions.width >= 1440 {
-            1
-        } else {
-            0
-        },
-        if dimensions.height >= 1440 { 1 } else { 0 },
+        if dimensions.width >= 1600 { 1 } else { 0 },
+        if dimensions.height >= 1600 { 1 } else { 0 },
         if is_hdr {
             "bt2020"
         } else if dimensions.height > 576 {
@@ -435,14 +414,8 @@ fn build_rav1e_args_string(
          --matrix={} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
         speed,
         crf,
-        if dimensions.width >= 2880 {
-            4
-        } else if dimensions.width >= 1440 {
-            2
-        } else {
-            1
-        },
-        if dimensions.height >= 1440 { 2 } else { 1 },
+        if dimensions.width >= 1600 { 2 } else { 1 },
+        if dimensions.height >= 1600 { 2 } else { 1 },
         if is_hdr {
             "BT2020"
         } else if dimensions.height > 576 {
