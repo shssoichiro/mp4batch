@@ -189,14 +189,14 @@ pub fn convert_video_av1an(
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     let workers = std::cmp::max(
         if encoder.has_tiling() {
-            if dimensions.width >= 2880 {
+            if dimensions.height >= 1440 || dimensions.width >= 2800 {
                 num_cpus::get() / 4
             } else if dimensions.width >= 1440 {
                 num_cpus::get() / 2
             } else {
                 num_cpus::get()
             }
-        } else if dimensions.width >= 2880 {
+        } else if dimensions.height >= 1440 || dimensions.width >= 2800 {
             std::cmp::min(4, num_cpus::get())
         } else if dimensions.width >= 1440 {
             std::cmp::min(8, num_cpus::get())
