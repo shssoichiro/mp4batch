@@ -188,7 +188,7 @@ pub fn convert_video_av1an(
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     let tiles = if dimensions.height >= 1600 { 2 } else { 1 }
-        + if dimensions.width >= 1600 { 2 } else { 1 };
+        * if dimensions.width >= 1600 { 2 } else { 1 };
     let workers = std::cmp::max(num_cpus::get() / tiles, 1);
     let mut command = Command::new("nice");
     command
