@@ -8,9 +8,10 @@ mod output;
 mod parse;
 
 use std::{
+    borrow::Cow,
     env,
     fs,
-    fs::File,
+    fs::{read_to_string, File},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
@@ -72,6 +73,12 @@ struct InputArgs {
     /// Quit after making the lossless video
     #[clap(long)]
     pub lossless_only: bool,
+
+    /// Do not create a lossless before running av1an.
+    ///
+    /// Useful for encodes with very little or no filtering.
+    #[clap(long)]
+    pub skip_lossless: bool,
 }
 
 fn main() {
@@ -178,6 +185,7 @@ fn main() {
             args.output.as_deref(),
             args.keep_lossless,
             args.lossless_only,
+            args.skip_lossless,
             args.verbose,
         );
         if let Err(err) = result {
@@ -198,22 +206,31 @@ fn process_file(
     output_dir: Option<&str>,
     keep_lossless: bool,
     lossless_only: bool,
+    skip_lossless: bool,
     verbose: bool,
 ) -> Result<()> {
-    eprintln!(
-        "{} {} {} {}",
-        Blue.bold().paint("[Info]"),
-        Blue.paint("Encoding"),
-        Blue.paint(input.file_name().unwrap().to_string_lossy()),
-        Blue.paint("lossless")
-    );
+    if !skip_lossless {
+        eprintln!(
+            "{} {} {} {}",
+            Blue.bold().paint("[Info]"),
+            Blue.paint("Encoding"),
+            Blue.paint(input.file_name().unwrap().to_string_lossy()),
+            Blue.paint("lossless")
+        );
+        let dimensions = get_video_dimensions(input)?;
+        create_lossless(input, dimensions)?;
+        eprintln!();
+    }
 
-    let dimensions = get_video_dimensions(input)?;
-    create_lossless(input, dimensions)?;
     if lossless_only {
+        if skip_lossless {
+            eprintln!(
+                "Received both --lossless-only and --skip-lossless. Doing nothing. This is \
+                 probably a mistake."
+            );
+        }
         return Ok(());
     }
-    eprintln!();
 
     for output in outputs {
         let video_suffix = build_video_suffix(output);
@@ -225,7 +242,12 @@ fn process_file(
             Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
         );
 
-        build_vpy_script(&vpy_file, input, output);
+        let input_to_script = if skip_lossless {
+            Cow::Owned(input.with_extension("vpy"))
+        } else {
+            Cow::Borrowed(input)
+        };
+        build_vpy_script(&vpy_file, input_to_script.as_ref(), output, skip_lossless);
         let video_out = vpy_file.with_extension("mkv");
         let dimensions = get_video_dimensions(&vpy_file)?;
         loop {
@@ -517,12 +539,20 @@ fn build_video_suffix(output: &Output) -> String {
     codec_str
 }
 
-fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
+fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossless: bool) {
     let mut script = BufWriter::new(File::create(&filename).unwrap());
-    writeln!(&mut script, "import vapoursynth as vs").unwrap();
-    writeln!(&mut script, "core = vs.core").unwrap();
+    if skip_lossless {
+        copy_and_modify_vpy_script(input, output, &mut script);
+    } else {
+        build_new_vpy_script(input, output, &mut script);
+    }
+}
+
+fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
+    writeln!(script, "import vapoursynth as vs").unwrap();
+    writeln!(script, "core = vs.core").unwrap();
     writeln!(
-        &mut script,
+        script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
         escape_python_string(
             input
@@ -535,21 +565,53 @@ fn build_vpy_script(filename: &Path, input: &Path, output: &Output) {
     )
     .unwrap();
 
+    write_filters(output, script, None);
+
+    writeln!(script, "clip.set_output()").unwrap();
+    script.flush().unwrap();
+}
+
+fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
+    let contents = read_to_string(input).unwrap();
+    let mut output_pos = None;
+    let mut output_var = None;
+    for line in contents.lines() {
+        if let Some(pos) = line.find(".set_output()") {
+            assert!(pos > 0);
+            output_pos = Some(contents.find(line).unwrap());
+            output_var = Some(&line[0..pos]);
+            break;
+        }
+    }
+    match (output_pos, output_var) {
+        (Some(pos), Some(var)) => {
+            write!(script, "{}", &contents[..pos]).unwrap();
+            write_filters(output, script, Some(var));
+            writeln!(script).unwrap();
+            write!(script, "{}", &contents[pos..]).unwrap();
+            script.flush().unwrap();
+        }
+        _ => {
+            panic!("Invalid input vapoursynth script, no `set_output()` found");
+        }
+    }
+}
+
+fn write_filters(output: &Output, script: &mut BufWriter<File>, clip: Option<&str>) {
+    let clip = clip.unwrap_or("clip");
+
     // We downscale resolution first because it's more likely that
     // we would be going from 10 bit to 8 bit, rather than the other way.
     // So this gives the best quality.
     if let Some((w, h)) = output.video.resolution {
         writeln!(
-            &mut script,
-            "clip = core.resize.Spline36(clip, {}, {}, dither_type='error_diffusion')",
-            w, h
+            script,
+            "{clip} = {clip}.resize.Spline36({w}, {h}, dither_type='error_diffusion')"
         )
         .unwrap();
     }
     if let Some(bd) = output.video.bit_depth {
-        writeln!(&mut script, "import vsutil").unwrap();
-        writeln!(&mut script, "clip = vsutil.depth(clip, {})", bd).unwrap();
+        writeln!(script, "import vsutil").unwrap();
+        writeln!(script, "{clip} = vsutil.depth({clip}, {bd})").unwrap();
     }
-    writeln!(&mut script, "clip.set_output()").unwrap();
-    script.flush().unwrap();
 }
