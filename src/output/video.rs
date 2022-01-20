@@ -362,7 +362,7 @@ fn build_aom_args_string(
          --quant-b-adapt=1 --enable-qm=1 --min-q=1 --enable-keyframe-filtering=0 \
          --arnr-strength=1 --arnr-maxframes={} --sharpness={} --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --enable-dual-filter=0 --tune=image_perceptual_quality \
-         --tile-columns={} --tile-rows={} --threads=64 --row-mt=0 --color-primaries={} \
+         --tile-columns={} --tile-rows={} --threads=64 --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
         speed,
         crf,
