@@ -161,7 +161,6 @@ pub fn convert_video_av1an(
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
-    verbose: bool,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -256,9 +255,6 @@ pub fn convert_video_av1an(
         if grain > 0 {
             command.arg("--photon-noise").arg(grain.to_string());
         }
-    }
-    if verbose {
-        command.arg("--verbose");
     }
     let status = command
         .status()

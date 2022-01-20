@@ -62,10 +62,6 @@ struct InputArgs {
     #[clap(short, long, value_name = "FILTERS")]
     pub formats: Option<String>,
 
-    /// Print more stats
-    #[clap(short, long)]
-    pub verbose: bool,
-
     /// Don't delete the lossless intermediate encode
     #[clap(long)]
     pub keep_lossless: bool,
@@ -186,7 +182,6 @@ fn main() {
             args.keep_lossless,
             args.lossless_only,
             args.skip_lossless,
-            args.verbose,
         );
         if let Err(err) = result {
             eprintln!(
@@ -207,7 +202,6 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     skip_lossless: bool,
-    verbose: bool,
 ) -> Result<()> {
     if !skip_lossless {
         eprintln!(
@@ -251,13 +245,8 @@ fn process_file(
         let video_out = vpy_file.with_extension("mkv");
         let dimensions = get_video_dimensions(&vpy_file)?;
         loop {
-            let result = convert_video_av1an(
-                &vpy_file,
-                &video_out,
-                output.video.encoder,
-                dimensions,
-                verbose,
-            );
+            let result =
+                convert_video_av1an(&vpy_file, &video_out, output.video.encoder, dimensions);
             // I hate this lazy workaround,
             // but this is due to a heisenbug in Vapoursynth
             // due to some sort of race condition,
