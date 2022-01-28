@@ -8,7 +8,10 @@ use std::{
 use ansi_term::Colour::{Green, Yellow};
 use anyhow::Result;
 
-use crate::input::{get_video_frame_count, PixelFormat, VideoDimensions};
+use crate::{
+    absolute_path,
+    input::{get_video_frame_count, PixelFormat, VideoDimensions},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VideoOutput {
@@ -191,7 +194,7 @@ pub fn convert_video_av1an(
     command
         .arg("av1an")
         .arg("-i")
-        .arg(vpy_input)
+        .arg(absolute_path(vpy_input).unwrap())
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
@@ -240,7 +243,7 @@ pub fn convert_video_av1an(
         .arg("-r")
         .arg("--verbose")
         .arg("-o")
-        .arg(output);
+        .arg(absolute_path(output).unwrap());
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }

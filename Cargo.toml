@@ -13,6 +13,7 @@ itertools = "0.10"
 lexical-sort = "0.3"
 nom = "7.1.0"
 num_cpus = "1.13"
+path-clean = "0.1"
 tempfile = "3"
 walkdir = "2"
 

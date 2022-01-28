@@ -9,10 +9,9 @@ mod parse;
 
 use std::{
     borrow::Cow,
-    env,
-    fs,
+    env, fs,
     fs::{read_to_string, File},
-    io::{BufWriter, Write},
+    io::{self, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -21,6 +20,7 @@ use anyhow::Result;
 use clap::Parser;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
+use path_clean::PathClean;
 use walkdir::WalkDir;
 
 use self::{input::*, output::*};
@@ -347,6 +347,19 @@ fn process_file(
     Ok(())
 }
 
+fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
+    let path = path.as_ref();
+
+    let absolute_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()?.join(path)
+    }
+    .clean();
+
+    Ok(absolute_path)
+}
+
 fn escape_python_string(input: &str) -> String {
     input.replace(r"\", r"\\").replace(r"'", r"\'")
 }
@@ -543,7 +556,12 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     writeln!(
         script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
-        escape_python_string(input.with_extension("lossless.mkv").to_str().unwrap())
+        escape_python_string(
+            absolute_path(input.with_extension("lossless.mkv"))
+                .unwrap()
+                .to_str()
+                .unwrap()
+        )
     )
     .unwrap();
 

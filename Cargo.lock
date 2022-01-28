@@ -220,6 +220,7 @@ dependencies = [
  "lexical-sort",
  "nom",
  "num_cpus",
+ "path-clean",
  "tempfile",
  "walkdir",
 ]
@@ -253,6 +254,12 @@ checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "path-clean"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecba01bf2678719532c5e3059e0b5f0811273d94b397088b82e3bd0a78c78fdd"
 
 [[package]]
 name = "proc-macro-error"
