@@ -543,14 +543,7 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     writeln!(
         script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
-        escape_python_string(
-            input
-                .with_extension("lossless.mkv")
-                .canonicalize()
-                .unwrap()
-                .to_str()
-                .unwrap()
-        )
+        escape_python_string(input.with_extension("lossless.mkv").to_str().unwrap())
     )
     .unwrap();
 
