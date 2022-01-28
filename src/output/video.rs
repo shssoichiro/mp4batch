@@ -360,7 +360,7 @@ fn build_aom_args_string(
          --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --enable-dual-filter=0 --tune=image_perceptual_quality \
          --tile-columns={} --tile-rows={} --threads=64 --row-mt=0 --color-primaries={} \
-         --transfer-characteristics={} --matrix-coefficients={} --disable-kf --kf-max-dist=9999 ",
+         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf --kf-max-dist=9999 ",
         speed,
         crf,
         if profile == Profile::Anime {
@@ -393,6 +393,7 @@ fn build_aom_args_string(
         } else {
             "bt601"
         },
+        dimensions.bit_depth
     )
 }
 
