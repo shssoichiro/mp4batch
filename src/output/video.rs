@@ -78,7 +78,7 @@ impl Display for Profile {
     }
 }
 
-pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> {
+pub fn create_lossless(input: &Path, dimensions: VideoDimensions, save_space: bool) -> Result<()> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
@@ -127,7 +127,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
-        .arg("ultrafast")
+        .arg(if save_space { "medium" } else { "ultrafast" })
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)
@@ -360,7 +360,8 @@ fn build_aom_args_string(
          --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --enable-dual-filter=0 --tune=image_perceptual_quality \
          --tile-columns={} --tile-rows={} --threads=64 --row-mt=0 --color-primaries={} \
-         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf --kf-max-dist=9999 ",
+         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf \
+         --kf-max-dist=9999 ",
         speed,
         crf,
         if profile == Profile::Anime {
