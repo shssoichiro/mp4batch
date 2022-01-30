@@ -187,6 +187,8 @@ pub fn convert_video_av1an(
     }
 
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    // We may not actually split tiles at this point,
+    // but we want to make sure we don't run out of memory
     let tiles = if dimensions.height >= 1600 { 2 } else { 1 }
         * if dimensions.width >= 1600 { 2 } else { 1 };
     let workers = std::cmp::max(num_cpus::get() / tiles, 1);
@@ -198,7 +200,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions))
+        .arg(&encoder.get_args_string(dimensions, workers))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -314,7 +316,7 @@ impl VideoEncoder {
         }
     }
 
-    pub fn get_args_string(&self, dimensions: VideoDimensions) -> String {
+    pub fn get_args_string(&self, dimensions: VideoDimensions, workers: usize) -> String {
         match self {
             VideoEncoder::Aom {
                 crf,
@@ -322,7 +324,7 @@ impl VideoEncoder {
                 profile,
                 is_hdr,
                 ..
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr),
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, workers),
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
@@ -352,6 +354,7 @@ fn build_aom_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
+    workers: usize,
 ) -> String {
     format!(
         " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=64 \
@@ -359,8 +362,9 @@ fn build_aom_args_string(
          --quant-b-adapt=1 --enable-qm=1 --min-q=1 --enable-keyframe-filtering=0 \
          --arnr-strength=1 --arnr-maxframes={} --sharpness=2 --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --enable-dual-filter=0 --tune=image_perceptual_quality \
-         --tile-columns={} --tile-rows={} --threads=64 --row-mt=0 --color-primaries={} \
-         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf --kf-max-dist=9999 ",
+         --tile-columns={} --tile-rows={} --threads=64 --row-mt={} --color-primaries={} \
+         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf \
+         --kf-max-dist=9999 ",
         speed,
         crf,
         if profile == Profile::Anime {
@@ -370,8 +374,9 @@ fn build_aom_args_string(
         },
         if is_hdr { 5 } else { 1 },
         if profile == Profile::Anime { 15 } else { 7 },
-        if dimensions.width >= 1600 { 1 } else { 0 },
-        if dimensions.height >= 1600 { 1 } else { 0 },
+        if dimensions.width >= 1936 { 1 } else { 0 },
+        if dimensions.height >= 1936 { 1 } else { 0 },
+        if workers >= num_cpus::get() { 0 } else { 1 },
         if is_hdr {
             "bt2020"
         } else if dimensions.height > 576 {

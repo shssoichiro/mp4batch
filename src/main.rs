@@ -9,7 +9,8 @@ mod parse;
 
 use std::{
     borrow::Cow,
-    env, fs,
+    env,
+    fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
