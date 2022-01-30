@@ -9,8 +9,7 @@ mod parse;
 
 use std::{
     borrow::Cow,
-    env,
-    fs,
+    env, fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
@@ -76,10 +75,6 @@ struct InputArgs {
     /// Useful for encodes with very little or no filtering.
     #[clap(long)]
     pub skip_lossless: bool,
-
-    /// Use a slower lossless preset to save space.
-    #[clap(long)]
-    pub save_space: bool,
 }
 
 fn main() {
@@ -187,7 +182,6 @@ fn main() {
             args.keep_lossless,
             args.lossless_only,
             args.skip_lossless,
-            args.save_space,
         );
         if let Err(err) = result {
             eprintln!(
@@ -208,7 +202,6 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     skip_lossless: bool,
-    save_space: bool,
 ) -> Result<()> {
     if !skip_lossless {
         eprintln!(
@@ -219,7 +212,7 @@ fn process_file(
             Blue.paint("lossless")
         );
         let dimensions = get_video_dimensions(input)?;
-        create_lossless(input, dimensions, save_space)?;
+        create_lossless(input, dimensions)?;
         eprintln!();
     }
 
