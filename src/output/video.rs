@@ -240,6 +240,8 @@ pub fn convert_video_av1an(
             (bd, PixelFormat::Yuv422) => format!("yuv422p{}le", bd),
             (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
         })
+        .arg("--chunk-order")
+        .arg("random")
         .arg("-r")
         .arg("--verbose")
         .arg("-o")
