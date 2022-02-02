@@ -361,7 +361,7 @@ fn build_aom_args_string(
          --enable-dnl-denoising=0 --disable-trellis-quant=0 --enable-dual-filter=0 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=64 \
          --row-mt={} --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} \
-         -b {} --disable-kf --kf-max-dist=9999 ",
+         -b {} --disable-kf ",
         speed,
         crf,
         if profile == Profile::Anime {
