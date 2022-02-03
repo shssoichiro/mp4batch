@@ -39,7 +39,9 @@ struct InputArgs {
     /// Takes a list of desired formats to output.
     /// Each filter is comma separated, each output is semicolon separated.
     ///
+    ///
     /// Video encoder options:
+    ///
     /// - enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
     /// - q=#: QP or CRF [default: varies by encoder]
     /// - s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
@@ -50,17 +52,20 @@ struct InputArgs {
     /// - ext=mkv/mp4: Output file format [default: mkv]
     ///
     /// Video filters (any unset will leave the input unchanged):
+    ///
     /// - bd=#: Output bit depth
     /// - res=#x#: Output resolution
     ///
     /// Audio encoder options:
+    ///
     /// - aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
     /// - ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
     /// - at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled, f=forced]
     ///
     /// Subtitle options:
+    ///
     /// - st=#-[e][f]: Subtitle tracks, pipe separated [default: None, e=enabled, f=forced]
-    #[clap(short, long, value_name = "FILTERS")]
+    #[clap(short, long, value_name = "FILTERS", verbatim_doc_comment)]
     pub formats: Option<String>,
 
     /// Don't delete the lossless intermediate encode
