@@ -56,7 +56,7 @@ pub fn convert_audio(
     output: &Path,
     audio_codec: AudioEncoder,
     audio_track: &Track,
-    audio_bitrate: u32,
+    mut audio_bitrate: u32,
 ) -> Result<()> {
     if output.exists() {
         // TODO: Verify the audio output is complete
@@ -81,6 +81,9 @@ pub fn convert_audio(
             command.arg("copy");
         }
         AudioEncoder::Aac => {
+            if audio_bitrate == 0 {
+                audio_bitrate = 96;
+            }
             command
                 .arg("libfdk_aac")
                 .arg("-vbr")
@@ -95,6 +98,9 @@ pub fn convert_audio(
                 .arg("aformat=channel_layouts=7.1|5.1|stereo");
         }
         AudioEncoder::Opus => {
+            if audio_bitrate == 0 {
+                audio_bitrate = 64;
+            }
             command
                 .arg("libopus")
                 .arg("-b:a")
