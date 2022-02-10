@@ -78,6 +78,32 @@ impl Display for Profile {
     }
 }
 
+pub fn extract_video(input: &Path, output: &Path) -> Result<()> {
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-y")
+        .arg("-i")
+        .arg(input)
+        .arg("-vcodec")
+        .arg("copy")
+        .arg("-map")
+        .arg("0:v:0")
+        .arg(output);
+
+    let status = command
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        anyhow::bail!("Failed to execute ffmpeg");
+    }
+}
+
 pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
@@ -213,6 +239,7 @@ pub fn convert_video_av1an(
                     Profile::Film | Profile::Fast => fps * 10,
                     Profile::Anime => fps * 15,
                 },
+                VideoEncoder::Copy => unreachable!(),
             }
             .to_string(),
         )
@@ -226,6 +253,7 @@ pub fn convert_video_av1an(
                     Profile::Film | Profile::Fast => fps,
                     Profile::Anime => fps / 2,
                 },
+                VideoEncoder::Copy => unreachable!(),
             }
             .to_string(),
         )
@@ -273,6 +301,7 @@ pub fn convert_video_av1an(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoEncoder {
+    Copy,
     Aom {
         crf: i16,
         speed: u8,
@@ -302,11 +331,12 @@ pub enum VideoEncoder {
 
 impl VideoEncoder {
     pub const fn supported_encoders() -> &'static [&'static str] {
-        &["aom", "rav1e", "x264", "x265"]
+        &["aom", "rav1e", "x264", "x265", "copy"]
     }
 
     pub const fn get_av1an_name(&self) -> &str {
         match self {
+            VideoEncoder::Copy => "copy",
             VideoEncoder::Aom { .. } => "aom",
             VideoEncoder::Rav1e { .. } => "rav1e",
             VideoEncoder::X264 { .. } => "x264",
@@ -338,6 +368,7 @@ impl VideoEncoder {
                 is_hdr,
                 ..
             } => build_x265_args_string(*crf, dimensions, *profile, *compat, *is_hdr),
+            VideoEncoder::Copy => unreachable!(),
         }
     }
 

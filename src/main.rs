@@ -8,7 +8,6 @@ mod output;
 mod parse;
 
 use std::{
-    borrow::Cow,
     env,
     fs,
     fs::{read_to_string, File},
@@ -107,7 +106,8 @@ fn main() {
                 !(filestem.contains(".aom-q")
                     || filestem.contains(".rav1e-q")
                     || filestem.contains(".x264-q")
-                    || filestem.contains(".x265-q"))
+                    || filestem.contains(".x265-q")
+                    || filestem.ends_with(".copy"))
             })
             .map(|e| e.path().to_path_buf())
             .sorted_unstable_by(|a, b| {
@@ -169,6 +169,9 @@ fn main() {
                                         is_hdr: false,
                                     }
                                 }
+                                "copy" => {
+                                    output.video.encoder = VideoEncoder::Copy;
+                                }
                                 enc => panic!("Unrecognized encoder: {}", enc),
                             }
                         }
@@ -202,23 +205,29 @@ fn main() {
 }
 
 fn process_file(
-    input: &Path,
+    input_vpy: &Path,
     outputs: &[Output],
     output_dir: Option<&str>,
     keep_lossless: bool,
     lossless_only: bool,
-    skip_lossless: bool,
+    mut skip_lossless: bool,
 ) -> Result<()> {
+    if outputs
+        .iter()
+        .all(|output| matches!(output.video.encoder, VideoEncoder::Copy))
+    {
+        skip_lossless = true;
+    }
     if !skip_lossless {
         eprintln!(
             "{} {} {} {}",
             Blue.bold().paint("[Info]"),
             Blue.paint("Encoding"),
-            Blue.paint(input.file_name().unwrap().to_string_lossy()),
+            Blue.paint(input_vpy.file_name().unwrap().to_string_lossy()),
             Blue.paint("lossless")
         );
-        let dimensions = get_video_dimensions(input)?;
-        create_lossless(input, dimensions)?;
+        let dimensions = get_video_dimensions(input_vpy)?;
+        create_lossless(input_vpy, dimensions)?;
         eprintln!();
     }
 
@@ -234,35 +243,37 @@ fn process_file(
 
     for output in outputs {
         let video_suffix = build_video_suffix(output);
-        let vpy_file = input.with_extension(&format!("{}.vpy", video_suffix));
+        let output_vpy = input_vpy.with_extension(&format!("{}.vpy", video_suffix));
+        let source_video = find_source_file(input_vpy);
         eprintln!(
             "{} {} {}",
             Blue.bold().paint("[Info]"),
             Blue.paint("Encoding"),
-            Blue.paint(vpy_file.file_name().unwrap().to_string_lossy())
+            Blue.paint(output_vpy.file_name().unwrap().to_string_lossy())
         );
 
-        let input_to_script = if skip_lossless {
-            Cow::Owned(input.with_extension("vpy"))
-        } else {
-            Cow::Borrowed(input)
-        };
-        build_vpy_script(&vpy_file, input_to_script.as_ref(), output, skip_lossless);
-        let video_out = vpy_file.with_extension("mkv");
-        let dimensions = get_video_dimensions(&vpy_file)?;
-        loop {
-            let result =
-                convert_video_av1an(&vpy_file, &video_out, output.video.encoder, dimensions);
-            // I hate this lazy workaround,
-            // but this is due to a heisenbug in Vapoursynth
-            // due to some sort of race condition,
-            // which causes crashes often enough to be annoying.
-            //
-            // Essentially, we retry the encode until it works.
-            if result.is_ok() {
-                break;
+        let video_out = output_vpy.with_extension("mkv");
+        match output.video.encoder {
+            VideoEncoder::Copy => {
+                extract_video(&source_video, &video_out)?;
             }
-        }
+            encoder => {
+                build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
+                let dimensions = get_video_dimensions(&output_vpy)?;
+                loop {
+                    let result = convert_video_av1an(&output_vpy, &video_out, encoder, dimensions);
+                    // I hate this lazy workaround,
+                    // but this is due to a heisenbug in Vapoursynth
+                    // due to some sort of race condition,
+                    // which causes crashes often enough to be annoying.
+                    //
+                    // Essentially, we retry the encode until it works.
+                    if result.is_ok() {
+                        break;
+                    }
+                }
+            }
+        };
 
         let audio_tracks = if output.audio_tracks.is_empty() {
             vec![Track {
@@ -280,9 +291,9 @@ fn process_file(
                 "{}-{}kbpc-at{}",
                 output.audio.encoder, output.audio.kbps_per_channel, i
             );
-            let audio_out = input.with_extension(&format!("{}.mka", audio_suffix));
+            let audio_out = input_vpy.with_extension(&format!("{}.mka", audio_suffix));
             convert_audio(
-                input,
+                input_vpy,
                 &audio_out,
                 output.audio.encoder,
                 audio_track,
@@ -294,7 +305,7 @@ fn process_file(
         let audio_suffix = audio_suffixes.join("-");
         let mut output_path = PathBuf::from(output_dir.unwrap_or(dotenv!("OUTPUT_PATH")));
         output_path.push(
-            input
+            input_vpy
                 .with_extension(&format!(
                     "{}-{}.{}",
                     video_suffix, audio_suffix, output.video.output_ext
@@ -310,14 +321,14 @@ fn process_file(
                 match &subtitle.source {
                     TrackSource::External(path) => {
                         let ext = path.extension().unwrap().to_str().unwrap();
-                        subtitle_out = input.with_extension(&format!("{}.{}", i, ext));
+                        subtitle_out = input_vpy.with_extension(&format!("{}.{}", i, ext));
                         fs::copy(path, &subtitle_out)?;
                     }
                     TrackSource::FromVideo(j) => {
-                        subtitle_out = input.with_extension(&format!("{}.ass", i));
-                        if extract_subtitles(&find_source_file(input), *j, &subtitle_out).is_err() {
-                            subtitle_out = input.with_extension(&format!("{}.srt", i));
-                            extract_subtitles(&find_source_file(input), *j, &subtitle_out)?;
+                        subtitle_out = input_vpy.with_extension(&format!("{}.ass", i));
+                        if extract_subtitles(&source_video, *j, &subtitle_out).is_err() {
+                            subtitle_out = input_vpy.with_extension(&format!("{}.srt", i));
+                            extract_subtitles(&source_video, *j, &subtitle_out)?;
                         }
                     }
                 }
@@ -326,7 +337,7 @@ fn process_file(
         }
 
         mux_video(
-            &find_source_file(input),
+            &source_video,
             &video_out,
             &audio_outputs,
             &subtitle_outputs,
@@ -341,13 +352,13 @@ fn process_file(
             "{} {} {}",
             Green.bold().paint("[Success]"),
             Green.paint("Finished encoding"),
-            Green.paint(vpy_file.file_name().unwrap().to_string_lossy())
+            Green.paint(output_vpy.file_name().unwrap().to_string_lossy())
         );
         eprintln!();
     }
 
     if !keep_lossless {
-        let _ = fs::remove_file(input.with_extension("lossless.mkv"));
+        let _ = fs::remove_file(input_vpy.with_extension("lossless.mkv"));
     }
 
     Ok(())
@@ -367,7 +378,7 @@ fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 }
 
 fn escape_python_string(input: &str) -> String {
-    input.replace(r"\", r"\\").replace(r"'", r"\'")
+    input.replace('\\', r"\\").replace('\'', r"\'")
 }
 
 fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
@@ -391,6 +402,9 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
                 VideoEncoder::Rav1e { ref mut crf, .. } => {
                     *crf = arg;
                     (0, 255)
+                }
+                VideoEncoder::Copy => {
+                    return;
                 }
             };
             if arg < range.0 || arg > range.1 {
@@ -425,6 +439,7 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             } => {
                 *profile = *arg;
             }
+            VideoEncoder::Copy => (),
         },
         ParsedFilter::Grain(arg) => {
             if let VideoEncoder::Aom { ref mut grain, .. } = output.video.encoder {
@@ -537,6 +552,7 @@ fn build_video_suffix(output: &Output) -> String {
             if is_hdr { "-hdr" } else { "" },
             if compat { "-compat" } else { "" }
         ),
+        VideoEncoder::Copy => "copy".to_string(),
     };
     if let Some(res) = output.video.resolution {
         codec_str.push_str(&format!("-{}x{}", res.0, res.1));
