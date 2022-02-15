@@ -226,8 +226,19 @@ fn process_file(
             Blue.paint(input_vpy.file_name().unwrap().to_string_lossy()),
             Blue.paint("lossless")
         );
-        let dimensions = get_video_dimensions(input_vpy)?;
-        create_lossless(input_vpy, dimensions)?;
+        loop {
+            // I hate this lazy workaround,
+            // but this is due to a heisenbug in Vapoursynth
+            // due to some sort of race condition,
+            // which causes crashes often enough to be annoying.
+            //
+            // Essentially, we retry the encode until it works.
+            let dimensions = get_video_dimensions(input_vpy)?;
+            let result = create_lossless(input_vpy, dimensions);
+            if result.is_ok() {
+                break;
+            }
+        }
         eprintln!();
     }
 
@@ -260,18 +271,7 @@ fn process_file(
             encoder => {
                 build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
                 let dimensions = get_video_dimensions(&output_vpy)?;
-                loop {
-                    let result = convert_video_av1an(&output_vpy, &video_out, encoder, dimensions);
-                    // I hate this lazy workaround,
-                    // but this is due to a heisenbug in Vapoursynth
-                    // due to some sort of race condition,
-                    // which causes crashes often enough to be annoying.
-                    //
-                    // Essentially, we retry the encode until it works.
-                    if result.is_ok() {
-                        break;
-                    }
-                }
+                convert_video_av1an(&output_vpy, &video_out, encoder, dimensions)?;
             }
         };
 

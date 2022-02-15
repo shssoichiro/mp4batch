@@ -170,7 +170,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
 
     if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
         if lossless_frames != dimensions.frames {
-            anyhow::bail!("Incomlete lossless encode");
+            anyhow::bail!("Incomplete lossless encode");
         }
     }
 
