@@ -437,8 +437,8 @@ fn build_rav1e_args_string(
 ) -> String {
     // TODO: Add proper HDR metadata
     format!(
-        " --speed={} --quantizer={} --tile-cols={} --tile-rows={} --primaries={} --transfer={} \
-         --matrix={} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
+        " --speed {} --quantizer {} --tile-cols {} --tile-rows {} --primaries {} --transfer {} \
+         --matrix {} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
         speed,
         crf,
         if dimensions.width >= 1600 { 2 } else { 1 },
