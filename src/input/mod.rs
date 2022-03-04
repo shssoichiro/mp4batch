@@ -168,11 +168,11 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     })
 }
 
-fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
+pub fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
     let command = Command::new("mediainfo").arg(input).output()?;
     let output = String::from_utf8_lossy(&command.stdout);
 
-    Ok(output
+    let mut data = output
         .lines()
         .skip_while(|line| line.trim() != "Video")
         .skip(1)
@@ -181,7 +181,21 @@ fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
             let (key, value) = line.split_once(':').unwrap();
             (key.trim().to_string(), value.trim().to_string())
         })
-        .collect())
+        .collect::<HashMap<String, String>>();
+    data.insert(
+        "File size".to_owned(),
+        output
+            .lines()
+            .find(|l| l.starts_with("File size"))
+            .unwrap()
+            .split_once(':')
+            .unwrap()
+            .1
+            .trim()
+            .to_string(),
+    );
+
+    Ok(data)
 }
 
 pub fn find_source_file(input: &Path) -> PathBuf {

@@ -212,6 +212,18 @@ fn process_file(
     lossless_only: bool,
     mut skip_lossless: bool,
 ) -> Result<()> {
+    let source_video = find_source_file(input_vpy);
+    let mediainfo = get_video_mediainfo(&source_video)?;
+    eprintln!(
+        "{} {} {} {} {} {} {}",
+        Blue.bold().paint("[Info]"),
+        Blue.paint(source_video.file_name().unwrap().to_string_lossy()),
+        Blue.paint("("),
+        Blue.bold().paint(mediainfo.get("File size").unwrap()),
+        Blue.paint(" - Video stream: "),
+        Blue.bold().paint(mediainfo.get("Stream size").unwrap()),
+        Blue.paint(")")
+    );
     if outputs
         .iter()
         .all(|output| matches!(output.video.encoder, VideoEncoder::Copy))
@@ -255,7 +267,6 @@ fn process_file(
     for output in outputs {
         let video_suffix = build_video_suffix(output);
         let output_vpy = input_vpy.with_extension(&format!("{}.vpy", video_suffix));
-        let source_video = find_source_file(input_vpy);
         eprintln!(
             "{} {} {}",
             Blue.bold().paint("[Info]"),
