@@ -400,7 +400,7 @@ fn build_aom_args_string(
         } else {
             "psy"
         },
-        if is_hdr { 5 } else { 2 },
+        if is_hdr { 5 } else { 1 },
         if profile == Profile::Anime { 0 } else { 3 },
         if dimensions.width >= 1936 { 1 } else { 0 },
         if dimensions.height >= 1936 { 1 } else { 0 },
