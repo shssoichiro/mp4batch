@@ -215,14 +215,21 @@ fn process_file(
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
     eprintln!(
-        "{} {} {}{}{}{}{}",
+        "{} {} {}{}{}{}",
         Blue.bold().paint("[Info]"),
         Blue.bold()
             .paint(source_video.file_name().unwrap().to_string_lossy()),
         Blue.paint("("),
         Blue.bold().paint(mediainfo.get("File size").unwrap()),
-        Blue.paint(" - Video stream: "),
-        Blue.bold().paint(mediainfo.get("Stream size").unwrap()),
+        if let Some(stream_size) = mediainfo.get("Stream size") {
+            format!(
+                "{}{}",
+                Blue.paint(" - Video stream: "),
+                Blue.bold().paint(stream_size)
+            )
+        } else {
+            String::new()
+        },
         Blue.paint(")")
     );
     if outputs
