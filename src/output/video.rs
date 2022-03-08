@@ -388,7 +388,7 @@ fn build_aom_args_string(
     format!(
         " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=64 \
          --enable-fwd-kf=1 --aq-mode=1 --deltaq-mode={} --enable-chroma-deltaq=1 \
-         --quant-b-adapt=1 --enable-qm=1 --min-q=1 --arnr-strength=1 --arnr-maxframes={} \
+         --quant-b-adapt=1 --enable-qm=1 --min-q=1 --arnr-strength=1 --arnr-maxframes=3 \
          --sharpness=3 --enable-dnl-denoising=0 --disable-trellis-quant=0 --enable-dual-filter=0 \
          --tune=image_perceptual_quality --tile-columns={} --tile-rows={} --threads=64 \
          --row-mt={} --color-primaries={} --transfer-characteristics={} --matrix-coefficients={} \
@@ -401,7 +401,6 @@ fn build_aom_args_string(
             "psy"
         },
         if is_hdr { 5 } else { 1 },
-        if profile == Profile::Anime { 0 } else { 3 },
         if dimensions.width >= 1936 { 1 } else { 0 },
         if dimensions.height >= 1936 { 1 } else { 0 },
         if workers >= num_cpus::get() { 0 } else { 1 },
