@@ -255,8 +255,18 @@ fn process_file(
             // Essentially, we retry the encode until it works.
             let dimensions = get_video_dimensions(input_vpy)?;
             let result = create_lossless(input_vpy, dimensions);
-            if result.is_ok() {
-                break;
+            match result {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "{} {}: {}",
+                        Red.bold().paint("[Error]"),
+                        Red.paint("While encoding lossless"),
+                        e
+                    );
+                }
             }
         }
         eprintln!();
