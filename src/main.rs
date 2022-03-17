@@ -604,6 +604,7 @@ fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossles
 fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
     writeln!(script, "import vapoursynth as vs").unwrap();
     writeln!(script, "core = vs.core").unwrap();
+    writeln!(script, "core.max_cache_size=1024").unwrap();
     writeln!(
         script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
