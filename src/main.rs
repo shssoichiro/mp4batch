@@ -377,6 +377,13 @@ fn process_file(
             &output_path,
         )?;
 
+        if output.video.encoder.hdr_enabled() {
+            let hdr_path = output_path.with_extension("hdr.mkv");
+            copy_hdr_data(&source_video, &output_path, &hdr_path)?;
+            fs::remove_file(&output_path)?;
+            fs::rename(&hdr_path, &output_path)?;
+        }
+
         eprintln!(
             "{} {} {}",
             Green.bold().paint("[Success]"),

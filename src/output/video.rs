@@ -375,6 +375,15 @@ impl VideoEncoder {
     pub const fn has_tiling(&self) -> bool {
         matches!(self, VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. })
     }
+
+    pub fn hdr_enabled(&self) -> bool {
+        match self {
+            VideoEncoder::Aom { is_hdr, .. } => *is_hdr,
+            VideoEncoder::Rav1e { is_hdr, .. } => *is_hdr,
+            VideoEncoder::X265 { is_hdr, .. } => *is_hdr,
+            _ => false,
+        }
+    }
 }
 
 fn build_aom_args_string(
@@ -602,4 +611,18 @@ fn build_x264_args_string(
             _ => "",
         }
     )
+}
+
+pub fn copy_hdr_data(input: &Path, target: &Path, output: &Path) -> Result<()> {
+    let status = Command::new("hdrcopier")
+        .arg("copy")
+        .arg("--chapters")
+        .arg(input)
+        .arg(target)
+        .arg(output)
+        .status()?;
+    if !status.success() {
+        anyhow::bail!("Error copying hdr data");
+    }
+    Ok(())
 }
