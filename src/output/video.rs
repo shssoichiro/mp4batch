@@ -613,13 +613,12 @@ fn build_x264_args_string(
     )
 }
 
-pub fn copy_hdr_data(input: &Path, target: &Path, output: &Path) -> Result<()> {
+pub fn copy_hdr_data(input: &Path, target: &Path) -> Result<()> {
     let status = Command::new("hdrcopier")
         .arg("copy")
         .arg("--chapters")
         .arg(input)
         .arg(target)
-        .arg(output)
         .status()?;
     if !status.success() {
         anyhow::bail!("Error copying hdr data");
