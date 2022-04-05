@@ -108,7 +108,11 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
-            if lossless_frames == dimensions.frames {
+            // We use a fuzzy frame count check because *some cursed sources*
+            // report a different frame count from the number of actual decodeable frames.
+            let diff = (lossless_frames as i64 - dimensions.frames as i64).abs() as u32;
+            let allowance = dimensions.frames / 1000;
+            if diff <= allowance {
                 eprintln!(
                     "{} {}",
                     Green.bold().paint("[Success]"),
@@ -169,7 +173,11 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
     }
 
     if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
-        if lossless_frames != dimensions.frames {
+        // We use a fuzzy frame count check because *some cursed sources*
+        // report a different frame count from the number of actual decodeable frames.
+        let diff = (lossless_frames as i64 - dimensions.frames as i64).abs() as u32;
+        let allowance = dimensions.frames / 1000;
+        if diff > allowance {
             anyhow::bail!("Incomplete lossless encode");
         }
     }
