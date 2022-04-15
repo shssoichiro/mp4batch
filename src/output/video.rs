@@ -176,7 +176,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
         // We use a fuzzy frame count check because *some cursed sources*
         // report a different frame count from the number of actual decodeable frames.
         let diff = (lossless_frames as i64 - dimensions.frames as i64).abs() as u32;
-        let allowance = dimensions.frames / 1000;
+        let allowance = dimensions.frames / 200;
         if diff > allowance {
             anyhow::bail!("Incomplete lossless encode");
         }
