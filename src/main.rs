@@ -631,7 +631,10 @@ fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWri
     let mut output_pos = None;
     let mut output_var = None;
     for line in contents.lines() {
-        if let Some(pos) = line.find(".set_output()") {
+        if let Some(pos) = line
+            .find(".set_output()")
+            .or_else(|| line.find(".set_output(0)"))
+        {
             assert!(pos > 0);
             output_pos = Some(contents.find(line).unwrap());
             output_var = Some(&line[0..pos]);
