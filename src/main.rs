@@ -303,7 +303,7 @@ fn process_file(
             }
         };
 
-        let audio_tracks = if output.audio_tracks.is_empty() {
+        let mut audio_tracks = if output.audio_tracks.is_empty() {
             vec![Track {
                 source: TrackSource::FromVideo(0),
                 enabled: true,
@@ -312,6 +312,16 @@ fn process_file(
         } else {
             output.audio_tracks.clone()
         };
+        let has_vpy_audio = fs::read_to_string(&input_vpy)?.contains(".set_output(1)");
+        if has_vpy_audio {
+            let audio_path = input_vpy.with_extension("flac");
+            save_vpy_audio(input_vpy, &audio_path)?;
+            audio_tracks = vec![Track {
+                source: TrackSource::External(audio_path),
+                enabled: true,
+                forced: false,
+            }];
+        }
         let mut audio_outputs = Vec::new();
         let mut audio_suffixes = Vec::new();
         for (i, audio_track) in audio_tracks.iter().enumerate() {

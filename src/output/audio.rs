@@ -1,4 +1,8 @@
-use std::{fmt::Display, path::Path, process::Command};
+use std::{
+    fmt::Display,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 use anyhow::Result;
 
@@ -6,6 +10,7 @@ use crate::{
     find_source_file,
     parse::{Track, TrackSource},
 };
+use ansi_term::Colour::Green;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioOutput {
@@ -143,6 +148,58 @@ pub fn convert_audio(
     } else {
         anyhow::bail!("Failed to execute ffmpeg");
     }
+}
+
+pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
+    let filename = input.file_name().unwrap().to_str().unwrap();
+    let pipe = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
+            .arg("-o")
+            .arg("1")
+            .arg("-c")
+            .arg("wav")
+            .arg(input)
+            .arg("-")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    } else {
+        panic!("Unrecognized input type");
+    };
+
+    let mut command = Command::new("nice");
+    let status = command
+        .arg("ffmpeg")
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-y")
+        .arg("-i")
+        .arg("-")
+        .arg("-acodec")
+        .arg("flac")
+        .arg("-compression_level")
+        .arg("9")
+        .arg(&output)
+        .stdin(pipe.stdout.unwrap())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    if !status.success() {
+        anyhow::bail!(
+            "Failed to execute ffmpeg: Exited with code {:x}",
+            status.code().unwrap()
+        );
+    }
+
+    eprintln!(
+        "{} {}",
+        Green.bold().paint("[Success]"),
+        Green.paint("Finished extracting Vapoursynth audio"),
+    );
+
+    Ok(())
 }
 
 fn get_channel_count(path: &Path, audio_track: &Track) -> Result<u32> {
