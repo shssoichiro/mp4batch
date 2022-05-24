@@ -419,13 +419,7 @@ fn build_aom_args_string(
         } else {
             "psy"
         },
-        if is_hdr {
-            5
-        } else if profile == Profile::Film {
-            1
-        } else {
-            0
-        },
+        if is_hdr { 5 } else { 0 },
         if dimensions.width >= 1936 { 1 } else { 0 },
         if dimensions.height >= 1936 { 1 } else { 0 },
         if workers >= num_cpus::get() { 0 } else { 1 },
