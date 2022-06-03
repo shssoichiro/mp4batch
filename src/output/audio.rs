@@ -4,13 +4,13 @@ use std::{
     process::{Command, Stdio},
 };
 
+use ansi_term::Colour::Green;
 use anyhow::Result;
 
 use crate::{
     find_source_file,
     parse::{Track, TrackSource},
 };
-use ansi_term::Colour::Green;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioOutput {

@@ -8,7 +8,8 @@ mod output;
 mod parse;
 
 use std::{
-    env, fs,
+    env,
+    fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
@@ -166,6 +167,7 @@ fn main() {
                                         speed: 5,
                                         profile: Profile::Film,
                                         is_hdr: false,
+                                        grain: 0,
                                     }
                                 }
                                 "copy" => {
@@ -565,12 +567,14 @@ fn build_video_suffix(output: &Output) -> String {
             speed,
             profile,
             is_hdr,
+            grain,
         } => format!(
-            "rav1e-q{}-s{}-{}{}",
+            "rav1e-q{}-s{}-{}{}-g{}",
             crf,
             speed,
             profile,
-            if is_hdr { "-hdr" } else { "" }
+            if is_hdr { "-hdr" } else { "" },
+            grain,
         ),
         VideoEncoder::X264 {
             crf,

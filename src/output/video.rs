@@ -325,6 +325,7 @@ pub enum VideoEncoder {
         speed: u8,
         profile: Profile,
         is_hdr: bool,
+        grain: u8,
     },
     X264 {
         crf: i16,
@@ -364,8 +365,12 @@ impl VideoEncoder {
                 ..
             } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, workers),
             VideoEncoder::Rav1e {
-                crf, speed, is_hdr, ..
-            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
+                crf,
+                speed,
+                is_hdr,
+                grain,
+                ..
+            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr, *grain),
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -423,27 +428,9 @@ fn build_aom_args_string(
         if dimensions.width >= 1936 { 1 } else { 0 },
         if dimensions.height >= 1936 { 1 } else { 0 },
         if workers >= num_cpus::get() { 0 } else { 1 },
-        if is_hdr {
-            "bt2020"
-        } else if dimensions.height > 576 {
-            "bt709"
-        } else {
-            "bt601"
-        },
-        if is_hdr {
-            "smpte2084"
-        } else if dimensions.height > 576 {
-            "bt709"
-        } else {
-            "bt601"
-        },
-        if is_hdr {
-            "bt2020ncl"
-        } else if dimensions.height > 576 {
-            "bt709"
-        } else {
-            "bt601"
-        },
+        if is_hdr { "bt2020" } else { "bt709" },
+        if is_hdr { "smpte2084" } else { "bt709" },
+        if is_hdr { "bt2020ncl" } else { "bt709" },
         dimensions.bit_depth
     )
 }
@@ -453,36 +440,20 @@ fn build_rav1e_args_string(
     speed: u8,
     dimensions: VideoDimensions,
     is_hdr: bool,
+    grain: u8,
 ) -> String {
     // TODO: Add proper HDR metadata
     format!(
         " --speed {} --quantizer {} --tile-cols {} --tile-rows {} --primaries {} --transfer {} \
-         --matrix {} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
+         --matrix {} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 --photon-noise {} ",
         speed,
         crf,
-        if dimensions.width >= 1600 { 2 } else { 1 },
-        if dimensions.height >= 1600 { 2 } else { 1 },
-        if is_hdr {
-            "BT2020"
-        } else if dimensions.height > 576 {
-            "BT709"
-        } else {
-            "BT601"
-        },
-        if is_hdr {
-            "SMPTE2084"
-        } else if dimensions.height > 576 {
-            "BT709"
-        } else {
-            "BT601"
-        },
-        if is_hdr {
-            "BT2020NCL"
-        } else if dimensions.height > 576 {
-            "BT709"
-        } else {
-            "BT601"
-        }
+        if dimensions.width >= 1936 { 2 } else { 1 },
+        if dimensions.height >= 1936 { 2 } else { 1 },
+        if is_hdr { "BT2020" } else { "BT709" },
+        if is_hdr { "SMPTE2084" } else { "BT709" },
+        if is_hdr { "BT2020NCL" } else { "BT709" },
+        grain
     )
 }
 
