@@ -8,8 +8,7 @@ mod output;
 mod parse;
 
 use std::{
-    env,
-    fs,
+    env, fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
@@ -485,15 +484,16 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             }
             VideoEncoder::Copy => (),
         },
-        ParsedFilter::Grain(arg) => {
-            if let VideoEncoder::Aom { ref mut grain, .. } = output.video.encoder {
+        ParsedFilter::Grain(arg) => match output.video.encoder {
+            VideoEncoder::Aom { ref mut grain, .. } | VideoEncoder::Rav1e { ref mut grain, .. } => {
                 let arg = *arg;
                 if arg > 64 {
                     panic!("'grain' must be between 0 and 64, received {}", arg);
                 }
                 *grain = arg;
             }
-        }
+            _ => (),
+        },
         ParsedFilter::Compat(arg) => match output.video.encoder {
             VideoEncoder::X264 { ref mut compat, .. }
             | VideoEncoder::X265 { ref mut compat, .. }
