@@ -21,7 +21,7 @@ pub struct VideoDimensions {
     pub bit_depth: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PixelFormat {
     Yuv420,
     Yuv422,
@@ -49,7 +49,7 @@ impl PixelFormat {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSpace {
     Bt709,
     Smpte170m,

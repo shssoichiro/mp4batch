@@ -9,6 +9,7 @@ mod parse;
 
 use std::{
     env,
+    fmt::Write as FmtWrite,
     fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
@@ -290,7 +291,7 @@ fn process_file(
     }
 
     for output in outputs {
-        let video_suffix = build_video_suffix(output);
+        let video_suffix = build_video_suffix(output)?;
         let output_vpy = input_vpy.with_extension(&format!("{}.vpy", video_suffix));
         eprintln!(
             "{} {} {}",
@@ -551,7 +552,7 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
     }
 }
 
-fn build_video_suffix(output: &Output) -> String {
+fn build_video_suffix(output: &Output) -> Result<String> {
     let mut codec_str = match output.video.encoder {
         VideoEncoder::Aom {
             crf,
@@ -608,12 +609,12 @@ fn build_video_suffix(output: &Output) -> String {
         VideoEncoder::Copy => "copy".to_string(),
     };
     if let Some(res) = output.video.resolution {
-        codec_str.push_str(&format!("-{}x{}", res.0, res.1));
+        write!(codec_str, "-{}x{}", res.0, res.1)?;
     }
     if let Some(bd) = output.video.bit_depth {
-        codec_str.push_str(&format!("-{}b", bd));
+        write!(codec_str, "-{}b", bd)?;
     }
-    codec_str
+    Ok(codec_str)
 }
 
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossless: bool) {
