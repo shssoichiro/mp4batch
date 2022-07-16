@@ -66,15 +66,11 @@ impl FromStr for Profile {
 
 impl Display for Profile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{}",
-            match self {
-                Profile::Film => "film",
-                Profile::Anime => "anime",
-                Profile::Fast => "fast",
-            }
-        )
+        write!(f, "{}", match self {
+            Profile::Film => "film",
+            Profile::Anime => "anime",
+            Profile::Fast => "fast",
+        })
     }
 }
 

@@ -8,7 +8,8 @@ mod output;
 mod parse;
 
 use std::{
-    env, fs,
+    env,
+    fs,
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
@@ -40,10 +41,12 @@ struct InputArgs {
     ///
     /// Video encoder options:
     ///
-    /// - enc=str: Encoder to use [default: x264] [options: copy, x264, x265, aom, rav1e]
+    /// - enc=str: Encoder to use [default: x264] [options: copy, x264, x265,
+    ///   aom, rav1e]
     /// - q=#: QP or CRF [default: varies by encoder]
     /// - s=#: Speed/cpu-used [aom/rav1e only] [default: varies by encoder]
-    /// - p=str: Encoder settings to use [default: film] [options: film, anime, fast]
+    /// - p=str: Encoder settings to use [default: film] [options: film, anime,
+    ///   fast]
     /// - grain=#: Grain synth level [aom only] [0-50, 0 = disabled]
     /// - compat=0/1: Enable extra playback compatibility/DXVA options
     /// - hdr=0/1: Enable HDR encoding features
@@ -56,13 +59,17 @@ struct InputArgs {
     ///
     /// Audio encoder options:
     ///
-    /// - aenc=str: Audio encoder to use [default: copy] [options: copy, aac, flac, opus]
-    /// - ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for opus]
-    /// - at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled, f=forced]
+    /// - aenc=str: Audio encoder to use [default: copy] [options: copy, aac,
+    ///   flac, opus]
+    /// - ab=#: Audio bitrate per channel in Kb/sec [default: 96 for aac, 64 for
+    ///   opus]
+    /// - at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled,
+    ///   f=forced]
     ///
     /// Subtitle options:
     ///
-    /// - st=#-[e][f]: Subtitle tracks, pipe separated [default: None, e=enabled, f=forced]
+    /// - st=#-[e][f]: Subtitle tracks, pipe separated [default: None,
+    ///   e=enabled, f=forced]
     #[clap(short, long, value_name = "FILTERS", verbatim_doc_comment)]
     pub formats: Option<String>,
 
