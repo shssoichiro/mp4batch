@@ -288,7 +288,10 @@ pub fn convert_video_av1an(
     }
     if let VideoEncoder::Aom { grain, .. } = encoder {
         if grain > 0 {
-            command.arg("--photon-noise").arg(grain.to_string());
+            command
+                .arg("--photon-noise")
+                .arg(grain.to_string())
+                .arg("--chroma-noise");
         }
     }
     let status = command
