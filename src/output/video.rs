@@ -286,7 +286,7 @@ pub fn convert_video_av1an(
             .arg("--set-thread-affinity")
             .arg((num_cpus::get() / workers).to_string());
     }
-    if let VideoEncoder::Aom { grain, .. } = encoder {
+    if let VideoEncoder::Aom { grain, .. } | VideoEncoder::Rav1e { grain, .. } = encoder {
         if grain > 0 {
             command
                 .arg("--photon-noise")
@@ -364,12 +364,8 @@ impl VideoEncoder {
                 ..
             } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr),
             VideoEncoder::Rav1e {
-                crf,
-                speed,
-                is_hdr,
-                grain,
-                ..
-            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr, *grain),
+                crf, speed, is_hdr, ..
+            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -436,12 +432,11 @@ fn build_rav1e_args_string(
     speed: u8,
     dimensions: VideoDimensions,
     is_hdr: bool,
-    grain: u8,
 ) -> String {
     // TODO: Add proper HDR metadata
     format!(
         " --speed {} --quantizer {} --tile-cols {} --tile-rows {} --primaries {} --transfer {} \
-         --matrix {} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 --photon-noise {} ",
+         --matrix {} --no-scene-detection --keyint 0 --rdo-lookahead-frames 40 ",
         speed,
         crf,
         if dimensions.width >= 1600 { 2 } else { 1 },
@@ -449,7 +444,6 @@ fn build_rav1e_args_string(
         if is_hdr { "BT2020" } else { "BT709" },
         if is_hdr { "SMPTE2084" } else { "BT709" },
         if is_hdr { "BT2020NCL" } else { "BT709" },
-        grain
     )
 }
 
