@@ -153,7 +153,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
-        .arg("ultrafast")
+        .arg("superfast")
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)
