@@ -23,6 +23,8 @@ Check out the full `mp4batch --help` for options. There are some secondary flags
 
 The above command will lookup all `*.vpy` files underneath the input directory, recursively, and encode each of them with aomenc at cq-level=20, cpu-used=4, av1an's photon-noise=8, transcode the _first_ audio track with ffmpeg+libopus at the default bitrate of 64 kbps per channel, mux them together with HDR data from the input file, and output the muxed into the directory specified in `.env`. The output file will have a unique name based on the input filename and the combination of parameters provided.
 
+It will use the aomenc and ffmpeg binaries that are in your system PATH. That means if you have baseline aomenc installed, it will use that. If you have aom-psy-git installed, it'll use that. If you don't have aomenc installed, it'll crash.
+
 ### Encode each vpy script in a directory twice
 
 `mp4batch -f "enc=aom,q=20,s=4;enc=x264,q=16" ~/data/DefinitelyNotHentai`
