@@ -1,8 +1,10 @@
 use std::{
     fmt::Display,
+    num::NonZeroUsize,
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
+    thread::available_parallelism,
 };
 
 use ansi_term::Colour::{Green, Yellow};
@@ -66,11 +68,15 @@ impl FromStr for Profile {
 
 impl Display for Profile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "{}", match self {
-            Profile::Film => "film",
-            Profile::Anime => "anime",
-            Profile::Fast => "fast",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Profile::Film => "film",
+                Profile::Anime => "anime",
+                Profile::Fast => "fast",
+            }
+        )
     }
 }
 
@@ -219,9 +225,14 @@ pub fn convert_video_av1an(
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     // We may not actually split tiles at this point,
     // but we want to make sure we don't run out of memory
-    let tiles = if dimensions.height >= 1600 { 2 } else { 1 }
-        * if dimensions.width >= 1600 { 2 } else { 1 };
-    let workers = std::cmp::max(num_cpus::get() / tiles, 1);
+    let tiles = NonZeroUsize::new(
+        if dimensions.height >= 1600 { 2 } else { 1 }
+            * if dimensions.width >= 1600 { 2 } else { 1 },
+    )
+    .unwrap();
+    let cores = available_parallelism().unwrap();
+    let workers = std::cmp::max(cores.get() / tiles.get(), 1);
+    let threads_per_worker = (workers as f32 / cores.get() as f32 * 1.5).ceil() as usize;
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -230,7 +241,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions))
+        .arg(&encoder.get_args_string(dimensions, threads_per_worker))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -281,10 +292,10 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
-    if num_cpus::get() % workers == 0 && encoder.has_tiling() {
+    if cores.get() % workers == 0 && encoder.has_tiling() {
         command
             .arg("--set-thread-affinity")
-            .arg((num_cpus::get() / workers).to_string());
+            .arg((cores.get() / workers).to_string());
     }
     if let VideoEncoder::Aom { grain, .. } | VideoEncoder::Rav1e { grain, .. } = encoder {
         if grain > 0 {
@@ -354,7 +365,7 @@ impl VideoEncoder {
         }
     }
 
-    pub fn get_args_string(&self, dimensions: VideoDimensions) -> String {
+    pub fn get_args_string(&self, dimensions: VideoDimensions, threads: usize) -> String {
         match self {
             VideoEncoder::Aom {
                 crf,
@@ -362,7 +373,7 @@ impl VideoEncoder {
                 profile,
                 is_hdr,
                 ..
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr),
+            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, threads),
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
@@ -402,13 +413,14 @@ fn build_aom_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     is_hdr: bool,
+    threads: usize,
 ) -> String {
     format!(
         " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=64 \
          --aq-mode=1 --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 \
          --min-q=1 --arnr-strength=1 --arnr-maxframes=3 --sharpness=3 --enable-dnl-denoising=0 \
          --disable-trellis-quant=0 --enable-dual-filter=0 --tune=image_perceptual_quality \
-         --tile-columns={} --tile-rows={} --threads=64 --row-mt=0 --color-primaries={} \
+         --tile-columns={} --tile-rows={} --threads={} --row-mt=0 --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf ",
         speed,
         crf,
@@ -420,6 +432,7 @@ fn build_aom_args_string(
         if is_hdr { 5 } else { 0 },
         if dimensions.width >= 1600 { 1 } else { 0 },
         if dimensions.height >= 1600 { 1 } else { 0 },
+        threads,
         if is_hdr { "bt2020" } else { "bt709" },
         if is_hdr { "smpte2084" } else { "bt709" },
         if is_hdr { "bt2020ncl" } else { "bt709" },
