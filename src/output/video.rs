@@ -232,7 +232,10 @@ pub fn convert_video_av1an(
     .unwrap();
     let cores = available_parallelism().unwrap();
     let workers = std::cmp::max(cores.get() / tiles.get(), 1);
-    let threads_per_worker = (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize;
+    let threads_per_worker = std::cmp::min(
+        64,
+        (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize + 2,
+    );
     let mut command = Command::new("nice");
     command
         .arg("av1an")
