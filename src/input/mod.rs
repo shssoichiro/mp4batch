@@ -8,6 +8,9 @@ use std::{
 };
 
 use anyhow::Result;
+use itertools::Itertools;
+use once_cell::sync::OnceCell;
+use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
@@ -204,19 +207,27 @@ pub fn find_source_file(input: &Path) -> PathBuf {
     }
 
     let script = fs::read_to_string(input).unwrap();
-    let (_, source) = script.split_once("source=").unwrap();
-    // If you have a quotation mark in your filename then go to hell
-    let source = source
-        .chars()
-        .skip(1)
-        .take_while(|&c| c != '"')
-        .collect::<String>();
+    let sources = parse_sources(&script);
+    // If there's a source that matches this script's name then use that,
+    // otherwise assume the first source is correct.
+    // This is mostly for OC merging.
+    let source = sources
+        .iter()
+        .find(|source| source.file_stem() == input.file_stem())
+        .unwrap_or_else(|| &sources[0]);
     // Handle relative or absolute paths
-    let mut output = if input.is_dir() {
-        input.to_path_buf()
-    } else {
-        input.parent().unwrap().to_path_buf()
-    };
-    output.push(&PathBuf::from(&source));
+    let mut output = input.parent().unwrap().to_path_buf();
+    output.push(source);
     output
+}
+
+fn parse_sources(script: &str) -> Vec<PathBuf> {
+    // If you have a quotation mark in your filename then go to hell
+    static PATTERN: OnceCell<Regex> = OnceCell::new();
+    let pattern = PATTERN.get_or_init(|| Regex::new("source=\"(.+)\"").unwrap());
+    pattern
+        .captures_iter(script)
+        .map(|cap| PathBuf::from(&cap[1]))
+        .unique()
+        .collect()
 }
