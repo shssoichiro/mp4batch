@@ -429,8 +429,8 @@ fn build_aom_args_string(
             "psy"
         },
         if is_hdr { 5 } else { 0 },
-        if dimensions.width >= 1600 { 1 } else { 0 },
-        if dimensions.height >= 1600 { 1 } else { 0 },
+        i32::from(dimensions.width >= 1600),
+        i32::from(dimensions.height >= 1600),
         threads,
         if is_hdr { "bt2020" } else { "bt709" },
         if is_hdr { "smpte2084" } else { "bt709" },

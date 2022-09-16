@@ -174,7 +174,7 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
         .arg("flac")
         .arg("-compression_level")
         .arg("9")
-        .arg(&output)
+        .arg(output)
         .stdin(pipe.stdout.unwrap())
         .stderr(Stdio::inherit())
         .status()

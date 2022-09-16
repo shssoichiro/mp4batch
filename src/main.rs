@@ -321,7 +321,7 @@ fn process_file(
         } else {
             output.audio_tracks.clone()
         };
-        let has_vpy_audio = fs::read_to_string(&input_vpy)?.contains(".set_output(1)");
+        let has_vpy_audio = fs::read_to_string(input_vpy)?.contains(".set_output(1)");
         if has_vpy_audio {
             let audio_path = input_vpy.with_extension("flac");
             save_vpy_audio(input_vpy, &audio_path)?;
@@ -618,7 +618,7 @@ fn build_video_suffix(output: &Output) -> Result<String> {
 }
 
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossless: bool) {
-    let mut script = BufWriter::new(File::create(&filename).unwrap());
+    let mut script = BufWriter::new(File::create(filename).unwrap());
     if skip_lossless {
         copy_and_modify_vpy_script(input, output, &mut script);
     } else {
