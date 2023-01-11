@@ -203,6 +203,7 @@ fn main() {
             args.keep_lossless,
             args.lossless_only,
             args.skip_lossless,
+            &args.force_keyframes
         );
         if let Err(err) = result {
             eprintln!(
@@ -223,6 +224,7 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     mut skip_lossless: bool,
+    force_keyframes: &str,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -312,7 +314,7 @@ fn process_file(
             encoder => {
                 build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
                 let dimensions = get_video_dimensions(&output_vpy)?;
-                convert_video_av1an(&output_vpy, &video_out, encoder, dimensions)?;
+                convert_video_av1an(&output_vpy, &video_out, encoder, dimensions, force_keyframes)?;
             }
         };
 

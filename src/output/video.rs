@@ -198,6 +198,7 @@ pub fn convert_video_av1an(
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
+    force_keyframes: &str,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -295,6 +296,9 @@ pub fn convert_video_av1an(
         .arg("random")
         .arg("-o")
         .arg(absolute_path(output).unwrap());
+    if !force_keyframes.is_empty() {
+        command.arg("--force-keyframes").arg(force_keyframes);
+    }
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
