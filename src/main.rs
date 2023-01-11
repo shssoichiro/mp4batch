@@ -296,7 +296,7 @@ fn process_file(
 
     for output in outputs {
         let video_suffix = build_video_suffix(output)?;
-        let output_vpy = input_vpy.with_extension(&format!("{}.vpy", video_suffix));
+        let output_vpy = input_vpy.with_extension(format!("{}.vpy", video_suffix));
         eprintln!(
             "{} {} {}",
             Blue.bold().paint("[Info]"),
@@ -342,7 +342,7 @@ fn process_file(
                 "{}-{}kbpc-at{}",
                 output.audio.encoder, output.audio.kbps_per_channel, i
             );
-            let audio_out = input_vpy.with_extension(&format!("{}.mka", audio_suffix));
+            let audio_out = input_vpy.with_extension(format!("{}.mka", audio_suffix));
             convert_audio(
                 input_vpy,
                 &audio_out,
@@ -357,7 +357,7 @@ fn process_file(
         let mut output_path = PathBuf::from(output_dir.unwrap_or(dotenv!("OUTPUT_PATH")));
         output_path.push(
             input_vpy
-                .with_extension(&format!(
+                .with_extension(format!(
                     "{}-{}.{}",
                     video_suffix, audio_suffix, output.video.output_ext
                 ))
@@ -372,13 +372,13 @@ fn process_file(
                 match &subtitle.source {
                     TrackSource::External(path) => {
                         let ext = path.extension().unwrap().to_str().unwrap();
-                        subtitle_out = input_vpy.with_extension(&format!("{}.{}", i, ext));
+                        subtitle_out = input_vpy.with_extension(format!("{}.{}", i, ext));
                         fs::copy(path, &subtitle_out)?;
                     }
                     TrackSource::FromVideo(j) => {
-                        subtitle_out = input_vpy.with_extension(&format!("{}.ass", i));
+                        subtitle_out = input_vpy.with_extension(format!("{}.ass", i));
                         if extract_subtitles(&source_video, *j, &subtitle_out).is_err() {
-                            subtitle_out = input_vpy.with_extension(&format!("{}.srt", i));
+                            subtitle_out = input_vpy.with_extension(format!("{}.srt", i));
                             extract_subtitles(&source_video, *j, &subtitle_out)?;
                         }
                     }
