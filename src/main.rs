@@ -87,6 +87,10 @@ struct InputArgs {
     /// Useful for encodes with very little or no filtering.
     #[clap(long)]
     pub skip_lossless: bool,
+
+    /// Comma-separated list of forced keyframes.
+    #[clap(long, default_value = "")]
+    pub force_keyframes: String,
 }
 
 fn main() {
