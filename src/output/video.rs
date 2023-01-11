@@ -198,7 +198,7 @@ pub fn convert_video_av1an(
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
-    force_keyframes: &str,
+    force_keyframes: &Option<String>,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -296,7 +296,7 @@ pub fn convert_video_av1an(
         .arg("random")
         .arg("-o")
         .arg(absolute_path(output).unwrap());
-    if !force_keyframes.is_empty() {
+    if let Some(force_keyframes) = force_keyframes {
         command.arg("--force-keyframes").arg(force_keyframes);
     }
     if dimensions.height > 1080 {
