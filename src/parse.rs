@@ -46,7 +46,7 @@ pub enum TrackSource {
     External(PathBuf),
 }
 
-pub fn parse_filters<'a, 'b>(input: &'a str, in_file: &'b Path) -> Vec<ParsedFilter<'a>> {
+pub fn parse_filters<'a>(input: &'a str, in_file: &Path) -> Vec<ParsedFilter<'a>> {
     let mut filters = Vec::new();
     let mut input = input.trim_start();
     while !input.is_empty() {
@@ -172,10 +172,7 @@ fn parse_audio_bitrate(input: &str) -> IResult<&str, ParsedFilter> {
         .map(|(input, token)| (input, ParsedFilter::AudioBitrate(token.parse().unwrap())))
 }
 
-fn parse_audio_tracks<'a, 'b>(
-    input: &'a str,
-    in_file: &'b Path,
-) -> IResult<&'a str, ParsedFilter<'a>> {
+fn parse_audio_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, ParsedFilter<'a>> {
     preceded(
         tag("at="),
         separated_list1(
@@ -210,10 +207,7 @@ fn parse_audio_tracks<'a, 'b>(
     })
 }
 
-fn parse_subtitle_tracks<'a, 'b>(
-    input: &'a str,
-    in_file: &'b Path,
-) -> IResult<&'a str, ParsedFilter<'a>> {
+fn parse_subtitle_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, ParsedFilter<'a>> {
     preceded(
         tag("st="),
         separated_list1(
