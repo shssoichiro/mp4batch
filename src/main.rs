@@ -22,6 +22,7 @@ use clap::Parser;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
 use path_clean::PathClean;
+use size::Size;
 use walkdir::WalkDir;
 
 use self::{input::*, output::*};
@@ -234,7 +235,11 @@ fn process_file(
         Blue.bold()
             .paint(source_video.file_name().unwrap().to_string_lossy()),
         Blue.paint("("),
-        Blue.bold().paint(mediainfo.get("File size").unwrap()),
+        Blue.bold().paint(
+            Size::from_bytes(source_video.metadata().unwrap().len())
+                .format()
+                .to_string()
+        ),
         if let Some(stream_size) = mediainfo.get("Stream size") {
             format!(
                 "{}{}",
