@@ -1,3 +1,7 @@
+### What is this???
+
+Encoding script. Batch encodes videos through a process of Vapoursynth -> Lossless x264 -> av1an (into whatever final format you want). The name is from legacy reasons e.g. it used to be intended for creating mp4s, although the output format is now mkv, but renaming things is hard.
+
 This was intended for personal use, but anyone is free to use it. That being said, there are likely to be bugs and undocumented things as well as settings you may not agree with.
 
 # mp4batch
