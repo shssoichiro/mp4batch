@@ -535,26 +535,11 @@ fn build_x264_args_string(
     profile: Profile,
     compat: bool,
 ) -> String {
-    let maxrate = if profile == Profile::Anime {
-        if dimensions.height >= 1440 {
-            80_000
-        } else if dimensions.height >= 768 {
-            32_500
-        } else {
-            17_500
-        }
-    } else if dimensions.height >= 1440 {
-        120_000
-    } else if dimensions.height >= 768 {
-        50_000
-    } else {
-        25_000
-    };
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
          96 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
          --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} {} {} --threads 4 --vbv-maxrate {} --vbv-bufsize {} ",
+         --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
         if profile == Profile::Fast {
             "faster"
@@ -610,8 +595,6 @@ fn build_x264_args_string(
             }
             _ => "",
         },
-        maxrate,
-        maxrate
     )
 }
 
