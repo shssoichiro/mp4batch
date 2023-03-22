@@ -537,7 +537,7 @@ fn build_x264_args_string(
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
-         96 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
+         96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
          --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
@@ -572,6 +572,11 @@ fn build_x264_args_string(
             Profile::Film => 0.8,
             Profile::Anime => 0.7,
             Profile::Fast => 0.7,
+        },
+        match profile {
+            // mbtree works fine on live action, but on anime it has undesirable effects
+            Profile::Anime => "--no-mbtree",
+            _ => "",
         },
         match profile {
             Profile::Film | Profile::Fast => 0.75,
