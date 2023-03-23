@@ -295,8 +295,6 @@ pub fn convert_video_av1an(
         })
         .arg("-r")
         .arg("--verbose")
-        .arg("--chunk-order")
-        .arg("random")
         .arg("-o")
         .arg(absolute_path(output).expect("Unable to get absolute path"));
     if let Some(force_keyframes) = force_keyframes {
