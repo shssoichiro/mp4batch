@@ -106,22 +106,21 @@ pub fn convert_audio(
             if audio_bitrate == 0 {
                 audio_bitrate = 64;
             }
+            let channels = get_channel_count(
+                &match audio_track.source {
+                    TrackSource::FromVideo(_) => find_source_file(input),
+                    TrackSource::External(ref path) => path.clone(),
+                },
+                audio_track,
+            )?;
             command
                 .arg("libopus")
                 .arg("-b:a")
-                .arg(&format!(
-                    "{}k",
-                    audio_bitrate
-                        * get_channel_count(
-                            &match audio_track.source {
-                                TrackSource::FromVideo(_) => find_source_file(input),
-                                TrackSource::External(ref path) => path.clone(),
-                            },
-                            audio_track
-                        )?
-                ))
+                .arg(&format!("{}k", audio_bitrate * channels))
                 .arg("-af")
-                .arg("aformat=channel_layouts=7.1|5.1|stereo");
+                .arg("aformat=channel_layouts=7.1|5.1|stereo")
+                .arg("-mapping_family")
+                .arg(if channels > 2 { "1" } else { "0" });
         }
         AudioEncoder::Flac => {
             command.arg("flac");
