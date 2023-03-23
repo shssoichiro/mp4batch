@@ -64,7 +64,7 @@ pub fn parse_filters<'a>(input: &'a str, in_file: &Path) -> Vec<ParsedFilter<'a>
             .or_else(|_| parse_audio_bitrate(input))
             .or_else(|_| parse_audio_tracks(input, in_file))
             .or_else(|_| parse_subtitle_tracks(input, in_file))
-            .unwrap();
+            .expect("Unrecognized filter");
         filters.push(result);
         input = next_input.trim_end().trim_start_matches(',').trim_start();
     }
@@ -189,14 +189,14 @@ fn parse_audio_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, Pa
                     .map(|(id, tags)| {
                         let tags = tags.unwrap_or("");
                         Track {
-                            source: match id.parse() {
-                                Ok(id) => TrackSource::FromVideo(id),
-                                Err(_) => {
+                            source: id.parse().map_or_else(
+                                |_| {
                                     let source = in_file.with_extension(id);
                                     assert!(source.exists());
                                     TrackSource::External(source)
-                                }
-                            },
+                                },
+                                TrackSource::FromVideo,
+                            ),
                             enabled: tags.contains('d') || tags.contains('e'),
                             forced: tags.contains('f'),
                         }
@@ -224,14 +224,14 @@ fn parse_subtitle_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str,
                     .map(|(id, tags)| {
                         let tags = tags.unwrap_or("");
                         Track {
-                            source: match id.parse() {
-                                Ok(id) => TrackSource::FromVideo(id),
-                                Err(_) => {
+                            source: id.parse().map_or_else(
+                                |_| {
                                     let source = in_file.with_extension(id);
                                     assert!(source.exists());
                                     TrackSource::External(source)
-                                }
-                            },
+                                },
+                                TrackSource::FromVideo,
+                            ),
                             enabled: tags.contains('d') || tags.contains('e'),
                             forced: tags.contains('f'),
                         }

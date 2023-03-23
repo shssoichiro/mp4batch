@@ -78,7 +78,10 @@ impl ColorSpace {
 }
 
 pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions> {
-    let filename = input.file_name().unwrap().to_str().unwrap();
+    let filename = input
+        .file_name()
+        .expect("File should have a name")
+        .to_string_lossy();
     if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
     } else {
@@ -91,23 +94,26 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
 
     let width = mediainfo
         .get(&"Width".to_string())
-        .unwrap()
+        .expect("Width should be specified in ffprobe output")
         .replace(' ', "")
         .parse()?;
     let height = mediainfo
         .get(&"Height".to_string())
-        .unwrap()
+        .expect("Height should be specified in ffprobe output")
         .replace(' ', "")
         .parse()?;
     let fps = (
         mediainfo
             .get(&"Frame rate".to_string())
-            .unwrap()
+            .expect("Frame rate should be specified in ffprobe output")
             .parse::<f32>()?
             .round() as u32,
         1,
     );
-    let bit_depth = mediainfo.get(&"Bit depth".to_string()).unwrap().parse()?;
+    let bit_depth = mediainfo
+        .get(&"Bit depth".to_string())
+        .expect("Bit depth should be specified in ffprobe output")
+        .parse()?;
 
     Ok(VideoDimensions {
         width,
@@ -155,11 +161,15 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         .replace("FPS: ", "")
         .split_whitespace()
         .next()
-        .unwrap()
+        .expect("FPS should have a value")
         .split('/')
         .map(|num| num.parse())
         .collect();
-    let bit_depth = lines[8].replace("Bits: ", "").trim().parse().unwrap();
+    let bit_depth = lines[8]
+        .replace("Bits: ", "")
+        .trim()
+        .parse()
+        .expect("Bits should be a number");
     Ok(VideoDimensions {
         width,
         height,
@@ -181,7 +191,9 @@ pub fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
         .skip(1)
         .take_while(|line| !line.is_empty())
         .map(|line| {
-            let (key, value) = line.split_once(':').unwrap();
+            let (key, value) = line
+                .split_once(':')
+                .expect("String should be a 'key: value' pair");
             (key.trim().to_string(), value.trim().to_string())
         })
         .collect::<HashMap<String, String>>();
@@ -190,9 +202,9 @@ pub fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
         output
             .lines()
             .find(|l| l.starts_with("File size"))
-            .unwrap()
+            .expect("File size should be in output data")
             .split_once(':')
-            .unwrap()
+            .expect("String should be a 'key: value' pair")
             .1
             .trim()
             .to_string(),
@@ -202,11 +214,16 @@ pub fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
 }
 
 pub fn find_source_file(input: &Path) -> PathBuf {
-    if input.extension().unwrap().to_string_lossy() != "vpy" {
+    if input
+        .extension()
+        .map(|ext| ext.to_string_lossy())
+        .as_deref()
+        != Some("vpy")
+    {
         return input.to_path_buf();
     }
 
-    let script = fs::read_to_string(input).unwrap();
+    let script = fs::read_to_string(input).expect("Failed to read source script");
     let sources = parse_sources(&script);
     // If there's a source that matches this script's name then use that,
     // otherwise assume the first source is correct.
@@ -216,7 +233,10 @@ pub fn find_source_file(input: &Path) -> PathBuf {
         .find(|source| source.file_stem() == input.file_stem())
         .unwrap_or_else(|| &sources[0]);
     // Handle relative or absolute paths
-    let mut output = input.parent().unwrap().to_path_buf();
+    let mut output = input
+        .parent()
+        .expect("File should have a parent dir")
+        .to_path_buf();
     output.push(source);
     output
 }
@@ -224,7 +244,7 @@ pub fn find_source_file(input: &Path) -> PathBuf {
 fn parse_sources(script: &str) -> Vec<PathBuf> {
     // If you have a quotation mark in your filename then go to hell
     static PATTERN: OnceCell<Regex> = OnceCell::new();
-    let pattern = PATTERN.get_or_init(|| Regex::new("source=\"(.+)\"").unwrap());
+    let pattern = PATTERN.get_or_init(|| Regex::new("source=\"(.+)\"").expect("Valid regex"));
     pattern
         .captures_iter(script)
         .map(|cap| PathBuf::from(&cap[1]))

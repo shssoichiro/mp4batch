@@ -1,4 +1,92 @@
-#![warn(clippy::all)]
+// Safety lints
+#![deny(bare_trait_objects)]
+#![deny(clippy::as_ptr_cast_mut)]
+#![deny(clippy::cast_ptr_alignment)]
+#![deny(clippy::large_stack_arrays)]
+#![deny(clippy::ptr_as_ptr)]
+#![deny(clippy::transmute_ptr_to_ptr)]
+// Performance lints
+#![warn(clippy::cloned_instead_of_copied)]
+#![warn(clippy::inefficient_to_string)]
+#![warn(clippy::invalid_upcast_comparisons)]
+#![warn(clippy::iter_with_drain)]
+#![warn(clippy::large_types_passed_by_value)]
+#![warn(clippy::linkedlist)]
+#![warn(clippy::mutex_integer)]
+#![warn(clippy::naive_bytecount)]
+#![warn(clippy::needless_bitwise_bool)]
+#![warn(clippy::needless_collect)]
+#![warn(clippy::needless_pass_by_value)]
+#![warn(clippy::no_effect_underscore_binding)]
+#![warn(clippy::or_fun_call)]
+#![warn(clippy::stable_sort_primitive)]
+#![warn(clippy::suboptimal_flops)]
+#![warn(clippy::trivial_regex)]
+#![warn(clippy::trivially_copy_pass_by_ref)]
+#![warn(clippy::unnecessary_join)]
+#![warn(clippy::unused_async)]
+#![warn(clippy::zero_sized_map_values)]
+// Correctness lints
+#![deny(clippy::case_sensitive_file_extension_comparisons)]
+#![deny(clippy::copy_iterator)]
+#![deny(clippy::expl_impl_clone_on_copy)]
+#![deny(clippy::float_cmp)]
+#![warn(clippy::imprecise_flops)]
+#![deny(clippy::manual_instant_elapsed)]
+#![deny(clippy::match_same_arms)]
+#![deny(clippy::mem_forget)]
+#![warn(clippy::must_use_candidate)]
+#![deny(clippy::path_buf_push_overwrite)]
+#![deny(clippy::same_functions_in_if_condition)]
+#![warn(clippy::suspicious_operation_groupings)]
+#![deny(clippy::unchecked_duration_subtraction)]
+#![deny(clippy::unicode_not_nfc)]
+// Clarity/formatting lints
+#![warn(clippy::borrow_as_ptr)]
+#![warn(clippy::checked_conversions)]
+#![warn(clippy::default_trait_access)]
+#![warn(clippy::derive_partial_eq_without_eq)]
+#![warn(clippy::explicit_deref_methods)]
+#![warn(clippy::filter_map_next)]
+#![warn(clippy::flat_map_option)]
+#![warn(clippy::fn_params_excessive_bools)]
+#![warn(clippy::from_iter_instead_of_collect)]
+#![warn(clippy::if_not_else)]
+#![warn(clippy::implicit_clone)]
+#![warn(clippy::iter_not_returning_iterator)]
+#![warn(clippy::iter_on_empty_collections)]
+#![warn(clippy::macro_use_imports)]
+#![warn(clippy::manual_clamp)]
+#![warn(clippy::manual_let_else)]
+#![warn(clippy::manual_ok_or)]
+#![warn(clippy::manual_string_new)]
+#![warn(clippy::map_flatten)]
+#![warn(clippy::map_unwrap_or)]
+#![warn(clippy::match_bool)]
+#![warn(clippy::mut_mut)]
+#![warn(clippy::needless_borrow)]
+#![warn(clippy::needless_continue)]
+#![warn(clippy::option_if_let_else)]
+#![warn(clippy::range_minus_one)]
+#![warn(clippy::range_plus_one)]
+#![warn(clippy::redundant_else)]
+#![warn(clippy::ref_binding_to_reference)]
+#![warn(clippy::ref_option_ref)]
+#![warn(clippy::semicolon_if_nothing_returned)]
+#![warn(clippy::trait_duplication_in_bounds)]
+#![warn(clippy::type_repetition_in_bounds)]
+#![warn(clippy::unnested_or_patterns)]
+#![warn(clippy::unused_peekable)]
+#![warn(clippy::unused_rounding)]
+#![warn(clippy::unused_self)]
+#![warn(clippy::used_underscore_binding)]
+#![warn(clippy::verbose_bit_mask)]
+#![warn(clippy::verbose_file_reads)]
+// Documentation lints
+#![warn(clippy::doc_link_with_quotes)]
+#![warn(clippy::doc_markdown)]
+#![warn(clippy::missing_errors_doc)]
+#![warn(clippy::missing_panics_doc)]
 
 #[macro_use]
 extern crate dotenv_codegen;
@@ -114,7 +202,11 @@ fn main() {
                     == Some("vpy".to_string())
             })
             .filter(|e| {
-                let filestem = e.path().file_stem().unwrap().to_string_lossy();
+                let filestem = e
+                    .path()
+                    .file_stem()
+                    .expect("File should have a name")
+                    .to_string_lossy();
                 !(filestem.contains(".aom-q")
                     || filestem.contains(".rav1e-q")
                     || filestem.contains(".x264-q")
@@ -131,10 +223,9 @@ fn main() {
     };
 
     for input in inputs {
-        let outputs = args
-            .formats
-            .as_ref()
-            .map(|formats| {
+        let outputs = args.formats.as_ref().map_or_else(
+            || vec![Output::default()],
+            |formats| {
                 let formats = formats.trim();
                 if formats.is_empty() {
                     return vec![Output::default()];
@@ -194,8 +285,8 @@ fn main() {
                         output
                     })
                     .collect()
-            })
-            .unwrap_or_else(|| vec![Output::default()]);
+            },
+        );
 
         let result = process_file(
             &input,
@@ -210,7 +301,12 @@ fn main() {
             eprintln!(
                 "{} {}: {}",
                 Red.bold().paint("[Error]"),
-                Red.paint(input.file_name().unwrap().to_string_lossy()),
+                Red.paint(
+                    input
+                        .file_name()
+                        .expect("File should have a name")
+                        .to_string_lossy()
+                ),
                 Red.paint(err.to_string())
             );
         }
@@ -232,23 +328,30 @@ fn process_file(
     eprintln!(
         "{} {} {}{}{}{}",
         Blue.bold().paint("[Info]"),
-        Blue.bold()
-            .paint(source_video.file_name().unwrap().to_string_lossy()),
+        Blue.bold().paint(
+            source_video
+                .file_name()
+                .expect("File should have a name")
+                .to_string_lossy()
+        ),
         Blue.paint("("),
         Blue.bold().paint(
-            Size::from_bytes(source_video.metadata().unwrap().len())
-                .format()
-                .to_string()
+            Size::from_bytes(
+                source_video
+                    .metadata()
+                    .expect("Unable to get source file metadata")
+                    .len()
+            )
+            .format()
+            .to_string()
         ),
-        if let Some(stream_size) = mediainfo.get("Stream size") {
-            format!(
+        mediainfo
+            .get("Stream size")
+            .map_or_else(String::new, |stream_size| format!(
                 "{}{}",
                 Blue.paint(" - Video stream: "),
                 Blue.bold().paint(stream_size)
-            )
-        } else {
-            String::new()
-        },
+            )),
         Blue.paint(")")
     );
     if outputs
@@ -262,7 +365,12 @@ fn process_file(
             "{} {} {} {}",
             Blue.bold().paint("[Info]"),
             Blue.paint("Encoding"),
-            Blue.paint(input_vpy.file_name().unwrap().to_string_lossy()),
+            Blue.paint(
+                input_vpy
+                    .file_name()
+                    .expect("File should have a name")
+                    .to_string_lossy()
+            ),
             Blue.paint("lossless")
         );
         loop {
@@ -308,7 +416,12 @@ fn process_file(
             "{} {} {}",
             Blue.bold().paint("[Info]"),
             Blue.paint("Encoding"),
-            Blue.paint(output_vpy.file_name().unwrap().to_string_lossy())
+            Blue.paint(
+                output_vpy
+                    .file_name()
+                    .expect("File should have a name")
+                    .to_string_lossy()
+            )
         );
 
         let video_out = output_vpy.with_extension("mkv");
@@ -375,7 +488,7 @@ fn process_file(
                     video_suffix, audio_suffix, output.video.output_ext
                 ))
                 .file_name()
-                .unwrap(),
+                .expect("File should have a name"),
         );
 
         let mut subtitle_outputs = Vec::new();
@@ -384,7 +497,10 @@ fn process_file(
                 let mut subtitle_out;
                 match &subtitle.source {
                     TrackSource::External(path) => {
-                        let ext = path.extension().unwrap().to_str().unwrap();
+                        let ext = path
+                            .extension()
+                            .expect("Output file should have an extension")
+                            .to_string_lossy();
                         subtitle_out = input_vpy.with_extension(format!("{}.{}", i, ext));
                         fs::copy(path, &subtitle_out)?;
                     }
@@ -420,7 +536,12 @@ fn process_file(
             "{} {} {}",
             Green.bold().paint("[Success]"),
             Green.paint("Finished encoding"),
-            Green.paint(output_vpy.file_name().unwrap().to_string_lossy())
+            Green.paint(
+                output_vpy
+                    .file_name()
+                    .expect("File should have a name")
+                    .to_string_lossy()
+            )
         );
         eprintln!();
     }
@@ -536,7 +657,7 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             _ => panic!("Attempted to use HDR with an unsupported encoder"),
         },
         ParsedFilter::Extension(arg) => {
-            output.video.output_ext = arg.to_string();
+            output.video.output_ext = (*arg).to_string();
         }
         ParsedFilter::BitDepth(arg) => {
             output.video.bit_depth = Some(*arg);
@@ -635,7 +756,7 @@ fn build_video_suffix(output: &Output) -> Result<String> {
 }
 
 fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossless: bool) {
-    let mut script = BufWriter::new(File::create(filename).unwrap());
+    let mut script = BufWriter::new(File::create(filename).expect("Unable to write script file"));
     if skip_lossless {
         copy_and_modify_vpy_script(input, output, &mut script);
     } else {
@@ -651,10 +772,9 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
         script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
         escape_python_string(
-            absolute_path(input.with_extension("lossless.mkv"))
-                .unwrap()
-                .to_str()
-                .unwrap()
+            &absolute_path(input.with_extension("lossless.mkv"))
+                .expect("Should be able to get absolute filepath")
+                .to_string_lossy()
         )
     )
     .unwrap();
@@ -662,11 +782,11 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     write_filters(output, script, None);
 
     writeln!(script, "clip.set_output()").unwrap();
-    script.flush().unwrap();
+    script.flush().expect("Unable to flush script data");
 }
 
 fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
-    let contents = read_to_string(input).unwrap();
+    let contents = read_to_string(input).expect("Unable to read input script");
     let mut output_pos = None;
     let mut output_var = None;
     for line in contents.lines() {
@@ -675,7 +795,11 @@ fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWri
             .or_else(|| line.find(".set_output(0)"))
         {
             assert!(pos > 0);
-            output_pos = Some(contents.find(line).unwrap());
+            output_pos = Some(
+                contents
+                    .find(line)
+                    .expect("Input script does not have an output clip"),
+            );
             output_var = Some(&line[0..pos]);
             break;
         }
@@ -686,7 +810,7 @@ fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWri
             write_filters(output, script, Some(var));
             writeln!(script).unwrap();
             write!(script, "{}", &contents[pos..]).unwrap();
-            script.flush().unwrap();
+            script.flush().expect("Unable to flush contents of script");
         }
         _ => {
             panic!("Invalid input vapoursynth script, no `set_output()` found");

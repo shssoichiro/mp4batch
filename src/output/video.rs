@@ -133,7 +133,10 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i: {}", e))?;
 
-    let filename = input.file_name().unwrap().to_str().unwrap();
+    let filename = input
+        .file_name()
+        .expect("File should have a name")
+        .to_string_lossy();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
             .arg("-c")
@@ -142,7 +145,7 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
-            .unwrap()
+            .expect("Unable to run vspipe, is it installed and in PATH?")
     } else {
         panic!("Unrecognized input type");
     };
@@ -163,14 +166,14 @@ pub fn create_lossless(input: &Path, dimensions: VideoDimensions) -> Result<()> 
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)
-        .stdin(pipe.stdout.unwrap())
+        .stdin(pipe.stdout.expect("stdout should be writeable"))
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",
-            status.code().unwrap()
+            status.code().unwrap_or(-1)
         );
     }
 
@@ -230,8 +233,8 @@ pub fn convert_video_av1an(
         if dimensions.height >= 1600 { 2 } else { 1 }
             * if dimensions.width >= 1600 { 2 } else { 1 },
     )
-    .unwrap();
-    let cores = available_parallelism().unwrap();
+    .expect("not 0");
+    let cores = available_parallelism().expect("Unable to get machine parallelism count");
     let mut workers = std::cmp::max(cores.get() / tiles.get(), 1);
     let threads_per_worker = std::cmp::min(
         64,
@@ -244,7 +247,7 @@ pub fn convert_video_av1an(
     command
         .arg("av1an")
         .arg("-i")
-        .arg(absolute_path(vpy_input).unwrap())
+        .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
@@ -295,7 +298,7 @@ pub fn convert_video_av1an(
         .arg("--chunk-order")
         .arg("random")
         .arg("-o")
-        .arg(absolute_path(output).unwrap());
+        .arg(absolute_path(output).expect("Unable to get absolute path"));
     if let Some(force_keyframes) = force_keyframes {
         command.arg("--force-keyframes").arg(force_keyframes);
     }
@@ -324,7 +327,7 @@ pub fn convert_video_av1an(
     } else {
         Err(anyhow::anyhow!(
             "Failed to execute av1an: Exited with code {:x}",
-            status.code().unwrap()
+            status.code().unwrap_or(-1)
         ))
     }
 }
@@ -375,7 +378,7 @@ impl VideoEncoder {
         }
     }
 
-    pub fn get_args_string(&self, dimensions: VideoDimensions, threads: usize) -> String {
+    pub fn get_args_string(self, dimensions: VideoDimensions, threads: usize) -> String {
         match self {
             VideoEncoder::Aom {
                 crf,
@@ -383,35 +386,35 @@ impl VideoEncoder {
                 profile,
                 is_hdr,
                 ..
-            } => build_aom_args_string(*crf, *speed, dimensions, *profile, *is_hdr, threads),
+            } => build_aom_args_string(crf, speed, dimensions, profile, is_hdr, threads),
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
-            } => build_rav1e_args_string(*crf, *speed, dimensions, *is_hdr),
+            } => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
             VideoEncoder::X264 {
                 crf,
                 profile,
                 compat,
-            } => build_x264_args_string(*crf, dimensions, *profile, *compat),
+            } => build_x264_args_string(crf, dimensions, profile, compat),
             VideoEncoder::X265 {
                 crf,
                 profile,
                 compat,
                 is_hdr,
                 ..
-            } => build_x265_args_string(*crf, dimensions, *profile, *compat, *is_hdr),
+            } => build_x265_args_string(crf, dimensions, profile, compat, is_hdr),
             VideoEncoder::Copy => unreachable!(),
         }
     }
 
-    pub const fn has_tiling(&self) -> bool {
+    pub const fn has_tiling(self) -> bool {
         matches!(self, VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. })
     }
 
-    pub fn hdr_enabled(&self) -> bool {
+    pub fn hdr_enabled(self) -> bool {
         match self {
-            VideoEncoder::Aom { is_hdr, .. } => *is_hdr,
-            VideoEncoder::Rav1e { is_hdr, .. } => *is_hdr,
-            VideoEncoder::X265 { is_hdr, .. } => *is_hdr,
+            VideoEncoder::Aom { is_hdr, .. }
+            | VideoEncoder::Rav1e { is_hdr, .. }
+            | VideoEncoder::X265 { is_hdr, .. } => is_hdr,
             _ => false,
         }
     }
@@ -574,7 +577,7 @@ fn build_x264_args_string(
         },
         match profile {
             Profile::Film => 0.8,
-            Profile::Anime => 0.7,
+            Profile::Anime |
             Profile::Fast => 0.7,
         },
         match profile {

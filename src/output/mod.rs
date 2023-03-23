@@ -29,7 +29,10 @@ pub fn mux_video(
     copy_fonts: bool,
     output: &Path,
 ) -> Result<()> {
-    let mut extension = output.extension().unwrap().to_string_lossy();
+    let mut extension = output
+        .extension()
+        .expect("Video should have extension")
+        .to_string_lossy();
 
     if extension != "mkv" && !subtitles.is_empty() {
         eprintln!(
@@ -89,18 +92,22 @@ pub fn mux_video(
             .arg("-map")
             .arg(&format!("{}:t?", 1 + audios.len() + subtitles.len()));
     } else {
-        let fonts_dir = input.parent().unwrap().join("fonts");
+        let fonts_dir = input
+            .parent()
+            .expect("File should have parent dir")
+            .join("fonts");
         if fonts_dir.is_dir() {
-            let fonts = fonts_dir.read_dir().unwrap();
+            let fonts = fonts_dir
+                .read_dir()
+                .expect("Unable to read directory contents");
             let mut i = 0;
             for font in fonts {
-                let font = font.unwrap();
+                let font = font.expect("Invalid directory entry");
                 let mimetype = match font
                     .path()
                     .extension()
                     .and_then(|ext| ext.to_str())
-                    .map(|ext| ext.to_lowercase())
-                    .unwrap_or_else(String::new)
+                    .map_or_else(String::new, |ext| ext.to_lowercase())
                     .as_str()
                 {
                     "ttf" => "font/ttf",

@@ -78,7 +78,7 @@ pub fn convert_audio(
         .arg("-i")
         .arg(match audio_track.source {
             TrackSource::FromVideo(_) => find_source_file(input),
-            TrackSource::External(ref path) => path.to_path_buf(),
+            TrackSource::External(ref path) => path.clone(),
         })
         .arg("-acodec");
     match audio_codec {
@@ -115,7 +115,7 @@ pub fn convert_audio(
                         * get_channel_count(
                             &match audio_track.source {
                                 TrackSource::FromVideo(_) => find_source_file(input),
-                                TrackSource::External(ref path) => path.to_path_buf(),
+                                TrackSource::External(ref path) => path.clone(),
                             },
                             audio_track
                         )?
@@ -151,7 +151,10 @@ pub fn convert_audio(
 }
 
 pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
-    let filename = input.file_name().unwrap().to_str().unwrap();
+    let filename = input
+        .file_name()
+        .expect("File should have a name")
+        .to_string_lossy();
     let pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
             .arg("-o")
@@ -162,7 +165,7 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
-            .unwrap()
+            .expect("Unable to run vspipe, is it installed and in PATH?")
     } else {
         panic!("Unrecognized input type");
     };
@@ -182,14 +185,14 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
         .arg("-compression_level")
         .arg("9")
         .arg(output)
-        .stdin(pipe.stdout.unwrap())
+        .stdin(pipe.stdout.expect("stdout should be writeable"))
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",
-            status.code().unwrap()
+            status.code().unwrap_or(-1)
         );
     }
 
