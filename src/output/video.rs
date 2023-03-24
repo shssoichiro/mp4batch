@@ -487,12 +487,17 @@ fn build_x265_args_string(
         Profile::Film => -2,
         Profile::Anime | Profile::Fast => -1,
     };
+    let chroma_offset = match profile {
+        Profile::Film | Profile::Fast => 0,
+        Profile::Anime => -2,
+    };
     format!(
-        " --crf {} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
-         --deblock {}:{} --psy-rd {} --psy-rdoq {} --aq-mode 3 --aq-strength {} --rc-lookahead 60 \
-         --lookahead-slices 1 --lookahead-threads 1 --weightb --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} --frame-threads 1 --y4m {} {} ",
-        crf,
+        " --crf {crf} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
+         --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 --aq-strength {} \
+         --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop --no-cutree --rc-lookahead 60 \
+         --lookahead-slices 1 --lookahead-threads 1 --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 \
+         --no-limit-modes --no-string-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
+         --output-depth {} --frame-threads 1 --y4m {} {} ",
         match profile {
             Profile::Film => 5,
             Profile::Anime => 8,
@@ -503,8 +508,6 @@ fn build_x265_args_string(
         } else {
             "--no-sao"
         },
-        deblock,
-        deblock,
         match profile {
             Profile::Film => "1.5",
             Profile::Anime | Profile::Fast => "1.0",
@@ -542,7 +545,7 @@ fn build_x264_args_string(
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
-         96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
+         96 --aq-mode 3 --aq-strength {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
          --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
@@ -575,13 +578,7 @@ fn build_x264_args_string(
         },
         match profile {
             Profile::Film => 0.8,
-            Profile::Anime |
-            Profile::Fast => 0.7,
-        },
-        match profile {
-            // mbtree works fine on live action, but on anime it has undesirable effects
-            Profile::Anime => "--no-mbtree",
-            _ => "",
+            Profile::Anime | Profile::Fast => 0.7,
         },
         match profile {
             Profile::Film | Profile::Fast => 0.75,
