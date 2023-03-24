@@ -316,6 +316,9 @@ pub fn convert_video_av1an(
                 .arg("--chroma-noise");
         }
     }
+    if let VideoEncoder::X265 { .. } = encoder {
+        command.arg("--concat").arg("mkvmerge");
+    }
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
