@@ -251,7 +251,7 @@ fn main() {
                                         crf: 18,
                                         profile: Profile::Film,
                                         compat: false,
-                                        is_hdr: true,
+                                        is_hdr: false,
                                     }
                                 }
                                 "aom" => {
