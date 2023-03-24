@@ -499,7 +499,7 @@ fn build_x265_args_string(
          --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 --aq-strength {} \
          --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop --no-cutree --rc-lookahead 60 \
          --lookahead-slices 1 --lookahead-threads 1 --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 \
-         --no-limit-modes --no-string-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
+         --no-limit-modes --no-strong-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
          --output-depth {} --frame-threads 1 --y4m {} {} ",
         match profile {
             Profile::Film => 5,
