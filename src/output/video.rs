@@ -240,9 +240,12 @@ pub fn convert_video_av1an(
         64,
         (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize + 2,
     );
-    if dimensions.height >= 1400 && dimensions.height < 1600 || dimensions.width > 3500 {
+    if dimensions.height >= 1400 && dimensions.height < 1600 {
         // Try to avoid OOM on certain resolutions by reducing worker count
         workers = workers * 3 / 4;
+    }
+    if dimensions.width > 3500 {
+        workers = workers / 2;
     }
     let mut command = Command::new("nice");
     command
