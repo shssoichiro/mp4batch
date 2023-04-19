@@ -425,33 +425,25 @@ fn build_aom_args_string(
     crf: i16,
     speed: u8,
     dimensions: VideoDimensions,
-    profile: Profile,
+    _profile: Profile,
     is_hdr: bool,
     threads: usize,
 ) -> String {
     format!(
-        " --cpu-used={} --cq-level={} --end-usage=q --tune-content={} --lag-in-frames=64 \
-         --aq-mode=1 --deltaq-mode={} --enable-chroma-deltaq=1 --quant-b-adapt=1 --enable-qm=1 \
-         --min-q=1 --arnr-strength=1 --arnr-maxframes=4 --sharpness=3 --enable-dnl-denoising=0 \
-         --disable-trellis-quant=0 --enable-dual-filter=0 --tune=ssim --enable-fwd-kf=1 \
-         --tile-columns={} --tile-rows={} --threads={} --row-mt=0 --color-primaries={} \
-         --transfer-characteristics={} --matrix-coefficients={} -b {} --disable-kf \
-         --kf-max-dist=9999 ",
-        speed,
-        crf,
-        if profile == Profile::Anime {
-            "animation"
-        } else {
-            "psy"
-        },
-        if is_hdr { 5 } else { 1 },
+        " -b {} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
+         --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --quant-sharpness=3 --row-mt=0 \
+         --tile-columns={} --tile-rows={} --arnr-maxframes=4 --arnr-strength=1 --tune=ssim  \
+         --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=12 \
+         --quant-b-adapt=1 --aq-mode=1 --deltaq-mode={} --tune-content=psy --color-primaries={} \
+         --transfer-characteristics={} --matrix-coefficients={} --sb-size=dynamic \
+         --enable-dnl-denoising=0 --threads={threads} ",
+        dimensions.bit_depth,
         i32::from(dimensions.width >= 1600),
         i32::from(dimensions.height >= 1600),
-        threads,
+        if is_hdr { 5 } else { 1 },
         if is_hdr { "bt2020" } else { "bt709" },
         if is_hdr { "smpte2084" } else { "bt709" },
         if is_hdr { "bt2020ncl" } else { "bt709" },
-        dimensions.bit_depth
     )
 }
 
@@ -496,10 +488,11 @@ fn build_x265_args_string(
     };
     format!(
         " --crf {crf} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
-         --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 --aq-strength {} \
-         --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop --no-cutree --rc-lookahead 60 \
-         --lookahead-slices 1 --lookahead-threads 1 --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 \
-         --no-limit-modes --no-strong-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
+         --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 \
+         --aq-strength {} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop \
+         --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads 1 --weightb \
+         --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 --no-limit-modes \
+         --no-strong-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
          --output-depth {} --frame-threads 1 --y4m {} {} ",
         match profile {
             Profile::Film => 5,
@@ -548,8 +541,8 @@ fn build_x264_args_string(
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
-         96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio 1.30 \
-         --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
+         96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
+         1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
          --transfer {} --output-depth {} {} {} --threads 4 ",
         crf,
         if profile == Profile::Fast {
