@@ -434,7 +434,7 @@ fn build_aom_args_string(
          --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --quant-sharpness=3 --row-mt=0 \
          --tile-columns={} --tile-rows={} --arnr-maxframes=4 --arnr-strength=1 --tune=ssim  \
          --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=12 \
-         --quant-b-adapt=1 --aq-mode=1 --deltaq-mode={} --tune-content=psy --color-primaries={} \
+         --quant-b-adapt=1 --aq-mode=0 --deltaq-mode={} --tune-content=psy --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} --sb-size=dynamic \
          --enable-dnl-denoising=0 --threads={threads} ",
         dimensions.bit_depth,
