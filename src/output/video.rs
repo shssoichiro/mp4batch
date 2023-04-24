@@ -230,19 +230,16 @@ pub fn convert_video_av1an(
     // We may not actually split tiles at this point,
     // but we want to make sure we don't run out of memory
     let tiles = NonZeroUsize::new(
-        if dimensions.height >= 1600 { 2 } else { 1 }
-            * if dimensions.width >= 1600 { 2 } else { 1 },
+        if dimensions.height >= 2000 { 2 } else { 1 }
+            * if dimensions.width >= 2000 { 2 } else { 1 },
     )
     .expect("not 0");
     let cores = available_parallelism().expect("Unable to get machine parallelism count");
-    let mut workers = std::cmp::max(cores.get() / tiles.get(), 1);
+    let workers = std::cmp::max(cores.get() / tiles.get(), 1);
     let threads_per_worker = std::cmp::min(
         64,
         (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize + 2,
     );
-    if dimensions.height >= 1400 && dimensions.height < 1600 {
-        workers = workers * 3 / 4;
-    }
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -430,7 +427,7 @@ fn build_aom_args_string(
     threads: usize,
 ) -> String {
     format!(
-        " -b {} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
+        " -b {} --end-usage=q --min-q=1 --lag-in-frames=48 --cpu-used={speed} --cq-level={crf} \
          --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --quant-sharpness=3 --row-mt=0 \
          --tile-columns={} --tile-rows={} --arnr-maxframes=15 --arnr-strength={} --tune=ssim  \
          --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=12 \
@@ -438,8 +435,8 @@ fn build_aom_args_string(
          --transfer-characteristics={} --matrix-coefficients={} --sb-size=dynamic \
          --enable-dnl-denoising=0 --threads={threads} ",
         dimensions.bit_depth,
-        i32::from(dimensions.width >= 1600),
-        i32::from(dimensions.height >= 1600),
+        i32::from(dimensions.width >= 2000),
+        i32::from(dimensions.height >= 2000),
         if profile == Profile::Anime { 1 } else { 3 },
         if is_hdr { 5 } else { 1 },
         if is_hdr { "bt2020" } else { "bt709" },
@@ -460,8 +457,8 @@ fn build_rav1e_args_string(
          --matrix {} --no-scene-detection --keyint 0 ",
         speed,
         crf,
-        if dimensions.width >= 1600 { 2 } else { 1 },
-        if dimensions.height >= 1600 { 2 } else { 1 },
+        if dimensions.width >= 2000 { 2 } else { 1 },
+        if dimensions.height >= 2000 { 2 } else { 1 },
         if is_hdr { "BT2020" } else { "BT709" },
         if is_hdr { "SMPTE2084" } else { "BT709" },
         if is_hdr { "BT2020NCL" } else { "BT709" },
