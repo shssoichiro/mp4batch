@@ -425,14 +425,14 @@ fn build_aom_args_string(
     crf: i16,
     speed: u8,
     dimensions: VideoDimensions,
-    _profile: Profile,
+    profile: Profile,
     is_hdr: bool,
     threads: usize,
 ) -> String {
     format!(
         " -b {} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
          --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --quant-sharpness=3 --row-mt=0 \
-         --tile-columns={} --tile-rows={} --arnr-maxframes=4 --arnr-strength=1 --tune=ssim  \
+         --tile-columns={} --tile-rows={} --arnr-maxframes=15 --arnr-strength={} --tune=ssim  \
          --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=12 \
          --quant-b-adapt=1 --aq-mode=0 --deltaq-mode={} --tune-content=psy --color-primaries={} \
          --transfer-characteristics={} --matrix-coefficients={} --sb-size=dynamic \
@@ -440,6 +440,7 @@ fn build_aom_args_string(
         dimensions.bit_depth,
         i32::from(dimensions.width >= 1600),
         i32::from(dimensions.height >= 1600),
+        if profile == Profile::Anime { 1 } else { 3 },
         if is_hdr { 5 } else { 1 },
         if is_hdr { "bt2020" } else { "bt709" },
         if is_hdr { "smpte2084" } else { "bt709" },
