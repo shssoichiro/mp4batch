@@ -427,7 +427,7 @@ fn build_aom_args_string(
     threads: usize,
 ) -> String {
     format!(
-        " -b {} --end-usage=q --min-q=1 --lag-in-frames=48 --cpu-used={speed} --cq-level={crf} \
+        " -b {} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
          --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --quant-sharpness=3 --row-mt=0 \
          --tile-columns={} --tile-rows={} --arnr-maxframes=15 --arnr-strength={} --tune=ssim  \
          --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=12 \
