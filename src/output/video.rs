@@ -230,8 +230,11 @@ pub fn convert_video_av1an(
     // We may not actually split tiles at this point,
     // but we want to make sure we don't run out of memory
     let tiles = NonZeroUsize::new(
-        if dimensions.height >= 2000 { 2 } else { 1 }
-            * if dimensions.width >= 2000 { 2 } else { 1 },
+        if dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600) {
+            2
+        } else {
+            1
+        } * if dimensions.width >= 2000 { 2 } else { 1 },
     )
     .expect("not 0");
     let cores = available_parallelism().expect("Unable to get machine parallelism count");
@@ -436,7 +439,9 @@ fn build_aom_args_string(
          --enable-dnl-denoising=0 --threads={threads} ",
         dimensions.bit_depth,
         i32::from(dimensions.width >= 2000),
-        i32::from(dimensions.height >= 2000),
+        i32::from(
+            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
+        ),
         if profile == Profile::Anime { 1 } else { 3 },
         if is_hdr { 5 } else { 1 },
         if is_hdr { "bt2020" } else { "bt709" },
