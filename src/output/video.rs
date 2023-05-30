@@ -457,13 +457,16 @@ fn build_rav1e_args_string(
     is_hdr: bool,
 ) -> String {
     // TODO: Add proper HDR metadata
+    // TODO: Remove rdo-lookahead-frames limitation if we can reduce rav1e memory usage
     format!(
         " --speed {} --quantizer {} --tile-cols {} --tile-rows {} --primaries {} --transfer {} \
-         --matrix {} --no-scene-detection --keyint 0 ",
+         --matrix {} --rdo-lookahead-frames 25 --no-scene-detection --keyint 0 ",
         speed,
         crf,
-        if dimensions.width >= 2000 { 2 } else { 1 },
-        if dimensions.height >= 2000 { 2 } else { 1 },
+        i32::from(dimensions.width >= 2000),
+        i32::from(
+            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
+        ),
         if is_hdr { "BT2020" } else { "BT709" },
         if is_hdr { "SMPTE2084" } else { "BT709" },
         if is_hdr { "BT2020NCL" } else { "BT709" },
