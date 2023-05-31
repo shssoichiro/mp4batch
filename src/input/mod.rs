@@ -202,7 +202,7 @@ pub fn get_video_mediainfo(input: &Path) -> Result<HashMap<String, String>> {
         output
             .lines()
             .find(|l| l.starts_with("File size"))
-            .unwrap_or_else(|| panic!("File size should be in output data: mediainfo {}", input.to_string_lossy()))
+            .unwrap_or("File size: 0.00 MiB")
             .split_once(':')
             .expect("String should be a 'key: value' pair")
             .1
