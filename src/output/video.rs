@@ -238,7 +238,12 @@ pub fn convert_video_av1an(
     )
     .expect("not 0");
     let cores = available_parallelism().expect("Unable to get machine parallelism count");
-    let workers = std::cmp::max(cores.get() / tiles.get(), 1);
+    let workers = match encoder {
+        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } => {
+            std::cmp::max(cores.get() / tiles.get(), 1)
+        }
+        _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
+    };
     let threads_per_worker = std::cmp::min(
         64,
         (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize + 2,
@@ -395,14 +400,14 @@ impl VideoEncoder {
                 crf,
                 profile,
                 compat,
-            } => build_x264_args_string(crf, dimensions, profile, compat),
+            } => build_x264_args_string(crf, dimensions, profile, compat, threads),
             VideoEncoder::X265 {
                 crf,
                 profile,
                 compat,
                 is_hdr,
                 ..
-            } => build_x265_args_string(crf, dimensions, profile, compat, is_hdr),
+            } => build_x265_args_string(crf, dimensions, profile, compat, is_hdr, threads),
             VideoEncoder::Copy => unreachable!(),
         }
     }
@@ -479,6 +484,7 @@ fn build_x265_args_string(
     profile: Profile,
     compat: bool,
     is_hdr: bool,
+    threads: usize,
 ) -> String {
     if is_hdr {
         todo!("Implement HDR support for x265");
@@ -496,10 +502,10 @@ fn build_x265_args_string(
         " --crf {crf} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
          --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 \
          --aq-strength {} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop \
-         --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads 1 --weightb \
+         --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads {threads} --weightb \
          --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 --no-limit-modes \
          --no-strong-intra-smoothing --limit-refs 1 --colormatrix {} --colorprim {} --transfer {} \
-         --output-depth {} --frame-threads 1 --y4m {} {} ",
+         --output-depth {} --frame-threads {threads} --y4m {} {} ",
         match profile {
             Profile::Film => 5,
             Profile::Anime => 8,
@@ -544,12 +550,13 @@ fn build_x264_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     compat: bool,
+    threads: usize,
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
          96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
          1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colormatrix {} --colorprim {} \
-         --transfer {} --output-depth {} {} {} --threads 4 ",
+         --transfer {} --output-depth {} {} {} --threads {threads} ",
         crf,
         if profile == Profile::Fast {
             "faster"
