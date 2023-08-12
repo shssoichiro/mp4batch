@@ -180,6 +180,10 @@ struct InputArgs {
     /// Comma-separated list of forced keyframes.
     #[clap(long)]
     pub force_keyframes: Option<String>,
+
+    /// Do not verify the length of the video after encoding
+    #[clap(long)]
+    pub no_verify: bool,
 }
 
 fn main() {
@@ -296,6 +300,7 @@ fn main() {
             args.lossless_only,
             args.skip_lossless,
             &args.force_keyframes,
+            !args.no_verify,
         );
         if let Err(err) = result {
             eprintln!(
@@ -314,6 +319,8 @@ fn main() {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::fn_params_excessive_bools)]
 fn process_file(
     input_vpy: &Path,
     outputs: &[Output],
@@ -322,6 +329,7 @@ fn process_file(
     lossless_only: bool,
     mut skip_lossless: bool,
     force_keyframes: &Option<String>,
+    verify_frame_count: bool,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -381,7 +389,7 @@ fn process_file(
             //
             // Essentially, we retry the encode until it works.
             let dimensions = get_video_dimensions(input_vpy)?;
-            let result = create_lossless(input_vpy, dimensions);
+            let result = create_lossless(input_vpy, dimensions, verify_frame_count);
             match result {
                 Ok(_) => {
                     break;
