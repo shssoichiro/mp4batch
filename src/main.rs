@@ -213,6 +213,7 @@ fn main() {
                     .to_string_lossy();
                 !(filestem.contains(".aom-q")
                     || filestem.contains(".rav1e-q")
+                    || filestem.contains(".svt-q")
                     || filestem.contains(".x264-q")
                     || filestem.contains(".x265-q")
                     || filestem.ends_with(".copy"))
@@ -272,6 +273,15 @@ fn main() {
                                     output.video.encoder = VideoEncoder::Rav1e {
                                         crf: 40,
                                         speed: 5,
+                                        profile: Profile::Film,
+                                        is_hdr: false,
+                                        grain: 0,
+                                    }
+                                }
+                                "svt" => {
+                                    output.video.encoder = VideoEncoder::SvtAv1 {
+                                        crf: 16,
+                                        speed: 4,
                                         profile: Profile::Film,
                                         is_hdr: false,
                                         grain: 0,
@@ -592,7 +602,8 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
                     *crf = arg;
                     (0, 51)
                 }
-                VideoEncoder::Aom { ref mut crf, .. } => {
+                VideoEncoder::Aom { ref mut crf, .. }
+                | VideoEncoder::SvtAv1 { ref mut crf, .. } => {
                     *crf = arg;
                     (0, 63)
                 }
@@ -612,7 +623,9 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             }
         }
         ParsedFilter::Speed(arg) => match output.video.encoder {
-            VideoEncoder::Aom { ref mut speed, .. } | VideoEncoder::Rav1e { ref mut speed, .. } => {
+            VideoEncoder::Aom { ref mut speed, .. }
+            | VideoEncoder::Rav1e { ref mut speed, .. }
+            | VideoEncoder::SvtAv1 { ref mut speed, .. } => {
                 let arg = *arg;
                 if arg > 10 {
                     panic!("'s' must be between 0 and 10, received {}", arg);
@@ -633,13 +646,18 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             }
             | VideoEncoder::Rav1e {
                 ref mut profile, ..
+            }
+            | VideoEncoder::SvtAv1 {
+                ref mut profile, ..
             } => {
                 *profile = *arg;
             }
             VideoEncoder::Copy => (),
         },
         ParsedFilter::Grain(arg) => match output.video.encoder {
-            VideoEncoder::Aom { ref mut grain, .. } | VideoEncoder::Rav1e { ref mut grain, .. } => {
+            VideoEncoder::Aom { ref mut grain, .. }
+            | VideoEncoder::Rav1e { ref mut grain, .. }
+            | VideoEncoder::SvtAv1 { ref mut grain, .. } => {
                 let arg = *arg;
                 if arg > 64 {
                     panic!("'grain' must be between 0 and 64, received {}", arg);
@@ -659,7 +677,8 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
         ParsedFilter::Hdr(arg) => match output.video.encoder {
             VideoEncoder::X265 { ref mut is_hdr, .. }
             | VideoEncoder::Aom { ref mut is_hdr, .. }
-            | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
+            | VideoEncoder::Rav1e { ref mut is_hdr, .. }
+            | VideoEncoder::SvtAv1 { ref mut is_hdr, .. } => {
                 *is_hdr = *arg;
             }
             _ => panic!("Attempted to use HDR with an unsupported encoder"),
@@ -724,6 +743,20 @@ fn build_video_suffix(output: &Output) -> Result<String> {
             grain,
         } => format!(
             "rav1e-q{}-s{}-{}{}-g{}",
+            crf,
+            speed,
+            profile,
+            if is_hdr { "-hdr" } else { "" },
+            grain,
+        ),
+        VideoEncoder::SvtAv1 {
+            crf,
+            speed,
+            profile,
+            is_hdr,
+            grain,
+        } => format!(
+            "svt-q{}-s{}-{}{}-g{}",
             crf,
             speed,
             profile,

@@ -245,7 +245,7 @@ pub fn convert_video_av1an(
     .expect("not 0");
     let cores = available_parallelism().expect("Unable to get machine parallelism count");
     let workers = match encoder {
-        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } => {
+        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } | VideoEncoder::SvtAv1 { .. } => {
             std::cmp::max(cores.get() / tiles.get(), 1)
         }
         _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
@@ -270,6 +270,7 @@ pub fn convert_video_av1an(
             match encoder {
                 VideoEncoder::Aom { profile, .. }
                 | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::SvtAv1 { profile, .. }
                 | VideoEncoder::X264 { profile, .. }
                 | VideoEncoder::X265 { profile, .. } => match profile {
                     Profile::Film | Profile::Fast => fps * 10,
@@ -284,6 +285,7 @@ pub fn convert_video_av1an(
             match encoder {
                 VideoEncoder::Aom { profile, .. }
                 | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::SvtAv1 { profile, .. }
                 | VideoEncoder::X264 { profile, .. }
                 | VideoEncoder::X265 { profile, .. } => match profile {
                     Profile::Film | Profile::Fast => fps,
@@ -319,7 +321,10 @@ pub fn convert_video_av1an(
             .arg("--set-thread-affinity")
             .arg((cores.get() / workers).to_string());
     }
-    if let VideoEncoder::Aom { grain, .. } | VideoEncoder::Rav1e { grain, .. } = encoder {
+    if let VideoEncoder::Aom { grain, .. }
+    | VideoEncoder::Rav1e { grain, .. }
+    | VideoEncoder::SvtAv1 { grain, .. } = encoder
+    {
         if grain > 0 {
             command
                 .arg("--photon-noise")
@@ -362,6 +367,13 @@ pub enum VideoEncoder {
         is_hdr: bool,
         grain: u8,
     },
+    SvtAv1 {
+        crf: i16,
+        speed: u8,
+        profile: Profile,
+        is_hdr: bool,
+        grain: u8,
+    },
     X264 {
         crf: i16,
         profile: Profile,
@@ -377,7 +389,7 @@ pub enum VideoEncoder {
 
 impl VideoEncoder {
     pub const fn supported_encoders() -> &'static [&'static str] {
-        &["aom", "rav1e", "x264", "x265", "copy"]
+        &["aom", "rav1e", "svt", "x264", "x265", "copy"]
     }
 
     pub const fn get_av1an_name(&self) -> &str {
@@ -385,6 +397,7 @@ impl VideoEncoder {
             VideoEncoder::Copy => "copy",
             VideoEncoder::Aom { .. } => "aom",
             VideoEncoder::Rav1e { .. } => "rav1e",
+            VideoEncoder::SvtAv1 { .. } => "svt-av1",
             VideoEncoder::X264 { .. } => "x264",
             VideoEncoder::X265 { .. } => "x265",
         }
@@ -402,6 +415,9 @@ impl VideoEncoder {
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
+            VideoEncoder::SvtAv1 {
+                crf, speed, is_hdr, ..
+            } => build_svtav1_args_string(crf, speed, dimensions, is_hdr, threads),
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -426,6 +442,7 @@ impl VideoEncoder {
         match self {
             VideoEncoder::Aom { is_hdr, .. }
             | VideoEncoder::Rav1e { is_hdr, .. }
+            | VideoEncoder::SvtAv1 { is_hdr, .. }
             | VideoEncoder::X265 { is_hdr, .. } => is_hdr,
             _ => false,
         }
@@ -481,6 +498,26 @@ fn build_rav1e_args_string(
         if is_hdr { "BT2020" } else { "BT709" },
         if is_hdr { "SMPTE2084" } else { "BT709" },
         if is_hdr { "BT2020NCL" } else { "BT709" },
+    )
+}
+
+fn build_svtav1_args_string(
+    crf: i16,
+    speed: u8,
+    dimensions: VideoDimensions,
+    is_hdr: bool,
+    threads: usize,
+) -> String {
+    format!(
+        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 --tile-rows {} --tile-columns {} --lp {threads} --rc 0 --bias-pct 100 --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} --transfer-characteristics {} ",
+        dimensions.bit_depth,
+        i32::from(dimensions.width >= 2000),
+        i32::from(
+            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
+        ),
+        if is_hdr { "9" } else { "1" },
+        if is_hdr { "9" } else { "1" },
+        if is_hdr { "16" } else { "1" },
     )
 }
 
