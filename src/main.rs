@@ -228,8 +228,6 @@ fn main() {
     };
 
     for input in inputs {
-        replace_with_bestsource(&input).unwrap();
-
         let outputs = args.formats.as_ref().map_or_else(
             || vec![Output::default()],
             |formats| {
@@ -878,16 +876,4 @@ fn write_filters(output: &Output, script: &mut BufWriter<File>, clip: Option<&st
         writeln!(script, "import vsutil").unwrap();
         writeln!(script, "{clip} = vsutil.depth({clip}, {bd})").unwrap();
     }
-}
-
-fn replace_with_bestsource(file: &Path) -> Result<()> {
-    let mut script = fs::read_to_string(file)?;
-    if !script.contains("core.lsmas.LWLibavSource") {
-        return Ok(());
-    }
-    script = script.replace("core.lsmas.LWLibavSource", "core.bs.VideoSource");
-    let mut out = File::create(file)?;
-    out.write_all(script.as_bytes())?;
-    out.flush()?;
-    Ok(())
 }
