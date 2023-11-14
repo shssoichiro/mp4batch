@@ -417,7 +417,7 @@ impl VideoEncoder {
             } => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
             VideoEncoder::SvtAv1 {
                 crf, speed, is_hdr, ..
-            } => build_svtav1_args_string(crf, speed, dimensions, is_hdr, threads),
+            } => build_svtav1_args_string(crf, speed, dimensions, is_hdr),
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -509,10 +509,9 @@ fn build_svtav1_args_string(
     speed: u8,
     dimensions: VideoDimensions,
     is_hdr: bool,
-    threads: usize,
 ) -> String {
     format!(
-        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 --tile-rows {} --tile-columns {} --lp {threads} --rc 0 --bias-pct 100 --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} --transfer-characteristics {} ",
+        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} --transfer-characteristics {} ",
         dimensions.bit_depth,
         i32::from(dimensions.width >= 2000),
         i32::from(
