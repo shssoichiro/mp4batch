@@ -681,6 +681,9 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
                 *is_hdr = *arg;
             }
+            VideoEncoder::SvtAv1 { .. } => {
+                // SVT parses this from colorimetry data
+            }
             _ => panic!("Attempted to use HDR with an unsupported encoder"),
         },
         ParsedFilter::Extension(arg) => {
