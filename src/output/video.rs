@@ -9,10 +9,11 @@ use std::{
 
 use ansi_term::Colour::{Green, Yellow};
 use anyhow::Result;
+use av_data::pixel::{ChromaLocation, ToPrimitive, TransferCharacteristic, YUVRange};
 
 use crate::{
     absolute_path,
-    input::{get_video_frame_count, PixelFormat, VideoDimensions},
+    input::{get_video_frame_count, Colorimetry, PixelFormat, VideoDimensions},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +209,7 @@ pub fn convert_video_av1an(
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
     force_keyframes: &Option<String>,
+    colorimetry: &Colorimetry,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -262,7 +264,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions, threads_per_worker))
+        .arg(&encoder.get_args_string(dimensions, colorimetry, threads_per_worker))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -371,7 +373,6 @@ pub enum VideoEncoder {
         crf: i16,
         speed: u8,
         profile: Profile,
-        is_hdr: bool,
         grain: u8,
     },
     X264 {
@@ -403,7 +404,12 @@ impl VideoEncoder {
         }
     }
 
-    pub fn get_args_string(self, dimensions: VideoDimensions, threads: usize) -> String {
+    pub fn get_args_string(
+        self,
+        dimensions: VideoDimensions,
+        colorimetry: &Colorimetry,
+        threads: usize,
+    ) -> String {
         match self {
             VideoEncoder::Aom {
                 crf,
@@ -415,9 +421,9 @@ impl VideoEncoder {
             VideoEncoder::Rav1e {
                 crf, speed, is_hdr, ..
             } => build_rav1e_args_string(crf, speed, dimensions, is_hdr),
-            VideoEncoder::SvtAv1 {
-                crf, speed, is_hdr, ..
-            } => build_svtav1_args_string(crf, speed, dimensions, is_hdr),
+            VideoEncoder::SvtAv1 { crf, speed, .. } => {
+                build_svtav1_args_string(crf, speed, dimensions, colorimetry)
+            }
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -441,12 +447,15 @@ impl VideoEncoder {
         )
     }
 
-    pub fn hdr_enabled(self) -> bool {
+    pub fn hdr_enabled(self, colorimetry: &Colorimetry) -> bool {
         match self {
             VideoEncoder::Aom { is_hdr, .. }
             | VideoEncoder::Rav1e { is_hdr, .. }
-            | VideoEncoder::SvtAv1 { is_hdr, .. }
             | VideoEncoder::X265 { is_hdr, .. } => is_hdr,
+            VideoEncoder::SvtAv1 { .. } => {
+                colorimetry.transfer == TransferCharacteristic::PerceptualQuantizer
+                    || colorimetry.transfer == TransferCharacteristic::HybridLogGamma
+            }
             _ => false,
         }
     }
@@ -508,18 +517,29 @@ fn build_svtav1_args_string(
     crf: i16,
     speed: u8,
     dimensions: VideoDimensions,
-    is_hdr: bool,
+    colorimetry: &Colorimetry,
 ) -> String {
     format!(
-        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} --transfer-characteristics {} ",
+        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} --transfer-characteristics {} --color-range {} --chroma-sample-position {} ",
         dimensions.bit_depth,
         i32::from(dimensions.width >= 2000),
         i32::from(
             dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
         ),
-        if is_hdr { "9" } else { "1" },
-        if is_hdr { "9" } else { "1" },
-        if is_hdr { "16" } else { "1" },
+        colorimetry.primaries.to_u8().unwrap(),
+        colorimetry.matrix.to_u8().unwrap(),
+        colorimetry.transfer.to_u8().unwrap(),
+        match colorimetry.range {
+            YUVRange::Limited => 0,
+            YUVRange::Full => 1,
+        },
+        match colorimetry.chroma_location {
+            ChromaLocation::Top  => "vertical",
+            ChromaLocation::Center => "colocated",
+            ChromaLocation::TopLeft => "topleft",
+            ChromaLocation::Left => "left",
+            _ => "unknown"
+        }
     )
 }
 

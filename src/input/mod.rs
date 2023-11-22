@@ -8,9 +8,14 @@ use std::{
 };
 
 use anyhow::Result;
+use av_data::pixel::{
+    ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
+    YUVRange,
+};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use regex::Regex;
+use vapoursynth::vsscript::{Environment, EvalFlags};
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
@@ -250,4 +255,49 @@ fn parse_sources(script: &str) -> Vec<PathBuf> {
         .map(|cap| PathBuf::from(&cap[1]))
         .unique()
         .collect()
+}
+
+pub struct Colorimetry {
+    pub range: YUVRange,
+    pub primaries: ColorPrimaries,
+    pub matrix: MatrixCoefficients,
+    pub transfer: TransferCharacteristic,
+    pub chroma_location: ChromaLocation,
+}
+
+pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
+    let env = Environment::from_file(input, EvalFlags::SetWorkingDir)?;
+    let (node, _) = env.get_output(0).unwrap();
+    let frame = node.get_frame(0)?;
+    let props = frame.props();
+    Ok(Colorimetry {
+        range: match props.get_int("_ColorRange") {
+            Ok(0) => YUVRange::Full,
+            _ => YUVRange::Limited,
+        },
+        primaries: props
+            .get_int("_Primaries")
+            .map_or(ColorPrimaries::Unspecified, |val| {
+                ColorPrimaries::from_i64(val).unwrap_or(ColorPrimaries::Unspecified)
+            }),
+        matrix: props
+            .get_int("_Matrix")
+            .map_or(MatrixCoefficients::Unspecified, |val| {
+                MatrixCoefficients::from_i64(val).unwrap_or(MatrixCoefficients::Unspecified)
+            }),
+        transfer: props
+            .get_int("_Transfer")
+            .map_or(TransferCharacteristic::Unspecified, |val| {
+                TransferCharacteristic::from_i64(val).unwrap_or(TransferCharacteristic::Unspecified)
+            }),
+        chroma_location: match props.get_int("_ChromaLocation") {
+            Ok(0) => ChromaLocation::Left,
+            Ok(1) => ChromaLocation::Center,
+            Ok(2) => ChromaLocation::TopLeft,
+            Ok(3) => ChromaLocation::Top,
+            Ok(4) => ChromaLocation::BottomLeft,
+            Ok(5) => ChromaLocation::Bottom,
+            _ => ChromaLocation::Unspecified,
+        },
+    })
 }

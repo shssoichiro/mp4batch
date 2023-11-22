@@ -283,7 +283,6 @@ fn main() {
                                         crf: 16,
                                         speed: 4,
                                         profile: Profile::Film,
-                                        is_hdr: false,
                                         grain: 0,
                                     }
                                 }
@@ -343,6 +342,7 @@ fn process_file(
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
+    let colorimetry = get_video_colorimetry(input_vpy)?;
     eprintln!(
         "{} {} {}{}{}{}",
         Blue.bold().paint("[Info]"),
@@ -456,6 +456,7 @@ fn process_file(
                     encoder,
                     dimensions,
                     force_keyframes,
+                    &colorimetry,
                 )?;
             }
         };
@@ -546,7 +547,7 @@ fn process_file(
             &output_path,
         )?;
 
-        if output.video.encoder.hdr_enabled() {
+        if output.video.encoder.hdr_enabled(&colorimetry) {
             copy_hdr_data(&source_video, &output_path)?;
         }
 
@@ -677,8 +678,7 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
         ParsedFilter::Hdr(arg) => match output.video.encoder {
             VideoEncoder::X265 { ref mut is_hdr, .. }
             | VideoEncoder::Aom { ref mut is_hdr, .. }
-            | VideoEncoder::Rav1e { ref mut is_hdr, .. }
-            | VideoEncoder::SvtAv1 { ref mut is_hdr, .. } => {
+            | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
                 *is_hdr = *arg;
             }
             _ => panic!("Attempted to use HDR with an unsupported encoder"),
@@ -753,16 +753,8 @@ fn build_video_suffix(output: &Output) -> Result<String> {
             crf,
             speed,
             profile,
-            is_hdr,
             grain,
-        } => format!(
-            "svt-q{}-s{}-{}{}-g{}",
-            crf,
-            speed,
-            profile,
-            if is_hdr { "-hdr" } else { "" },
-            grain,
-        ),
+        } => format!("svt-q{}-s{}-{}-g{}", crf, speed, profile, grain),
         VideoEncoder::X264 {
             crf,
             profile,
