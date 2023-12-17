@@ -102,12 +102,6 @@ use std::{
     fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
-    process::exit,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread,
 };
 
 use ansi_term::Colour::{Blue, Green, Red};
@@ -194,15 +188,6 @@ struct InputArgs {
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-
-    let term = Arc::new(AtomicBool::new(false));
-    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term)).unwrap();
-    thread::spawn(move || loop {
-        if term.load(Ordering::Relaxed) {
-            exit(0);
-        }
-    });
-
     let args = InputArgs::parse();
 
     let input = Path::new(&args.input);
