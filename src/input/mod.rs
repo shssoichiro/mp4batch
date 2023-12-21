@@ -9,7 +9,11 @@ use std::{
 
 use anyhow::Result;
 use av_data::pixel::{
-    ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
+    ChromaLocation,
+    ColorPrimaries,
+    FromPrimitive,
+    MatrixCoefficients,
+    TransferCharacteristic,
     YUVRange,
 };
 use itertools::Itertools;
@@ -263,6 +267,13 @@ pub struct Colorimetry {
     pub matrix: MatrixCoefficients,
     pub transfer: TransferCharacteristic,
     pub chroma_location: ChromaLocation,
+}
+
+impl Colorimetry {
+    pub fn is_hdr(&self) -> bool {
+        self.transfer == TransferCharacteristic::HybridLogGamma
+            || self.transfer == TransferCharacteristic::PerceptualQuantizer
+    }
 }
 
 pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {

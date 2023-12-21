@@ -256,7 +256,6 @@ fn main() {
                                         crf: 18,
                                         profile: Profile::Film,
                                         compat: false,
-                                        is_hdr: false,
                                     }
                                 }
                                 "aom" => {
@@ -264,7 +263,6 @@ fn main() {
                                         crf: 16,
                                         speed: 4,
                                         profile: Profile::Film,
-                                        is_hdr: false,
                                         grain: 0,
                                         compat: false,
                                     }
@@ -274,7 +272,6 @@ fn main() {
                                         crf: 40,
                                         speed: 5,
                                         profile: Profile::Film,
-                                        is_hdr: false,
                                         grain: 0,
                                     }
                                 }
@@ -547,7 +544,7 @@ fn process_file(
             &output_path,
         )?;
 
-        if output.video.encoder.hdr_enabled(&colorimetry) {
+        if colorimetry.is_hdr() {
             copy_hdr_data(&source_video, &output_path)?;
         }
 
@@ -675,17 +672,6 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             }
             _ => (),
         },
-        ParsedFilter::Hdr(arg) => match output.video.encoder {
-            VideoEncoder::X265 { ref mut is_hdr, .. }
-            | VideoEncoder::Aom { ref mut is_hdr, .. }
-            | VideoEncoder::Rav1e { ref mut is_hdr, .. } => {
-                *is_hdr = *arg;
-            }
-            VideoEncoder::SvtAv1 { .. } => {
-                // SVT parses this from colorimetry data
-            }
-            _ => panic!("Attempted to use HDR with an unsupported encoder"),
-        },
         ParsedFilter::Extension(arg) => {
             output.video.output_ext = (*arg).to_string();
         }
@@ -726,15 +712,13 @@ fn build_video_suffix(output: &Output) -> Result<String> {
             crf,
             speed,
             profile,
-            is_hdr,
             grain,
             compat,
         } => format!(
-            "aom-q{}-s{}-{}{}-g{}{}",
+            "aom-q{}-s{}-{}-g{}{}",
             crf,
             speed,
             profile,
-            if is_hdr { "-hdr" } else { "" },
             grain,
             if compat { "-compat" } else { "" }
         ),
@@ -742,16 +726,8 @@ fn build_video_suffix(output: &Output) -> Result<String> {
             crf,
             speed,
             profile,
-            is_hdr,
             grain,
-        } => format!(
-            "rav1e-q{}-s{}-{}{}-g{}",
-            crf,
-            speed,
-            profile,
-            if is_hdr { "-hdr" } else { "" },
-            grain,
-        ),
+        } => format!("rav1e-q{}-s{}-{}-g{}", crf, speed, profile, grain),
         VideoEncoder::SvtAv1 {
             crf,
             speed,
@@ -772,12 +748,10 @@ fn build_video_suffix(output: &Output) -> Result<String> {
             crf,
             profile,
             compat,
-            is_hdr,
         } => format!(
-            "x265-q{}-{}{}{}",
+            "x265-q{}-{}{}",
             crf,
             profile,
-            if is_hdr { "-hdr" } else { "" },
             if compat { "-compat" } else { "" }
         ),
         VideoEncoder::Copy => "copy".to_string(),

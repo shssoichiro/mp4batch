@@ -23,7 +23,6 @@ pub enum ParsedFilter<'a> {
     Profile(Profile),
     Grain(u8),
     Compat(bool),
-    Hdr(bool),
     Extension(&'a str),
     BitDepth(u8),
     Resolution { width: u32, height: u32 },
@@ -56,7 +55,6 @@ pub fn parse_filters<'a>(input: &'a str, in_file: &Path) -> Vec<ParsedFilter<'a>
             .or_else(|_| parse_profile(input))
             .or_else(|_| parse_grain(input))
             .or_else(|_| parse_compat(input))
-            .or_else(|_| parse_hdr(input))
             .or_else(|_| parse_extension(input))
             .or_else(|_| parse_bit_depth(input))
             .or_else(|_| parse_resolution(input))
@@ -115,11 +113,6 @@ fn parse_compat(input: &str) -> IResult<&str, ParsedFilter> {
             ParsedFilter::Compat(token.parse::<u8>().unwrap() > 0),
         )
     })
-}
-
-fn parse_hdr(input: &str) -> IResult<&str, ParsedFilter> {
-    preceded(tag("hdr="), digit1)(input)
-        .map(|(input, token)| (input, ParsedFilter::Hdr(token.parse::<u8>().unwrap() > 0)))
 }
 
 fn parse_extension(input: &str) -> IResult<&str, ParsedFilter> {

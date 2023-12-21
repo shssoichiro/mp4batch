@@ -37,16 +37,12 @@ pub enum AudioEncoder {
 
 impl Display for AudioEncoder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{}",
-            match self {
-                AudioEncoder::Copy => "copy",
-                AudioEncoder::Aac => "aac",
-                AudioEncoder::Flac => "flac",
-                AudioEncoder::Opus => "opus",
-            }
-        )
+        write!(f, "{}", match self {
+            AudioEncoder::Copy => "copy",
+            AudioEncoder::Aac => "aac",
+            AudioEncoder::Flac => "flac",
+            AudioEncoder::Opus => "opus",
+        })
     }
 }
 
@@ -128,13 +124,10 @@ pub fn convert_audio(
     };
     command
         .arg("-map")
-        .arg(format!(
-            "0:a:{}",
-            match audio_track.source {
-                TrackSource::FromVideo(id) => id,
-                TrackSource::External(_) => 0,
-            }
-        ))
+        .arg(format!("0:a:{}", match audio_track.source {
+            TrackSource::FromVideo(id) => id,
+            TrackSource::External(_) => 0,
+        }))
         .arg("-map_chapters")
         .arg("-1")
         .arg(output);
@@ -209,13 +202,10 @@ fn get_channel_count(path: &Path, audio_track: &Track) -> Result<u32> {
         .arg("-v")
         .arg("error")
         .arg("-select_streams")
-        .arg(format!(
-            "a:{}",
-            match audio_track.source {
-                TrackSource::FromVideo(id) => id,
-                TrackSource::External(_) => 0,
-            }
-        ))
+        .arg(format!("a:{}", match audio_track.source {
+            TrackSource::FromVideo(id) => id,
+            TrackSource::External(_) => 0,
+        }))
         .arg("-show_entries")
         .arg("stream=channels")
         .arg("-of")
