@@ -876,8 +876,8 @@ fn build_x264_args_string(
             _ => unimplemented!("Transfer characteristics not implemented for x264"),
         },
         match colorimetry.range {
-            YUVRange::Limited => "limited",
-            YUVRange::Full => "full",
+            YUVRange::Limited => "tv",
+            YUVRange::Full => "pc",
         },
         match colorimetry.chroma_location {
             ChromaLocation::Left => " --chromaloc 0",
