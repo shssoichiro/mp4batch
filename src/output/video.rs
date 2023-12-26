@@ -249,16 +249,23 @@ pub fn convert_video_av1an(
     )
     .expect("not 0");
     let cores = available_parallelism().expect("Unable to get machine parallelism count");
-    let workers = match encoder {
+    let workers = NonZeroUsize::new(match encoder {
         VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } | VideoEncoder::SvtAv1 { .. } => {
             std::cmp::max(cores.get() / tiles.get(), 1)
         }
         _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
-    };
-    let threads_per_worker = std::cmp::min(
-        64,
-        (cores.get() as f32 / workers as f32 * 1.5).ceil() as usize + 2,
+    })
+    .unwrap();
+    assert!(
+        workers <= cores,
+        "Worker count exceeded core count, this is a bug"
     );
+
+    let threads_per_worker = NonZeroUsize::new(std::cmp::min(
+        64,
+        (cores.get() as f32 / workers.get() as f32 * 1.5).ceil() as usize + 2,
+    ))
+    .unwrap();
     let mut command = Command::new("nice");
     command
         .arg("av1an")
@@ -267,7 +274,7 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions, colorimetry, threads_per_worker))
+        .arg(&encoder.get_args_string(dimensions, colorimetry, threads_per_worker, cores, workers))
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -321,7 +328,7 @@ pub fn convert_video_av1an(
     if dimensions.height > 1080 {
         command.arg("--sc-downscale-height").arg("1080");
     }
-    if cores.get() % workers == 0 && encoder.has_tiling() {
+    if encoder.uses_av1an_thread_pinning() {
         command
             .arg("--set-thread-affinity")
             .arg((cores.get() / workers).to_string());
@@ -408,7 +415,9 @@ impl VideoEncoder {
         self,
         dimensions: VideoDimensions,
         colorimetry: &Colorimetry,
-        threads: usize,
+        computed_threads: NonZeroUsize,
+        cores: NonZeroUsize,
+        workers: NonZeroUsize,
     ) -> String {
         match self {
             VideoEncoder::Aom {
@@ -416,29 +425,54 @@ impl VideoEncoder {
                 speed,
                 profile,
                 ..
-            } => build_aom_args_string(crf, speed, dimensions, profile, colorimetry, threads),
+            } => build_aom_args_string(
+                crf,
+                speed,
+                dimensions,
+                profile,
+                colorimetry,
+                computed_threads,
+            ),
             VideoEncoder::Rav1e { crf, speed, .. } => {
                 build_rav1e_args_string(crf, speed, dimensions, colorimetry)
             }
-            VideoEncoder::SvtAv1 { crf, speed, .. } => {
-                build_svtav1_args_string(crf, speed, dimensions, colorimetry)
-            }
+            VideoEncoder::SvtAv1 { crf, speed, .. } => build_svtav1_args_string(
+                crf,
+                speed,
+                cores.get() / workers.get(),
+                dimensions,
+                colorimetry,
+            ),
             VideoEncoder::X264 {
                 crf,
                 profile,
                 compat,
-            } => build_x264_args_string(crf, dimensions, profile, compat, colorimetry, threads),
+            } => build_x264_args_string(
+                crf,
+                dimensions,
+                profile,
+                compat,
+                colorimetry,
+                computed_threads,
+            ),
             VideoEncoder::X265 {
                 crf,
                 profile,
                 compat,
                 ..
-            } => build_x265_args_string(crf, dimensions, profile, compat, colorimetry, threads),
+            } => build_x265_args_string(
+                crf,
+                dimensions,
+                profile,
+                compat,
+                colorimetry,
+                computed_threads,
+            ),
             VideoEncoder::Copy => unreachable!(),
         }
     }
 
-    pub const fn has_tiling(self) -> bool {
+    pub const fn uses_av1an_thread_pinning(self) -> bool {
         matches!(
             self,
             VideoEncoder::Aom { .. } | VideoEncoder::SvtAv1 { .. } | VideoEncoder::Rav1e { .. }
@@ -452,7 +486,7 @@ fn build_aom_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     colorimetry: &Colorimetry,
-    threads: usize,
+    threads: NonZeroUsize,
 ) -> String {
     // Note: aom doesn't have a parameter to control full vs limited range
     format!(
@@ -609,6 +643,7 @@ fn build_rav1e_args_string(
 fn build_svtav1_args_string(
     crf: i16,
     speed: u8,
+    threads: usize,
     dimensions: VideoDimensions,
     colorimetry: &Colorimetry,
 ) -> String {
@@ -616,13 +651,15 @@ fn build_svtav1_args_string(
         " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
          --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 \
          --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 \
-         --enable-tf 0 --scd 0 --keyint -1 --color-primaries {} --matrix-coefficients {} \
-         --transfer-characteristics {} --color-range {} --chroma-sample-position {} ",
+         --enable-tf 0 --scd 0 --keyint -1 --lp {} --pin 0 --color-primaries {} \
+         --matrix-coefficients {} --transfer-characteristics {} --color-range {} \
+         --chroma-sample-position {} ",
         dimensions.bit_depth,
         i32::from(dimensions.width >= 2000),
         i32::from(
             dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
         ),
+        threads,
         colorimetry.primaries.to_u8().unwrap(),
         colorimetry.matrix.to_u8().unwrap(),
         colorimetry.transfer.to_u8().unwrap(),
@@ -646,7 +683,7 @@ fn build_x265_args_string(
     profile: Profile,
     compat: bool,
     colorimetry: &Colorimetry,
-    threads: usize,
+    threads: NonZeroUsize,
 ) -> String {
     // TODO: Add full HDR metadata
 
@@ -776,7 +813,7 @@ fn build_x264_args_string(
     profile: Profile,
     compat: bool,
     colorimetry: &Colorimetry,
-    threads: usize,
+    threads: NonZeroUsize,
 ) -> String {
     format!(
         " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
