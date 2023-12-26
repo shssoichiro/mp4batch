@@ -29,6 +29,7 @@ pub enum ParsedFilter<'a> {
     AudioEncoder(&'a str),
     AudioBitrate(u32),
     AudioTracks(Vec<Track>),
+    AudioNormalize,
     SubtitleTracks(Vec<Track>),
 }
 
@@ -61,6 +62,7 @@ pub fn parse_filters<'a>(input: &'a str, in_file: &Path) -> Vec<ParsedFilter<'a>
             .or_else(|_| parse_audio_encoder(input))
             .or_else(|_| parse_audio_bitrate(input))
             .or_else(|_| parse_audio_tracks(input, in_file))
+            .or_else(|_| parse_audio_norm(input))
             .or_else(|_| parse_subtitle_tracks(input, in_file))
             .expect("Unrecognized filter");
         filters.push(result);
@@ -198,6 +200,10 @@ fn parse_audio_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, Pa
             ),
         )
     })
+}
+
+fn parse_audio_norm(input: &str) -> IResult<&str, ParsedFilter> {
+    tag("an=1")(input).map(|(input, _)| (input, ParsedFilter::AudioNormalize))
 }
 
 fn parse_subtitle_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, ParsedFilter<'a>> {

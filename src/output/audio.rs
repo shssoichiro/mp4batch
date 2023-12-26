@@ -16,6 +16,7 @@ use crate::{
 pub struct AudioOutput {
     pub encoder: AudioEncoder,
     pub kbps_per_channel: u32,
+    pub normalize: bool,
 }
 
 impl Default for AudioOutput {
@@ -23,6 +24,7 @@ impl Default for AudioOutput {
         AudioOutput {
             encoder: AudioEncoder::Copy,
             kbps_per_channel: 0,
+            normalize: false,
         }
     }
 }
@@ -52,16 +54,109 @@ impl AudioEncoder {
     }
 }
 
+#[derive(Clone, Copy)]
+struct FirstPassData {
+    pub integrated: f32,
+    pub true_peak: f32,
+    pub lra: f32,
+    pub threshold: f32,
+    pub offset: f32,
+}
+
 pub fn convert_audio(
     input: &Path,
     output: &Path,
     audio_codec: AudioEncoder,
     audio_track: &Track,
     mut audio_bitrate: u32,
+    normalize: bool,
 ) -> Result<()> {
     if output.exists() {
         // TODO: Verify the audio output is complete
         return Ok(());
+    }
+
+    let mut fp_data = None;
+    if normalize {
+        eprintln!("Normalizing audio");
+        let result = Command::new("ffmpeg")
+            .arg("-hide_banner")
+            .arg("-loglevel")
+            .arg("level+error")
+            .arg("-stats")
+            .arg("-y")
+            .arg("-i")
+            .arg(match audio_track.source {
+                TrackSource::FromVideo(_) => find_source_file(input),
+                TrackSource::External(ref path) => path.clone(),
+            })
+            .arg("-map")
+            .arg(format!("0:a:{}", match audio_track.source {
+                TrackSource::FromVideo(id) => id,
+                TrackSource::External(_) => 0,
+            }))
+            .arg("-map_chapters")
+            .arg("-1")
+            .arg("-af")
+            .arg("loudnorm=I=-16:dual_mono=true:TP=-1.5:LRA=11:print_format=summary")
+            .arg("-f")
+            .arg("null")
+            .arg("-")
+            .output()?;
+
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        let norm_data = stderr
+            .lines()
+            .skip_while(|line| !line.starts_with("[Parsed_loudnorm_"))
+            .skip(1)
+            .collect::<Vec<_>>();
+        fp_data = Some(FirstPassData {
+            integrated: norm_data
+                .iter()
+                .find(|line| line.starts_with("Input Integrated:"))
+                .unwrap()
+                .split_whitespace()
+                .nth(2)
+                .unwrap()
+                .parse()
+                .unwrap(),
+            true_peak: norm_data
+                .iter()
+                .find(|line| line.starts_with("Input True Peak:"))
+                .unwrap()
+                .split_whitespace()
+                .nth(3)
+                .unwrap()
+                .parse()
+                .unwrap(),
+            lra: norm_data
+                .iter()
+                .find(|line| line.starts_with("Input LRA:"))
+                .unwrap()
+                .split_whitespace()
+                .nth(2)
+                .unwrap()
+                .parse()
+                .unwrap(),
+            threshold: norm_data
+                .iter()
+                .find(|line| line.starts_with("Input Threshold:"))
+                .unwrap()
+                .split_whitespace()
+                .nth(2)
+                .unwrap()
+                .parse()
+                .unwrap(),
+            offset: norm_data
+                .iter()
+                .find(|line| line.starts_with("Target Offset:"))
+                .unwrap()
+                .split_whitespace()
+                .nth(2)
+                .unwrap()
+                .parse()
+                .unwrap(),
+        });
     }
 
     let mut command = Command::new("ffmpeg");
@@ -76,16 +171,32 @@ pub fn convert_audio(
             TrackSource::FromVideo(_) => find_source_file(input),
             TrackSource::External(ref path) => path.clone(),
         })
-        .arg("-acodec");
+        .arg("-map")
+        .arg(format!("0:a:{}", match audio_track.source {
+            TrackSource::FromVideo(id) => id,
+            TrackSource::External(_) => 0,
+        }))
+        .arg("-map_chapters")
+        .arg("-1");
+    if normalize {
+        let params = fp_data.unwrap();
+        command.arg("-af").arg(&format!(
+            "loudnorm=I=-16:dual_mono=true:TP=-1.5:LRA=11:measured_I={:.1}:measured_TP={:.1}:\
+             measured_LRA={:.1}:measured_thresh={:.1}:offset={:.1}:linear=true:\
+             print_format=summary",
+            params.integrated, params.true_peak, params.lra, params.threshold, params.offset
+        ));
+    }
     match audio_codec {
         AudioEncoder::Copy => {
-            command.arg("copy");
+            command.arg("-acodec").arg("copy");
         }
         AudioEncoder::Aac => {
             if audio_bitrate == 0 {
                 audio_bitrate = 96;
             }
             command
+                .arg("-acodec")
                 .arg("libfdk_aac")
                 .arg("-vbr")
                 .arg(match audio_bitrate {
@@ -110,6 +221,7 @@ pub fn convert_audio(
                 audio_track,
             )?;
             command
+                .arg("-acodec")
                 .arg("libopus")
                 .arg("-b:a")
                 .arg(&format!("{}k", audio_bitrate * channels))
@@ -119,18 +231,10 @@ pub fn convert_audio(
                 .arg(if channels > 2 { "1" } else { "0" });
         }
         AudioEncoder::Flac => {
-            command.arg("flac");
+            command.arg("-acodec").arg("flac");
         }
     };
-    command
-        .arg("-map")
-        .arg(format!("0:a:{}", match audio_track.source {
-            TrackSource::FromVideo(id) => id,
-            TrackSource::External(_) => 0,
-        }))
-        .arg("-map_chapters")
-        .arg("-1")
-        .arg(output);
+    command.arg(output);
 
     let status = command
         .status()

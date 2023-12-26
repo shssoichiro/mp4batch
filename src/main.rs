@@ -66,6 +66,7 @@ struct InputArgs {
     ///   opus]
     /// - at=#-[e][f]: Audio tracks, pipe separated [default: 0, e=enabled,
     ///   f=forced]
+    /// - an=1: Enable audio normalization. Be SURE you want this. [default: 0]
     ///
     /// Subtitle options:
     ///
@@ -414,6 +415,7 @@ fn process_file(
                 output.audio.encoder,
                 audio_track,
                 output.audio.kbps_per_channel,
+                output.audio.normalize,
             )?;
             audio_outputs.push((audio_out, audio_track.enabled, audio_track.forced));
             audio_suffixes.push(audio_suffix);
@@ -622,6 +624,9 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
         }
         ParsedFilter::AudioTracks(args) => {
             output.audio_tracks = args.clone();
+        }
+        ParsedFilter::AudioNormalize => {
+            output.audio.normalize = true;
         }
         ParsedFilter::SubtitleTracks(args) => {
             output.sub_tracks = args.clone();
