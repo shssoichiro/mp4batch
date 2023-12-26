@@ -81,9 +81,6 @@ pub fn convert_audio(
         eprintln!("Normalizing audio");
         let result = Command::new("ffmpeg")
             .arg("-hide_banner")
-            .arg("-loglevel")
-            .arg("level+error")
-            .arg("-stats")
             .arg("-y")
             .arg("-i")
             .arg(match audio_track.source {
