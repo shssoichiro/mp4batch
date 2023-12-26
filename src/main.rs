@@ -105,13 +105,14 @@ use std::{
 };
 
 use ansi_term::Colour::{Blue, Green, Red};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
 use path_clean::PathClean;
 use size::Size;
 use walkdir::WalkDir;
+use which::which;
 
 use self::{input::*, output::*};
 use crate::parse::{parse_filters, ParsedFilter, Track, TrackSource};
@@ -188,6 +189,9 @@ struct InputArgs {
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
+
+    check_for_required_apps().unwrap();
+
     let args = InputArgs::parse();
 
     let input = Path::new(&args.input);
@@ -323,6 +327,15 @@ fn main() {
         }
         eprintln!();
     }
+}
+
+fn check_for_required_apps() -> Result<()> {
+    which("mediainfo").map_err(|_| anyhow!("mediainfo not installed or not in PATH!"))?;
+    which("mkvmerge").map_err(|_| anyhow!("mkvmerge not installed or not in PATH!"))?;
+    which("vspipe").map_err(|_| anyhow!("vspipe not installed or not in PATH!"))?;
+    which("ffmpeg").map_err(|_| anyhow!("ffmpeg not installed or not in PATH!"))?;
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
