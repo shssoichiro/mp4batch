@@ -9,7 +9,7 @@ rust-version = "1.60"
 ansi_term = "0.12"
 anyhow = "1.0"
 clap = { version = "4.0.8", features = ["derive"] }
-dotenv_codegen = "0.15"
+dotenvy_macro = "0.15"
 itertools = "0.12"
 lexical-sort = "0.3"
 nom = "7.1.0"
