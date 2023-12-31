@@ -436,11 +436,17 @@ impl VideoEncoder {
             VideoEncoder::Rav1e { crf, speed, .. } => {
                 build_rav1e_args_string(crf, speed, dimensions, colorimetry)
             }
-            VideoEncoder::SvtAv1 { crf, speed, .. } => build_svtav1_args_string(
+            VideoEncoder::SvtAv1 {
+                crf,
+                speed,
+                profile,
+                ..
+            } => build_svtav1_args_string(
                 crf,
                 speed,
                 cores.get() / workers.get(),
                 dimensions,
+                profile,
                 colorimetry,
             ),
             VideoEncoder::X264 {
@@ -645,12 +651,13 @@ fn build_svtav1_args_string(
     speed: u8,
     threads: usize,
     dimensions: VideoDimensions,
+    profile: Profile,
     colorimetry: &Colorimetry,
 ) -> String {
     format!(
         " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
          --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 \
-         --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune 2 --enable-tf 0 --scd 0 \
+         --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune {} --enable-tf 0 --scd 0 \
          --keyint -1 --lp {} --pin 0 --color-primaries {} --matrix-coefficients {} \
          --transfer-characteristics {} --color-range {} --chroma-sample-position {} ",
         dimensions.bit_depth,
@@ -658,6 +665,7 @@ fn build_svtav1_args_string(
         i32::from(
             dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
         ),
+        if profile == Profile::Anime { "2" } else { "0" },
         threads,
         colorimetry.primaries.to_u8().unwrap(),
         colorimetry.matrix.to_u8().unwrap(),
