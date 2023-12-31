@@ -495,77 +495,78 @@ fn build_aom_args_string(
     threads: NonZeroUsize,
 ) -> String {
     // Note: aom doesn't have a parameter to control full vs limited range
+    let bd = dimensions.bit_depth;
+    let tile_cols = i32::from(dimensions.width >= 2000);
+    let tile_rows = i32::from(
+        dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600),
+    );
+    let arnr_str = if profile == Profile::Anime { 1 } else { 3 };
+    let deltaq_mode = if colorimetry.is_hdr() { 5 } else { 1 };
+    let prim = match colorimetry.primaries {
+        ColorPrimaries::BT709 => "bt709",
+        ColorPrimaries::BT470M => "bt470m",
+        ColorPrimaries::BT470BG => "bt470bg",
+        ColorPrimaries::ST170M | ColorPrimaries::ST240M => "smpte240",
+        ColorPrimaries::Film => "film",
+        ColorPrimaries::BT2020 => "bt2020",
+        ColorPrimaries::ST428 => "xyz",
+        ColorPrimaries::P3DCI => "smpte431",
+        ColorPrimaries::P3Display => "smpte432",
+        ColorPrimaries::Tech3213 => "ebu3213",
+        ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
+        _ => unimplemented!("Color primaries not implemented for aom"),
+    };
+    let transfer = match colorimetry.transfer {
+        TransferCharacteristic::BT1886 => "bt709",
+        TransferCharacteristic::BT470M => "bt470m",
+        TransferCharacteristic::BT470BG => "bt470bg",
+        TransferCharacteristic::ST170M => "bt601",
+        TransferCharacteristic::ST240M => "smpte240",
+        TransferCharacteristic::Linear => "lin",
+        TransferCharacteristic::Logarithmic100 => "log100",
+        TransferCharacteristic::Logarithmic316 => "log100sq10",
+        TransferCharacteristic::XVYCC => "iec61966",
+        TransferCharacteristic::BT1361E => "bt1361",
+        TransferCharacteristic::SRGB => "srgb",
+        TransferCharacteristic::BT2020Ten => "bt2020-10bit",
+        TransferCharacteristic::BT2020Twelve => "bt2020-12bit",
+        TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+        TransferCharacteristic::ST428 => "smpte428",
+        TransferCharacteristic::HybridLogGamma => "hlg",
+        TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
+        _ => unimplemented!("Transfer characteristics not implemented for aom"),
+    };
+    let matrix = match colorimetry.matrix {
+        MatrixCoefficients::Identity => "identity",
+        MatrixCoefficients::BT709 => "bt709",
+        MatrixCoefficients::BT470M => "fcc73",
+        MatrixCoefficients::BT470BG => "bt470bg",
+        MatrixCoefficients::ST170M => "bt601",
+        MatrixCoefficients::ST240M => "smpte240",
+        MatrixCoefficients::YCgCo => "ycgco",
+        MatrixCoefficients::BT2020NonConstantLuminance => "bt2020ncl",
+        MatrixCoefficients::BT2020ConstantLuminance => "bt2020cl",
+        MatrixCoefficients::ST2085 => "smpte2085",
+        MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chromncl",
+        MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chromcl",
+        MatrixCoefficients::ICtCp => "ictcp",
+        MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
+        _ => unimplemented!("Matrix coefficients not implemented for aom"),
+    };
+    let csp = match colorimetry.chroma_location {
+        ChromaLocation::Top => "vertical",
+        ChromaLocation::Center => "colocated",
+        _ => "unknown",
+    };
     format!(
-        " -b {} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
+        " -b {bd} --end-usage=q --min-q=1 --lag-in-frames=64 --cpu-used={speed} --cq-level={crf} \
          --disable-kf --kf-max-dist=9999 --enable-fwd-kf=0 --sharpness=3 --row-mt=0 \
-         --tile-columns={} --tile-rows={} --arnr-maxframes=15 --arnr-strength={} --tune=ssim  \
-         --enable-chroma-deltaq=1 --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=8 \
-         --quant-b-adapt=1 --aq-mode=0 --deltaq-mode={} --tune-content=psy --sb-size=dynamic \
-         --enable-dnl-denoising=0 --color-primaries={} --transfer-characteristics={} \
-         --matrix-coefficients={} --chroma-sample-position={}  --threads={threads} ",
-        dimensions.bit_depth,
-        i32::from(dimensions.width >= 2000),
-        i32::from(
-            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
-        ),
-        if profile == Profile::Anime { 1 } else { 3 },
-        if colorimetry.is_hdr() { 5 } else { 1 },
-        match colorimetry.primaries {
-            ColorPrimaries::BT709 => "bt709",
-            ColorPrimaries::BT470M => "bt470m",
-            ColorPrimaries::BT470BG => "bt470bg",
-            ColorPrimaries::ST170M | ColorPrimaries::ST240M => "smpte240",
-            ColorPrimaries::Film => "film",
-            ColorPrimaries::BT2020 => "bt2020",
-            ColorPrimaries::ST428 => "xyz",
-            ColorPrimaries::P3DCI => "smpte431",
-            ColorPrimaries::P3Display => "smpte432",
-            ColorPrimaries::Tech3213 => "ebu3213",
-            ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
-            _ => unimplemented!("Color primaries not implemented for aom"),
-        },
-        match colorimetry.matrix {
-            MatrixCoefficients::Identity => "identity",
-            MatrixCoefficients::BT709 => "bt709",
-            MatrixCoefficients::BT470M => "fcc73",
-            MatrixCoefficients::BT470BG => "bt470bg",
-            MatrixCoefficients::ST170M => "bt601",
-            MatrixCoefficients::ST240M => "smpte240",
-            MatrixCoefficients::YCgCo => "ycgco",
-            MatrixCoefficients::BT2020NonConstantLuminance => "bt2020ncl",
-            MatrixCoefficients::BT2020ConstantLuminance => "bt2020cl",
-            MatrixCoefficients::ST2085 => "smpte2085",
-            MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chromncl",
-            MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chromcl",
-            MatrixCoefficients::ICtCp => "ictcp",
-            MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
-            _ => unimplemented!("Matrix coefficients not implemented for aom"),
-        },
-        match colorimetry.transfer {
-            TransferCharacteristic::BT1886 => "bt709",
-            TransferCharacteristic::BT470M => "bt470m",
-            TransferCharacteristic::BT470BG => "bt470bg",
-            TransferCharacteristic::ST170M => "bt601",
-            TransferCharacteristic::ST240M => "smpte240",
-            TransferCharacteristic::Linear => "lin",
-            TransferCharacteristic::Logarithmic100 => "log100",
-            TransferCharacteristic::Logarithmic316 => "log100sq10",
-            TransferCharacteristic::XVYCC => "iec61966",
-            TransferCharacteristic::BT1361E => "bt1361",
-            TransferCharacteristic::SRGB => "srgb",
-            TransferCharacteristic::BT2020Ten => "bt2020-10bit",
-            TransferCharacteristic::BT2020Twelve => "bt2020-12bit",
-            TransferCharacteristic::PerceptualQuantizer => "smpte2084",
-            TransferCharacteristic::ST428 => "smpte428",
-            TransferCharacteristic::HybridLogGamma => "hlg",
-            TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
-            _ => unimplemented!("Transfer characteristics not implemented for aom"),
-        },
-        match colorimetry.chroma_location {
-            ChromaLocation::Top => "vertical",
-            ChromaLocation::Center => "colocated",
-            _ => "unknown",
-        }
+         --tile-columns={tile_cols} --tile-rows={tile_rows} --arnr-maxframes=15 \
+         --arnr-strength={arnr_str} --tune=ssim  --enable-chroma-deltaq=1 \
+         --disable-trellis-quant=0 --enable-qm=1 --qm-min=0 --qm-max=8 --quant-b-adapt=1 \
+         --aq-mode=0 --deltaq-mode={deltaq_mode} --tune-content=psy --sb-size=dynamic \
+         --enable-dnl-denoising=0 --color-primaries={prim} --transfer-characteristics={transfer} \
+         --matrix-coefficients={matrix} --chroma-sample-position={csp}  --threads={threads} "
     )
 }
 
@@ -578,71 +579,70 @@ fn build_rav1e_args_string(
     // TODO: Add proper HDR metadata
     // TODO: Remove rdo-lookahead-frames limitation if we can reduce rav1e memory
     // usage
+    let tile_cols = i32::from(dimensions.width >= 2000);
+    let tile_rows = i32::from(
+        dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600),
+    );
+    let prim = match colorimetry.primaries {
+        ColorPrimaries::BT709 => "BT709",
+        ColorPrimaries::BT470M => "BT470M",
+        ColorPrimaries::BT470BG => "BT470BG",
+        ColorPrimaries::ST170M => "BT601",
+        ColorPrimaries::ST240M => "SMPTE240",
+        ColorPrimaries::Film => "GenericFilm",
+        ColorPrimaries::BT2020 => "BT2020",
+        ColorPrimaries::ST428 => "XYZ",
+        ColorPrimaries::P3DCI => "SMPTE431",
+        ColorPrimaries::P3Display => "SMPTE432",
+        ColorPrimaries::Tech3213 => "EBU3213",
+        ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
+        _ => unimplemented!("Color primaries not implemented for rav1e"),
+    };
+    let matrix = match colorimetry.matrix {
+        MatrixCoefficients::Identity => "Identity",
+        MatrixCoefficients::BT709 => "BT709",
+        MatrixCoefficients::BT470M => "FCC",
+        MatrixCoefficients::BT470BG => "BT470BG",
+        MatrixCoefficients::ST170M => "BT601",
+        MatrixCoefficients::ST240M => "SMPTE240",
+        MatrixCoefficients::YCgCo => "YCgCo",
+        MatrixCoefficients::BT2020NonConstantLuminance => "BT2020NCL",
+        MatrixCoefficients::BT2020ConstantLuminance => "BT2020CL",
+        MatrixCoefficients::ST2085 => "SMPTE2085",
+        MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "ChromatNCL",
+        MatrixCoefficients::ChromaticityDerivedConstantLuminance => "ChromatCL",
+        MatrixCoefficients::ICtCp => "ICtCp",
+        MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
+        _ => unimplemented!("Matrix coefficients not implemented for rav1e"),
+    };
+    let transfer = match colorimetry.transfer {
+        TransferCharacteristic::BT1886 => "BT709",
+        TransferCharacteristic::BT470M => "BT470M",
+        TransferCharacteristic::BT470BG => "BT470BG",
+        TransferCharacteristic::ST170M => "BT601",
+        TransferCharacteristic::ST240M => "SMPTE240",
+        TransferCharacteristic::Linear => "Linear",
+        TransferCharacteristic::Logarithmic100 => "Log100",
+        TransferCharacteristic::Logarithmic316 => "Log100Sqrt10",
+        TransferCharacteristic::XVYCC => "IEC61966",
+        TransferCharacteristic::BT1361E => "BT1361",
+        TransferCharacteristic::SRGB => "SRGB",
+        TransferCharacteristic::BT2020Ten => "BT2020_10Bit",
+        TransferCharacteristic::BT2020Twelve => "BT2020_12Bit",
+        TransferCharacteristic::PerceptualQuantizer => "SMPTE2084",
+        TransferCharacteristic::ST428 => "SMPTE428",
+        TransferCharacteristic::HybridLogGamma => "HLG",
+        TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
+        _ => unimplemented!("Transfer characteristics not implemented for rav1e"),
+    };
+    let range = match colorimetry.range {
+        YUVRange::Limited => "Limited",
+        YUVRange::Full => "Full",
+    };
     format!(
-        " --speed {} --quantizer {} --tile-cols {} --tile-rows {} --primaries {} --matrix {}  \
-         --transfer {} --range {} --rdo-lookahead-frames 25 --no-scene-detection --keyint 0 ",
-        speed,
-        crf,
-        i32::from(dimensions.width >= 2000),
-        i32::from(
-            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
-        ),
-        match colorimetry.primaries {
-            ColorPrimaries::BT709 => "BT709",
-            ColorPrimaries::BT470M => "BT470M",
-            ColorPrimaries::BT470BG => "BT470BG",
-            ColorPrimaries::ST170M => "BT601",
-            ColorPrimaries::ST240M => "SMPTE240",
-            ColorPrimaries::Film => "GenericFilm",
-            ColorPrimaries::BT2020 => "BT2020",
-            ColorPrimaries::ST428 => "XYZ",
-            ColorPrimaries::P3DCI => "SMPTE431",
-            ColorPrimaries::P3Display => "SMPTE432",
-            ColorPrimaries::Tech3213 => "EBU3213",
-            ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
-            _ => unimplemented!("Color primaries not implemented for rav1e"),
-        },
-        match colorimetry.matrix {
-            MatrixCoefficients::Identity => "Identity",
-            MatrixCoefficients::BT709 => "BT709",
-            MatrixCoefficients::BT470M => "FCC",
-            MatrixCoefficients::BT470BG => "BT470BG",
-            MatrixCoefficients::ST170M => "BT601",
-            MatrixCoefficients::ST240M => "SMPTE240",
-            MatrixCoefficients::YCgCo => "YCgCo",
-            MatrixCoefficients::BT2020NonConstantLuminance => "BT2020NCL",
-            MatrixCoefficients::BT2020ConstantLuminance => "BT2020CL",
-            MatrixCoefficients::ST2085 => "SMPTE2085",
-            MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "ChromatNCL",
-            MatrixCoefficients::ChromaticityDerivedConstantLuminance => "ChromatCL",
-            MatrixCoefficients::ICtCp => "ICtCp",
-            MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
-            _ => unimplemented!("Matrix coefficients not implemented for rav1e"),
-        },
-        match colorimetry.transfer {
-            TransferCharacteristic::BT1886 => "BT709",
-            TransferCharacteristic::BT470M => "BT470M",
-            TransferCharacteristic::BT470BG => "BT470BG",
-            TransferCharacteristic::ST170M => "BT601",
-            TransferCharacteristic::ST240M => "SMPTE240",
-            TransferCharacteristic::Linear => "Linear",
-            TransferCharacteristic::Logarithmic100 => "Log100",
-            TransferCharacteristic::Logarithmic316 => "Log100Sqrt10",
-            TransferCharacteristic::XVYCC => "IEC61966",
-            TransferCharacteristic::BT1361E => "BT1361",
-            TransferCharacteristic::SRGB => "SRGB",
-            TransferCharacteristic::BT2020Ten => "BT2020_10Bit",
-            TransferCharacteristic::BT2020Twelve => "BT2020_12Bit",
-            TransferCharacteristic::PerceptualQuantizer => "SMPTE2084",
-            TransferCharacteristic::ST428 => "SMPTE428",
-            TransferCharacteristic::HybridLogGamma => "HLG",
-            TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
-            _ => unimplemented!("Transfer characteristics not implemented for rav1e"),
-        },
-        match colorimetry.range {
-            YUVRange::Limited => "Limited",
-            YUVRange::Full => "Full",
-        }
+        " --speed {speed} --quantizer {crf} --tile-cols {tile_cols} --tile-rows {tile_rows} \
+         --primaries {prim} --matrix {matrix}  --transfer {transfer} --range {range} \
+         --rdo-lookahead-frames 25 --no-scene-detection --keyint 0 "
     )
 }
 
@@ -654,33 +654,33 @@ fn build_svtav1_args_string(
     profile: Profile,
     colorimetry: &Colorimetry,
 ) -> String {
+    let depth = dimensions.bit_depth;
+    let tile_cols = i32::from(dimensions.width >= 2000);
+    let tile_rows = i32::from(
+        dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600),
+    );
+    let tune = if profile == Profile::Anime { "2" } else { "0" };
+    let prim = colorimetry.primaries.to_u8().unwrap();
+    let matrix = colorimetry.matrix.to_u8().unwrap();
+    let transfer = colorimetry.transfer.to_u8().unwrap();
+    let range = match colorimetry.range {
+        YUVRange::Limited => 0,
+        YUVRange::Full => 1,
+    };
+    let csp = match colorimetry.chroma_location {
+        ChromaLocation::Top => "vertical",
+        ChromaLocation::Center => "colocated",
+        ChromaLocation::TopLeft => "topleft",
+        ChromaLocation::Left => "left",
+        _ => "unknown",
+    };
     format!(
-        " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
-         --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 \
-         --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune {} --enable-tf 0 --scd 0 \
-         --keyint -1 --lp {} --pin 0 --color-primaries {} --matrix-coefficients {} \
-         --transfer-characteristics {} --color-range {} --chroma-sample-position {} ",
-        dimensions.bit_depth,
-        i32::from(dimensions.width >= 2000),
-        i32::from(
-            dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600)
-        ),
-        if profile == Profile::Anime { "2" } else { "0" },
-        threads,
-        colorimetry.primaries.to_u8().unwrap(),
-        colorimetry.matrix.to_u8().unwrap(),
-        colorimetry.transfer.to_u8().unwrap(),
-        match colorimetry.range {
-            YUVRange::Limited => 0,
-            YUVRange::Full => 1,
-        },
-        match colorimetry.chroma_location {
-            ChromaLocation::Top => "vertical",
-            ChromaLocation::Center => "colocated",
-            ChromaLocation::TopLeft => "topleft",
-            ChromaLocation::Left => "left",
-            _ => "unknown",
-        }
+        " --input-depth {depth} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
+         --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --bias-pct 100 \
+         --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune \
+         {tune} --enable-tf 0 --scd 0 --keyint -1 --lp {threads} --pin 0 --color-primaries {prim} \
+         --matrix-coefficients {matrix} --transfer-characteristics {transfer} --color-range \
+         {range} --chroma-sample-position {csp} "
     )
 }
 
@@ -702,115 +702,116 @@ fn build_x265_args_string(
         Profile::Film | Profile::Fast => 0,
         Profile::Anime => -2,
     };
-    format!(
-        " --crf {crf} --preset slow --bframes {} --keyint -1 --min-keyint 1 --no-scenecut {} \
-         --deblock {deblock}:{deblock} --psy-rd {} --psy-rdoq {} --qcomp 0.65 --aq-mode 3 \
-         --aq-strength {} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} --no-open-gop \
-         --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads {threads} \
-         --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 --no-limit-modes \
-         --no-strong-intra-smoothing --limit-refs 1 --colorprim {} --colormatrix {} --transfer {} \
-         --range {} {} --output-depth {} --frame-threads {threads} --y4m {} {} ",
-        match profile {
-            Profile::Film => 5,
-            Profile::Anime => 8,
-            Profile::Fast => 3,
-        },
-        if (profile == Profile::Anime && crf >= 17) || crf >= 19 {
-            "--limit-sao"
+    let bframes = match profile {
+        Profile::Film => 5,
+        Profile::Anime => 8,
+        Profile::Fast => 3,
+    };
+    let sao = if (profile == Profile::Anime && crf >= 17) || crf >= 19 {
+        "--limit-sao"
+    } else {
+        "--no-sao"
+    };
+    let psy_rd = match profile {
+        Profile::Film => "1.5",
+        Profile::Anime | Profile::Fast => "1.0",
+    };
+    let psy_rdo = match profile {
+        Profile::Film => "3.0",
+        Profile::Anime | Profile::Fast => "1.5",
+    };
+    let aq_str = match profile {
+        Profile::Film => "0.8",
+        Profile::Anime | Profile::Fast => "0.7",
+    };
+    let prim = match colorimetry.primaries {
+        ColorPrimaries::BT709 => "bt709",
+        ColorPrimaries::BT470M => "bt470m",
+        ColorPrimaries::BT470BG => "bt470bg",
+        ColorPrimaries::ST170M => "smpte170m",
+        ColorPrimaries::ST240M => "smpte240m",
+        ColorPrimaries::Film => "film",
+        ColorPrimaries::BT2020 => "bt2020",
+        ColorPrimaries::ST428 => "smpte428",
+        ColorPrimaries::P3DCI => "smpte431",
+        ColorPrimaries::P3Display => "smpte432",
+        ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
+        _ => unimplemented!("Color primaries not implemented for x265"),
+    };
+    let matrix = match colorimetry.matrix {
+        MatrixCoefficients::Identity => "gbr",
+        MatrixCoefficients::BT709 => "bt709",
+        MatrixCoefficients::BT470M => "fcc",
+        MatrixCoefficients::BT470BG => "bt470bg",
+        MatrixCoefficients::ST170M => "smpte170m",
+        MatrixCoefficients::ST240M => "smpte240m",
+        MatrixCoefficients::YCgCo => "ycgco",
+        MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
+        MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
+        MatrixCoefficients::ST2085 => "smpte2085",
+        MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
+        MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
+        MatrixCoefficients::ICtCp => "ictcp",
+        MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
+        _ => unimplemented!("Matrix coefficients not implemented for x265"),
+    };
+    let transfer = match colorimetry.transfer {
+        TransferCharacteristic::BT1886 => "bt709",
+        TransferCharacteristic::BT470M => "bt470m",
+        TransferCharacteristic::BT470BG => "bt470bg",
+        TransferCharacteristic::ST170M => "smpte170m",
+        TransferCharacteristic::ST240M => "smpte240m",
+        TransferCharacteristic::Linear => "linear",
+        TransferCharacteristic::Logarithmic100 => "log100",
+        TransferCharacteristic::Logarithmic316 => "log316",
+        TransferCharacteristic::XVYCC => "iec61966-2-4",
+        TransferCharacteristic::BT1361E => "bt1361e",
+        TransferCharacteristic::SRGB => "iec61966-2-1",
+        TransferCharacteristic::BT2020Ten => "bt2020-10",
+        TransferCharacteristic::BT2020Twelve => "bt2020-12",
+        TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+        TransferCharacteristic::ST428 => "smpte428",
+        TransferCharacteristic::HybridLogGamma => "arib-std-b67",
+        TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
+        _ => unimplemented!("Transfer characteristics not implemented for x265"),
+    };
+    let range = match colorimetry.range {
+        YUVRange::Limited => "limited",
+        YUVRange::Full => "full",
+    };
+    let csp = match colorimetry.chroma_location {
+        ChromaLocation::Left => " --chromaloc 0",
+        ChromaLocation::Center => " --chromaloc 1",
+        ChromaLocation::TopLeft => " --chromaloc 2",
+        ChromaLocation::Top => " --chromaloc 3",
+        ChromaLocation::BottomLeft => " --chromaloc 4",
+        ChromaLocation::Bottom => " --chromaloc 5",
+        _ => "",
+    };
+    let depth = dimensions.bit_depth;
+    let level = if compat {
+        if dimensions.bit_depth == 10 {
+            "--profile main10 --level-idc 5.1"
         } else {
-            "--no-sao"
-        },
-        match profile {
-            Profile::Film => "1.5",
-            Profile::Anime | Profile::Fast => "1.0",
-        },
-        match profile {
-            Profile::Film => "3.0",
-            Profile::Anime | Profile::Fast => "1.5",
-        },
-        match profile {
-            Profile::Film => "0.8",
-            Profile::Anime | Profile::Fast => "0.7",
-        },
-        match colorimetry.primaries {
-            ColorPrimaries::BT709 => "bt709",
-            ColorPrimaries::BT470M => "bt470m",
-            ColorPrimaries::BT470BG => "bt470bg",
-            ColorPrimaries::ST170M => "smpte170m",
-            ColorPrimaries::ST240M => "smpte240m",
-            ColorPrimaries::Film => "film",
-            ColorPrimaries::BT2020 => "bt2020",
-            ColorPrimaries::ST428 => "smpte428",
-            ColorPrimaries::P3DCI => "smpte431",
-            ColorPrimaries::P3Display => "smpte432",
-            ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
-            _ => unimplemented!("Color primaries not implemented for x265"),
-        },
-        match colorimetry.matrix {
-            MatrixCoefficients::Identity => "gbr",
-            MatrixCoefficients::BT709 => "bt709",
-            MatrixCoefficients::BT470M => "fcc",
-            MatrixCoefficients::BT470BG => "bt470bg",
-            MatrixCoefficients::ST170M => "smpte170m",
-            MatrixCoefficients::ST240M => "smpte240m",
-            MatrixCoefficients::YCgCo => "ycgco",
-            MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
-            MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
-            MatrixCoefficients::ST2085 => "smpte2085",
-            MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
-            MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
-            MatrixCoefficients::ICtCp => "ictcp",
-            MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
-            _ => unimplemented!("Matrix coefficients not implemented for x265"),
-        },
-        match colorimetry.transfer {
-            TransferCharacteristic::BT1886 => "bt709",
-            TransferCharacteristic::BT470M => "bt470m",
-            TransferCharacteristic::BT470BG => "bt470bg",
-            TransferCharacteristic::ST170M => "smpte170m",
-            TransferCharacteristic::ST240M => "smpte240m",
-            TransferCharacteristic::Linear => "linear",
-            TransferCharacteristic::Logarithmic100 => "log100",
-            TransferCharacteristic::Logarithmic316 => "log316",
-            TransferCharacteristic::XVYCC => "iec61966-2-4",
-            TransferCharacteristic::BT1361E => "bt1361e",
-            TransferCharacteristic::SRGB => "iec61966-2-1",
-            TransferCharacteristic::BT2020Ten => "bt2020-10",
-            TransferCharacteristic::BT2020Twelve => "bt2020-12",
-            TransferCharacteristic::PerceptualQuantizer => "smpte2084",
-            TransferCharacteristic::ST428 => "smpte428",
-            TransferCharacteristic::HybridLogGamma => "arib-std-b67",
-            TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
-            _ => unimplemented!("Transfer characteristics not implemented for x265"),
-        },
-        match colorimetry.range {
-            YUVRange::Limited => "limited",
-            YUVRange::Full => "full",
-        },
-        match colorimetry.chroma_location {
-            ChromaLocation::Left => " --chromaloc 0",
-            ChromaLocation::Center => " --chromaloc 1",
-            ChromaLocation::TopLeft => " --chromaloc 2",
-            ChromaLocation::Top => " --chromaloc 3",
-            ChromaLocation::BottomLeft => " --chromaloc 4",
-            ChromaLocation::Bottom => " --chromaloc 5",
-            _ => "",
-        },
-        dimensions.bit_depth,
-        if compat {
-            if dimensions.bit_depth == 10 {
-                "--profile main10 --level-idc 5.1"
-            } else {
-                "--profile main --level-idc 5.1"
-            }
-        } else {
-            ""
-        },
-        if colorimetry.is_hdr() {
-            "--hdr10-opt"
-        } else {
-            ""
+            "--profile main --level-idc 5.1"
         }
+    } else {
+        ""
+    };
+    let hdr: &str = if colorimetry.is_hdr() {
+        "--hdr10-opt"
+    } else {
+        ""
+    };
+    format!(
+        " --crf {crf} --preset slow --bframes {bframes} --keyint -1 --min-keyint 1 --no-scenecut \
+         {sao} --deblock {deblock}:{deblock} --psy-rd {psy_rd} --psy-rdoq {psy_rdo} --qcomp 0.65 \
+         --aq-mode 3 --aq-strength {aq_str} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} \
+         --no-open-gop --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads \
+         {threads} --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 \
+         --no-limit-modes --no-strong-intra-smoothing --limit-refs 1 --colorprim {prim} \
+         --colormatrix {matrix} --transfer {transfer} --range {range} {csp} --output-depth \
+         {depth} --frame-threads {threads} --y4m {level} {hdr} "
     )
 }
 
@@ -822,131 +823,127 @@ fn build_x264_args_string(
     colorimetry: &Colorimetry,
     threads: NonZeroUsize,
 ) -> String {
+    let preset = if profile == Profile::Fast {
+        "faster"
+    } else {
+        "veryslow"
+    };
+    let bframes = match profile {
+        Profile::Film => 5,
+        Profile::Anime => 8,
+        Profile::Fast => 3,
+    };
+    let psy_rd = match profile {
+        Profile::Film => format!("{:.1}:{:.1}", 1.0, 0.0),
+        Profile::Anime => format!("{:.1}:{:.1}", 0.7, 0.0),
+        Profile::Fast => format!("{:.1}:{:.1}", 0.0, 0.0),
+    };
+    let deblock = match profile {
+        Profile::Film => format!("{}:{}", -3, -3),
+        Profile::Anime => format!("{}:{}", -2, -1),
+        Profile::Fast => format!("{}:{}", 0, 0),
+    };
+    let merange = if dimensions.width > 1440 {
+        48
+    } else if dimensions.width > 1024 {
+        32
+    } else {
+        24
+    };
+    let aq_str = match profile {
+        Profile::Film => 0.8,
+        Profile::Anime | Profile::Fast => 0.7,
+    };
+    let mbtree = match profile {
+        // mbtree works fine on live action, but on anime it has undesirable effects
+        Profile::Anime => "--no-mbtree",
+        _ => "",
+    };
+    let qcomp = match profile {
+        Profile::Film | Profile::Fast => 0.75,
+        Profile::Anime => 0.65,
+    };
+    let prim = match colorimetry.primaries {
+        ColorPrimaries::BT709 => "bt709",
+        ColorPrimaries::BT470M => "bt470m",
+        ColorPrimaries::BT470BG => "bt470bg",
+        ColorPrimaries::ST170M => "smpte170m",
+        ColorPrimaries::ST240M => "smpte240m",
+        ColorPrimaries::Film => "film",
+        ColorPrimaries::BT2020 => "bt2020",
+        ColorPrimaries::ST428 => "smpte428",
+        ColorPrimaries::P3DCI => "smpte431",
+        ColorPrimaries::P3Display => "smpte432",
+        ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
+        _ => unimplemented!("Color primaries not implemented for x264"),
+    };
+    let matrix = match colorimetry.matrix {
+        MatrixCoefficients::Identity => "GBR",
+        MatrixCoefficients::BT709 => "bt709",
+        MatrixCoefficients::BT470M => "fcc",
+        MatrixCoefficients::BT470BG => "bt470bg",
+        MatrixCoefficients::ST170M => "smpte170m",
+        MatrixCoefficients::ST240M => "smpte240m",
+        MatrixCoefficients::YCgCo => "YCgCo",
+        MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
+        MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
+        MatrixCoefficients::ST2085 => "smpte2085",
+        MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
+        MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
+        MatrixCoefficients::ICtCp => "ICtCp",
+        MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
+        _ => unimplemented!("Matrix coefficients not implemented for x264"),
+    };
+    let transfer = match colorimetry.transfer {
+        TransferCharacteristic::BT1886 => "bt709",
+        TransferCharacteristic::BT470M => "bt470m",
+        TransferCharacteristic::BT470BG => "bt470bg",
+        TransferCharacteristic::ST170M => "smpte170m",
+        TransferCharacteristic::ST240M => "smpte240m",
+        TransferCharacteristic::Linear => "linear",
+        TransferCharacteristic::Logarithmic100 => "log100",
+        TransferCharacteristic::Logarithmic316 => "log316",
+        TransferCharacteristic::XVYCC => "iec61966-2-4",
+        TransferCharacteristic::BT1361E => "bt1361e",
+        TransferCharacteristic::SRGB => "iec61966-2-1",
+        TransferCharacteristic::BT2020Ten => "bt2020-10",
+        TransferCharacteristic::BT2020Twelve => "bt2020-12",
+        TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+        TransferCharacteristic::ST428 => "smpte428",
+        TransferCharacteristic::HybridLogGamma => "arib-std-b67",
+        TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
+        _ => unimplemented!("Transfer characteristics not implemented for x264"),
+    };
+    let range = match colorimetry.range {
+        YUVRange::Limited => "tv",
+        YUVRange::Full => "pc",
+    };
+    let csp = match colorimetry.chroma_location {
+        ChromaLocation::Left => " --chromaloc 0",
+        ChromaLocation::Center => " --chromaloc 1",
+        ChromaLocation::TopLeft => " --chromaloc 2",
+        ChromaLocation::Top => " --chromaloc 3",
+        ChromaLocation::BottomLeft => " --chromaloc 4",
+        ChromaLocation::Bottom => " --chromaloc 5",
+        _ => "",
+    };
+    let depth = dimensions.bit_depth;
+    let vbv = if compat {
+        "--level 4.1 --vbv-maxrate 50000 --vbv-bufsize 78125"
+    } else {
+        ""
+    };
+    let level = match dimensions.pixel_format {
+        PixelFormat::Yuv422 => "--profile high422 --output-csp i422",
+        PixelFormat::Yuv444 => "--profile high444 --output-csp i444",
+        _ => "",
+    };
     format!(
-        " --crf {} --preset {} --bframes {} --psy-rd {} --deblock {} --merange {} --rc-lookahead \
-         96 --aq-mode 3 --aq-strength {} {} -i 1 -I infinite --no-scenecut --qcomp {} --ipratio \
-         1.30 --pbratio 1.20 --no-fast-pskip --no-dct-decimate --colorprim {} --colormatrix {} \
-         --transfer {} --range {} {} --output-depth {} {} {} --threads {threads} ",
-        crf,
-        if profile == Profile::Fast {
-            "faster"
-        } else {
-            "veryslow"
-        },
-        match profile {
-            Profile::Film => 5,
-            Profile::Anime => 8,
-            Profile::Fast => 3,
-        },
-        match profile {
-            Profile::Film => format!("{:.1}:{:.1}", 1.0, 0.0),
-            Profile::Anime => format!("{:.1}:{:.1}", 0.7, 0.0),
-            Profile::Fast => format!("{:.1}:{:.1}", 0.0, 0.0),
-        },
-        match profile {
-            Profile::Film => format!("{}:{}", -3, -3),
-            Profile::Anime => format!("{}:{}", -2, -1),
-            Profile::Fast => format!("{}:{}", 0, 0),
-        },
-        if dimensions.width > 1440 {
-            48
-        } else if dimensions.width > 1024 {
-            32
-        } else {
-            24
-        },
-        match profile {
-            Profile::Film => 0.8,
-            Profile::Anime | Profile::Fast => 0.7,
-        },
-        match profile {
-            // mbtree works fine on live action, but on anime it has undesirable effects
-            Profile::Anime => "--no-mbtree",
-            _ => "",
-        },
-        match profile {
-            Profile::Film | Profile::Fast => 0.75,
-            Profile::Anime => 0.65,
-        },
-        match colorimetry.primaries {
-            ColorPrimaries::BT709 => "bt709",
-            ColorPrimaries::BT470M => "bt470m",
-            ColorPrimaries::BT470BG => "bt470bg",
-            ColorPrimaries::ST170M => "smpte170m",
-            ColorPrimaries::ST240M => "smpte240m",
-            ColorPrimaries::Film => "film",
-            ColorPrimaries::BT2020 => "bt2020",
-            ColorPrimaries::ST428 => "smpte428",
-            ColorPrimaries::P3DCI => "smpte431",
-            ColorPrimaries::P3Display => "smpte432",
-            ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
-            _ => unimplemented!("Color primaries not implemented for x264"),
-        },
-        match colorimetry.matrix {
-            MatrixCoefficients::Identity => "GBR",
-            MatrixCoefficients::BT709 => "bt709",
-            MatrixCoefficients::BT470M => "fcc",
-            MatrixCoefficients::BT470BG => "bt470bg",
-            MatrixCoefficients::ST170M => "smpte170m",
-            MatrixCoefficients::ST240M => "smpte240m",
-            MatrixCoefficients::YCgCo => "YCgCo",
-            MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
-            MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
-            MatrixCoefficients::ST2085 => "smpte2085",
-            MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
-            MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
-            MatrixCoefficients::ICtCp => "ICtCp",
-            MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
-            _ => unimplemented!("Matrix coefficients not implemented for x264"),
-        },
-        match colorimetry.transfer {
-            TransferCharacteristic::BT1886 => "bt709",
-            TransferCharacteristic::BT470M => "bt470m",
-            TransferCharacteristic::BT470BG => "bt470bg",
-            TransferCharacteristic::ST170M => "smpte170m",
-            TransferCharacteristic::ST240M => "smpte240m",
-            TransferCharacteristic::Linear => "linear",
-            TransferCharacteristic::Logarithmic100 => "log100",
-            TransferCharacteristic::Logarithmic316 => "log316",
-            TransferCharacteristic::XVYCC => "iec61966-2-4",
-            TransferCharacteristic::BT1361E => "bt1361e",
-            TransferCharacteristic::SRGB => "iec61966-2-1",
-            TransferCharacteristic::BT2020Ten => "bt2020-10",
-            TransferCharacteristic::BT2020Twelve => "bt2020-12",
-            TransferCharacteristic::PerceptualQuantizer => "smpte2084",
-            TransferCharacteristic::ST428 => "smpte428",
-            TransferCharacteristic::HybridLogGamma => "arib-std-b67",
-            TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
-            _ => unimplemented!("Transfer characteristics not implemented for x264"),
-        },
-        match colorimetry.range {
-            YUVRange::Limited => "tv",
-            YUVRange::Full => "pc",
-        },
-        match colorimetry.chroma_location {
-            ChromaLocation::Left => " --chromaloc 0",
-            ChromaLocation::Center => " --chromaloc 1",
-            ChromaLocation::TopLeft => " --chromaloc 2",
-            ChromaLocation::Top => " --chromaloc 3",
-            ChromaLocation::BottomLeft => " --chromaloc 4",
-            ChromaLocation::Bottom => " --chromaloc 5",
-            _ => "",
-        },
-        dimensions.bit_depth,
-        if compat {
-            "--level 4.1 --vbv-maxrate 50000 --vbv-bufsize 78125"
-        } else {
-            ""
-        },
-        match dimensions.pixel_format {
-            PixelFormat::Yuv422 => {
-                "--profile high422 --output-csp i422"
-            }
-            PixelFormat::Yuv444 => {
-                "--profile high444 --output-csp i444"
-            }
-            _ => "",
-        },
+        " --crf {crf} --preset {preset} --bframes {bframes} --psy-rd {psy_rd} --deblock {deblock} \
+         --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i 1 \
+         -I infinite --no-scenecut --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 --no-fast-pskip \
+         --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
+         --range {range} {csp} --output-depth {depth} {vbv} {level} --threads {threads} "
     )
 }
 
