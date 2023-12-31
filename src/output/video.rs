@@ -650,10 +650,9 @@ fn build_svtav1_args_string(
     format!(
         " --input-depth {} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
          --tile-rows {} --tile-columns {} --rc 0 --bias-pct 100 --maxsection-pct 10000 \
-         --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --enable-overlays 1 --tune 0 \
-         --enable-tf 0 --scd 0 --keyint -1 --lp {} --pin 0 --color-primaries {} \
-         --matrix-coefficients {} --transfer-characteristics {} --color-range {} \
-         --chroma-sample-position {} ",
+         --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune 2 --enable-tf 0 --scd 0 \
+         --keyint -1 --lp {} --pin 0 --color-primaries {} --matrix-coefficients {} \
+         --transfer-characteristics {} --color-range {} --chroma-sample-position {} ",
         dimensions.bit_depth,
         i32::from(dimensions.width >= 2000),
         i32::from(
