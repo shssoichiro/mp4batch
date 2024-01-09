@@ -319,7 +319,6 @@ pub fn convert_video_av1an(
             (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
         })
         .arg("-r")
-        .arg("--verbose")
         .arg("-o")
         .arg(absolute_path(output).expect("Unable to get absolute path"));
     if let Some(force_keyframes) = force_keyframes {
