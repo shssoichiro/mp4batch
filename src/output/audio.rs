@@ -73,6 +73,7 @@ pub fn convert_audio(
 ) -> Result<()> {
     if output.exists() {
         // TODO: Verify the audio output is complete
+        eprintln!("Audio output already exists, reusing");
         return Ok(());
     }
 

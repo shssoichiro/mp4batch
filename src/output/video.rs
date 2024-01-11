@@ -234,6 +234,7 @@ pub fn convert_video_av1an(
     }
 
     if output.exists() && get_video_frame_count(output)? == dimensions.frames {
+        eprintln!("Video output already exists, reusing");
         return Ok(());
     }
 
