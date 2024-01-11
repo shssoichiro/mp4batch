@@ -361,6 +361,76 @@ pub fn convert_video_av1an(
     }
 }
 
+pub fn convert_video_x264(
+    vpy_input: &Path,
+    output: &Path,
+    crf: i16,
+    profile: Profile,
+    compat: bool,
+    dimensions: VideoDimensions,
+    colorimetry: &Colorimetry,
+) -> Result<()> {
+    if dimensions.width % 8 != 0 {
+        eprintln!(
+            "{} {} {} {}",
+            Yellow.bold().paint("[Warning]"),
+            Yellow.paint("Width"),
+            Yellow.paint(dimensions.width.to_string()),
+            Yellow.paint("is not divisble by 8")
+        );
+    }
+    if dimensions.height % 8 != 0 {
+        eprintln!(
+            "{} {} {} {}",
+            Yellow.bold().paint("[Warning]"),
+            Yellow.paint("Height"),
+            Yellow.paint(dimensions.height.to_string()),
+            Yellow.paint("is not divisble by 8")
+        );
+    }
+
+    if output.exists() && get_video_frame_count(output)? == dimensions.frames {
+        eprintln!("Video output already exists, reusing");
+        return Ok(());
+    }
+
+    let pipe = Command::new("vspipe")
+        .arg("-c")
+        .arg("y4m")
+        .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
+        .arg("-")
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Unable to run vspipe, is it installed and in PATH?");
+
+    let mut command = Command::new("nice");
+    command.arg("x264");
+    for arg in build_x264_args_string(crf, dimensions, profile, compat, colorimetry)
+        .split_ascii_whitespace()
+    {
+        command.arg(arg);
+    }
+    command
+        .arg("-o")
+        .arg(absolute_path(output).expect("Unable to get absolute path"))
+        .arg("-");
+    command
+        .stdin(pipe.stdout.expect("stdout should be writeable"))
+        .stderr(Stdio::inherit());
+    let status = command
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Failed to execute av1an: Exited with code {:x}",
+            status.code().unwrap_or(-1)
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoEncoder {
     Copy,
@@ -447,14 +517,7 @@ impl VideoEncoder {
                 crf,
                 profile,
                 compat,
-            } => build_x264_args_string(
-                crf,
-                dimensions,
-                profile,
-                compat,
-                colorimetry,
-                computed_threads,
-            ),
+            } => build_x264_args_string(crf, dimensions, profile, compat, colorimetry),
             VideoEncoder::X265 {
                 crf,
                 profile,
@@ -813,7 +876,6 @@ fn build_x264_args_string(
     profile: Profile,
     compat: bool,
     colorimetry: &Colorimetry,
-    threads: NonZeroUsize,
 ) -> String {
     let preset = if profile == Profile::Fast {
         "faster"
@@ -935,7 +997,7 @@ fn build_x264_args_string(
          --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i 1 \
          -I infinite --no-scenecut --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 --no-fast-pskip \
          --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
-         --range {range} {csp} --output-depth {depth} {vbv} {level} --threads {threads} "
+         --range {range} {csp} --output-depth {depth} {vbv} {level} "
     )
 }
 

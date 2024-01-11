@@ -244,6 +244,7 @@ fn check_for_required_apps() -> Result<()> {
     which("mkvmerge").map_err(|_| anyhow!("mkvmerge not installed or not in PATH!"))?;
     which("vspipe").map_err(|_| anyhow!("vspipe not installed or not in PATH!"))?;
     which("ffmpeg").map_err(|_| anyhow!("ffmpeg not installed or not in PATH!"))?;
+    which("x264").map_err(|_| anyhow!("x264 not installed or not in PATH!"))?;
 
     Ok(())
 }
@@ -366,6 +367,23 @@ fn process_file(
         match output.video.encoder {
             VideoEncoder::Copy => {
                 extract_video(&source_video, &video_out)?;
+            }
+            VideoEncoder::X264 {
+                crf,
+                profile,
+                compat,
+            } => {
+                build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
+                let dimensions = get_video_dimensions(&output_vpy)?;
+                convert_video_x264(
+                    &output_vpy,
+                    &video_out,
+                    crf,
+                    profile,
+                    compat,
+                    dimensions,
+                    &colorimetry,
+                )?;
             }
             encoder => {
                 build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
