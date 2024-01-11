@@ -877,6 +877,17 @@ fn build_x264_args_string(
     compat: bool,
     colorimetry: &Colorimetry,
 ) -> String {
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    let min_keyint = if profile == Profile::Anime {
+        fps / 2
+    } else {
+        fps
+    };
+    let max_keyint = if profile == Profile::Anime {
+        fps * 15
+    } else {
+        fps * 10
+    };
     let preset = if profile == Profile::Fast {
         "faster"
     } else {
@@ -994,10 +1005,10 @@ fn build_x264_args_string(
     };
     format!(
         " --crf {crf} --preset {preset} --bframes {bframes} --psy-rd {psy_rd} --deblock {deblock} \
-         --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i 1 \
-         -I infinite --no-scenecut --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 --no-fast-pskip \
-         --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
-         --range {range} {csp} --output-depth {depth} {vbv} {level} "
+         --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i \
+         {min_keyint} -I {max_keyint} --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 \
+         --no-fast-pskip --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer \
+         {transfer} --range {range} {csp} --output-depth {depth} {vbv} {level} "
     )
 }
 
