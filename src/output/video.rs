@@ -233,7 +233,7 @@ pub fn convert_video_av1an(
         );
     }
 
-    if output.exists() && get_video_frame_count(output)? == dimensions.frames {
+    if output.exists() && get_video_frame_count(output).unwrap_or(0) == dimensions.frames {
         eprintln!("Video output already exists, reusing");
         return Ok(());
     }
@@ -389,7 +389,7 @@ pub fn convert_video_x264(
         );
     }
 
-    if output.exists() && get_video_frame_count(output)? == dimensions.frames {
+    if output.exists() && get_video_frame_count(output).unwrap_or(0) == dimensions.frames {
         eprintln!("Video output already exists, reusing");
         return Ok(());
     }
@@ -410,9 +410,9 @@ pub fn convert_video_x264(
         .arg("y4m")
         .arg("--frames")
         .arg(dimensions.frames.to_string());
-    for arg in build_x264_args_string(crf, dimensions, profile, compat, colorimetry)
-        .split_ascii_whitespace()
-    {
+    let args = build_x264_args_string(crf, dimensions, profile, compat, colorimetry);
+    eprintln!("x264 args: {args}");
+    for arg in args.split_ascii_whitespace() {
         command.arg(arg);
     }
     command
@@ -422,7 +422,6 @@ pub fn convert_video_x264(
     command
         .stdin(pipe.stdout.expect("stdout should be writeable"))
         .stderr(Stdio::inherit());
-    dbg!(&command);
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
