@@ -422,6 +422,7 @@ pub fn convert_video_x264(
     command
         .stdin(pipe.stdout.expect("stdout should be writeable"))
         .stderr(Stdio::inherit());
+    dbg!(&command);
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
