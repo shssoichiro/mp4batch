@@ -404,7 +404,12 @@ pub fn convert_video_x264(
         .expect("Unable to run vspipe, is it installed and in PATH?");
 
     let mut command = Command::new("nice");
-    command.arg("x264");
+    command
+        .arg("x264")
+        .arg("--demuxer")
+        .arg("y4m")
+        .arg("--frames")
+        .arg(dimensions.frames.to_string());
     for arg in build_x264_args_string(crf, dimensions, profile, compat, colorimetry)
         .split_ascii_whitespace()
     {
