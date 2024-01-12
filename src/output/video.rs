@@ -344,7 +344,7 @@ pub fn convert_video_av1an(
                 .arg("--chroma-noise");
         }
     }
-    if let VideoEncoder::X265 { .. } = encoder {
+    if let VideoEncoder::X265 { .. } | VideoEncoder::X264 { .. } = encoder {
         command.arg("--concat").arg("mkvmerge");
     }
     let status = command
