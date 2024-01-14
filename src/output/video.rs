@@ -736,11 +736,11 @@ fn build_svtav1_args_string(
     };
     format!(
         " --input-depth {depth} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
-         --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --bias-pct 100 \
-         --maxsection-pct 10000 --enable-qm 1 --qm-min 0 --qm-max 8 --irefresh-type 1 --tune 0 \
-         --enable-tf 0 --scd 0 --keyint -1 --lp {threads} --pin 0 --color-primaries {prim} \
-         --matrix-coefficients {matrix} --transfer-characteristics {transfer} --color-range \
-         {range} --chroma-sample-position {csp} "
+         --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --enable-qm 1 --qm-min 0 \
+         --qm-max 8 --irefresh-type 1 --tune 0 --enable-tf 0 --scd 0 --keyint -1 --lp {threads} \
+         --pin 0 --color-primaries {prim} --matrix-coefficients {matrix} \
+         --transfer-characteristics {transfer} --color-range {range} --chroma-sample-position \
+         {csp} "
     )
 }
 
