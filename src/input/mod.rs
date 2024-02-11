@@ -312,3 +312,16 @@ pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
         },
     })
 }
+
+pub fn get_audio_delay_ms(input: &Path, track: usize) -> Result<i32> {
+    let command = Command::new("mediainfo")
+        .arg("--Output=Audio;%Delay%\n")
+        .arg(input)
+        .output()?;
+    let output = String::from_utf8_lossy(&command.stdout);
+    Ok(output
+        .lines()
+        .nth(track)
+        .unwrap_or_else(|| panic!("Expected {} tracks, did not find enough", track + 1))
+        .parse::<i32>()?)
+}
