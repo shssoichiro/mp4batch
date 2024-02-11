@@ -11,7 +11,7 @@ use ansi_term::Colour::Yellow;
 use anyhow::Result;
 
 pub use self::{audio::*, video::*};
-use crate::parse::Track;
+use crate::cli::Track;
 
 #[derive(Debug, Clone, Default)]
 pub struct Output {

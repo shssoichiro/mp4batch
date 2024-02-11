@@ -8,8 +8,8 @@ use ansi_term::Colour::Green;
 use anyhow::Result;
 
 use crate::{
+    cli::{Track, TrackSource},
     find_source_file,
-    parse::{Track, TrackSource},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

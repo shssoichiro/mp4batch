@@ -1,8 +1,8 @@
 use dotenvy_macro::dotenv;
 
+mod cli;
 mod input;
 mod output;
-mod parse;
 
 use std::{
     env,
@@ -24,7 +24,7 @@ use walkdir::WalkDir;
 use which::which;
 
 use self::{input::*, output::*};
-use crate::parse::{parse_filters, ParsedFilter, Track, TrackSource};
+use crate::cli::{parse_filters, ParsedFilter, Track, TrackSource};
 
 #[derive(Parser, Debug)]
 struct InputArgs {
