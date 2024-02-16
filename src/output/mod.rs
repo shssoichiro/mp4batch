@@ -125,7 +125,7 @@ pub fn mux_video(
         }
         command.arg("--track-order").arg(track_order.join(","));
 
-        let status = command.arg(output).status()?;
+        let status = command.status()?;
         if status.success() {
             Ok(())
         } else {
