@@ -125,9 +125,12 @@ pub fn mux_video(
         }
         command.arg("--track-order").arg(track_order.join(","));
 
-        command.status()?;
-        // For some reason mkvmerge gives a non-zero return code even on success
-        Ok(())
+        let status = command.status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            anyhow::bail!("Failed to mux video");
+        }
     } else {
         let mut command = Command::new("ffmpeg");
         command
