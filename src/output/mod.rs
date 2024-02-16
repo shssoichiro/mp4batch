@@ -51,8 +51,6 @@ pub fn mux_video(
         let mut inputs_read = 1;
         let mut command = Command::new("mkvmerge");
         command
-            .arg("--ui-language")
-            .arg("en")
             .arg("--output")
             .arg(output)
             .arg("--no-audio")
