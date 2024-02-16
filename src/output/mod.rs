@@ -51,8 +51,6 @@ pub fn mux_video(
         let mut inputs_read = 1;
         let mut command = Command::new("mkvmerge");
         command
-            .arg("--ui-language")
-            .arg("en")
             .arg("--output")
             .arg(output)
             .arg("--no-audio")
@@ -79,8 +77,8 @@ pub fn mux_video(
 
                 command
                     .arg("--audio-tracks")
-                    .arg("1")
-                    .arg("--no-audio")
+                    .arg("0")
+                    .arg("--no-video")
                     .arg("--no-subtitles")
                     .arg("--no-attachments")
                     .arg("--no-chapters");
@@ -104,6 +102,9 @@ pub fn mux_video(
         if !subtitles.is_empty() {
             for subtitle in subtitles {
                 command
+                    .arg("--no-video")
+                    .arg("--no-audio")
+                    .arg("--no-attachments")
                     .arg("--language")
                     .arg("0:en")
                     .arg("--sub-charset")
@@ -124,7 +125,7 @@ pub fn mux_video(
         }
         command.arg("--track-order").arg(track_order.join(","));
 
-        let status = command.arg(output).status()?;
+        let status = command.status()?;
         if status.success() {
             Ok(())
         } else {
