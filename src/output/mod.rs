@@ -102,6 +102,9 @@ pub fn mux_video(
         if !subtitles.is_empty() {
             for subtitle in subtitles {
                 command
+                    .arg("--no-video")
+                    .arg("--no-audio")
+                    .arg("--no-attachments")
                     .arg("--language")
                     .arg("0:en")
                     .arg("--sub-charset")
