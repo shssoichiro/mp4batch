@@ -124,6 +124,7 @@ pub fn mux_video(
             todo!("copy fonts not currently implemented for mkv");
         }
         command.arg("--track-order").arg(track_order.join(","));
+        dbg!(&command);
 
         let status = command.status()?;
         if status.success() {
