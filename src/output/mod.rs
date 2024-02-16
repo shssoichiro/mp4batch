@@ -78,7 +78,7 @@ pub fn mux_video(
                 command
                     .arg("--audio-tracks")
                     .arg("1")
-                    .arg("--no-audio")
+                    .arg("--no-video")
                     .arg("--no-subtitles")
                     .arg("--no-attachments")
                     .arg("--no-chapters");
