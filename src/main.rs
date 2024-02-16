@@ -434,7 +434,7 @@ fn process_file(
                 output.audio.kbps_per_channel,
                 output.audio.normalize,
             )?;
-            audio_outputs.push((audio_out, audio_track.enabled, audio_track.forced));
+            audio_outputs.push((audio_out, audio_track.clone()));
             audio_suffixes.push(audio_suffix);
         }
         let audio_suffix = audio_suffixes.join("-");

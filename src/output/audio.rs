@@ -10,7 +10,6 @@ use anyhow::Result;
 use crate::{
     cli::{Track, TrackSource},
     find_source_file,
-    get_audio_delay_ms,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,17 +157,6 @@ pub fn convert_audio(
         });
     }
 
-    let audio_delay = get_audio_delay_ms(
-        &match audio_track.source {
-            TrackSource::FromVideo(_) => find_source_file(input),
-            TrackSource::External(ref path) => path.clone(),
-        },
-        match audio_track.source {
-            TrackSource::FromVideo(id) => id as usize,
-            TrackSource::External(_) => 0,
-        },
-    )?;
-
     let mut command = Command::new("ffmpeg");
     command
         .arg("-hide_banner")
@@ -196,16 +184,6 @@ pub fn convert_audio(
              print_format=summary",
             params.integrated, params.true_peak, params.lra, params.threshold, params.offset
         ));
-    }
-    #[allow(clippy::comparison_chain)]
-    if audio_delay > 0 {
-        command
-            .arg("-af")
-            .arg(&format!("adelay=delays={}:all=1", audio_delay));
-    } else if audio_delay < 0 {
-        command
-            .arg("-af")
-            .arg(&format!("atrim=start={}", -audio_delay as f32 / 1000.));
     }
     match audio_codec {
         AudioEncoder::Copy => {
