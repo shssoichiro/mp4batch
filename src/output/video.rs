@@ -1013,7 +1013,8 @@ fn build_x264_args_string(
          --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i \
          {min_keyint} -I {max_keyint} --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 \
          --no-fast-pskip --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer \
-         {transfer} --range {range} {csp} --output-depth {depth} {vbv} {level} "
+         {transfer} --input-range {range} --range {range} {csp} --output-depth {depth} {vbv} \
+         {level} "
     )
 }
 
