@@ -28,7 +28,7 @@ pub struct Output {
 pub fn mux_video(
     input: &Path,
     video: &Path,
-    audios: &[(PathBuf, Track)],
+    audios: &[(PathBuf, Track, AudioEncoder)],
     subtitles: &[(PathBuf, bool, bool)],
     copy_fonts: bool,
     output: &Path,
@@ -64,16 +64,22 @@ pub fn mux_video(
             .arg(")");
         if !audios.is_empty() {
             for audio in audios {
-                let audio_delay = get_audio_delay_ms(
-                    &match audio.1.source {
-                        TrackSource::FromVideo(_) => find_source_file(input),
-                        TrackSource::External(ref path) => path.clone(),
-                    },
-                    match audio.1.source {
-                        TrackSource::FromVideo(id) => id as usize,
-                        TrackSource::External(_) => 0,
-                    },
-                )?;
+                let audio_delay = if audio.2 == AudioEncoder::Copy {
+                    // If we're copying, mkvtoolnix copies the sync automatically.
+                    0
+                } else {
+                    // If we're reencoding the audio, then we need to manually apply the sync.
+                    get_audio_delay_ms(
+                        &match audio.1.source {
+                            TrackSource::FromVideo(_) => find_source_file(input),
+                            TrackSource::External(ref path) => path.clone(),
+                        },
+                        match audio.1.source {
+                            TrackSource::FromVideo(id) => id as usize,
+                            TrackSource::External(_) => 0,
+                        },
+                    )?
+                };
 
                 command
                     .arg("--audio-tracks")
