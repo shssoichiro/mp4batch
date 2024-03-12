@@ -31,7 +31,7 @@ pub fn build_svtav1_args_string(
     format!(
         " --input-depth {depth} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
          --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --enable-qm 1 --qm-min 0 \
-         --qm-max 8 --irefresh-type 1 --tune 2 --enable-tf 0 --scd 0 --keyint -1 --lp {threads} \
+         --qm-max 8 --tune 2 --enable-tf 0 --scd 0 --keyint -1 --lp {threads} \
          --pin 0 --color-primaries {prim} --matrix-coefficients {matrix} \
          --transfer-characteristics {transfer} --color-range {range} --chroma-sample-position \
          {csp} "
