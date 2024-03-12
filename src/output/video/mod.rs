@@ -15,10 +15,8 @@ use crate::{
     absolute_path,
     input::{get_video_frame_count, Colorimetry, PixelFormat, VideoDimensions},
     output::video::{
-        aom::build_aom_args_string,
-        rav1e::build_rav1e_args_string,
-        svt_av1::build_svtav1_args_string,
-        x264::build_x264_args_string,
+        aom::build_aom_args_string, rav1e::build_rav1e_args_string,
+        svt_av1::build_svtav1_args_string, x264::build_x264_args_string,
         x265::build_x265_args_string,
     },
 };
@@ -82,11 +80,15 @@ impl FromStr for Profile {
 
 impl Display for Profile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "{}", match self {
-            Profile::Film => "film",
-            Profile::Anime => "anime",
-            Profile::Fast => "fast",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Profile::Film => "film",
+                Profile::Anime => "anime",
+                Profile::Fast => "fast",
+            }
+        )
     }
 }
 

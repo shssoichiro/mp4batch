@@ -1,11 +1,7 @@
 use std::num::NonZeroUsize;
 
 use av_data::pixel::{
-    ChromaLocation,
-    ColorPrimaries,
-    MatrixCoefficients,
-    TransferCharacteristic,
-    YUVRange,
+    ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
 };
 
 use crate::{

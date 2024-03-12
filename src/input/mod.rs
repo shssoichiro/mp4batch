@@ -9,11 +9,7 @@ use std::{
 
 use anyhow::Result;
 use av_data::pixel::{
-    ChromaLocation,
-    ColorPrimaries,
-    FromPrimitive,
-    MatrixCoefficients,
-    TransferCharacteristic,
+    ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
     YUVRange,
 };
 use itertools::Itertools;

@@ -13,8 +13,7 @@ use anyhow::Result;
 pub use self::{audio::*, video::*};
 use crate::{
     cli::{Track, TrackSource},
-    find_source_file,
-    get_audio_delay_ms,
+    find_source_file, get_audio_delay_ms,
 };
 
 #[derive(Debug, Clone, Default)]

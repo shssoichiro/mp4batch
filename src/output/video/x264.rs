@@ -5,11 +5,7 @@ use std::{
 
 use ansi_term::Color::Yellow;
 use av_data::pixel::{
-    ChromaLocation,
-    ColorPrimaries,
-    MatrixCoefficients,
-    TransferCharacteristic,
-    YUVRange,
+    ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
 };
 
 use crate::{
