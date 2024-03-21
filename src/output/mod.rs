@@ -1,6 +1,3 @@
-mod audio;
-mod video;
-
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
@@ -10,11 +7,15 @@ use std::{
 use ansi_term::Colour::Yellow;
 use anyhow::Result;
 
-pub use self::{audio::*, video::*};
 use crate::{
     cli::{Track, TrackSource},
     find_source_file, get_audio_delay_ms,
 };
+
+pub use self::{audio::*, video::*};
+
+mod audio;
+mod video;
 
 #[derive(Debug, Clone, Default)]
 pub struct Output {
@@ -30,6 +31,7 @@ pub fn mux_video(
     audios: &[(PathBuf, Track, AudioEncoder)],
     subtitles: &[(PathBuf, bool, bool)],
     copy_fonts: bool,
+    ignore_delay: bool,
     output: &Path,
 ) -> Result<()> {
     let mut extension = output
@@ -63,7 +65,7 @@ pub fn mux_video(
             .arg(")");
         if !audios.is_empty() {
             for audio in audios {
-                let audio_delay = if audio.2 == AudioEncoder::Copy {
+                let audio_delay = if ignore_delay || audio.2 == AudioEncoder::Copy {
                     // If we're copying, mkvtoolnix copies the sync automatically.
                     0
                 } else {

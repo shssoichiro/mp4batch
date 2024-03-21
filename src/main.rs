@@ -1,14 +1,8 @@
-use dotenvy_macro::dotenv;
-
-mod cli;
-mod input;
-mod output;
-
 use std::{
     env,
     fmt::Write as FmtWrite,
     fs,
-    fs::{read_to_string, File},
+    fs::{File, read_to_string},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
 };
@@ -16,6 +10,7 @@ use std::{
 use ansi_term::Colour::{Blue, Green, Red};
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use dotenvy_macro::dotenv;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
 use path_clean::PathClean;
@@ -23,8 +18,13 @@ use size::Size;
 use walkdir::WalkDir;
 use which::which;
 
-use self::{input::*, output::*};
 use crate::cli::{parse_filters, ParsedFilter, Track, TrackSource};
+
+use self::{input::*, output::*};
+
+mod cli;
+mod input;
+mod output;
 
 #[derive(Parser, Debug)]
 struct InputArgs {
@@ -95,6 +95,10 @@ struct InputArgs {
     /// Do not verify the length of the video after encoding
     #[clap(long)]
     pub no_verify: bool,
+
+    /// Do not copy audio delay to the output
+    #[clap(long)]
+    pub no_delay: bool,
 }
 
 fn main() {
@@ -221,6 +225,7 @@ fn main() {
             args.skip_lossless,
             &args.force_keyframes,
             !args.no_verify,
+            args.no_delay
         );
         if let Err(err) = result {
             eprintln!(
@@ -260,6 +265,7 @@ fn process_file(
     mut skip_lossless: bool,
     force_keyframes: &Option<String>,
     verify_frame_count: bool,
+    ignore_delay: bool,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -483,6 +489,7 @@ fn process_file(
                 .sub_tracks
                 .iter()
                 .any(|track| matches!(track.source, TrackSource::FromVideo(_))),
+            ignore_delay,
             &output_path,
         )?;
 
