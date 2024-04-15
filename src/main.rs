@@ -2,7 +2,7 @@ use std::{
     env,
     fmt::Write as FmtWrite,
     fs,
-    fs::{File, read_to_string},
+    fs::{read_to_string, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
 };
@@ -225,7 +225,7 @@ fn main() {
             args.skip_lossless,
             &args.force_keyframes,
             !args.no_verify,
-            args.no_delay
+            args.no_delay,
         );
         if let Err(err) = result {
             eprintln!(
