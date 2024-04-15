@@ -1,7 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt,
-    fmt::Display,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -25,7 +23,6 @@ pub struct VideoDimensions {
     // fps in num/den format
     pub fps: (u32, u32),
     pub pixel_format: PixelFormat,
-    pub colorspace: ColorSpace,
     pub bit_depth: u8,
 }
 
@@ -54,31 +51,6 @@ impl PixelFormat {
             return PixelFormat::Yuv444;
         }
         unimplemented!()
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColorSpace {
-    Bt709,
-    Smpte170m,
-}
-
-impl Display for ColorSpace {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> ::std::result::Result<(), fmt::Error> {
-        match *self {
-            ColorSpace::Bt709 => write!(f, "bt709"),
-            ColorSpace::Smpte170m => write!(f, "smpte170m"),
-        }
-    }
-}
-
-impl ColorSpace {
-    fn from_dimensions(_width: u32, height: u32) -> Self {
-        if height >= 576 {
-            ColorSpace::Bt709
-        } else {
-            ColorSpace::Smpte170m
-        }
     }
 }
 
@@ -126,7 +98,6 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
         fps,
         frames: 0,
         pixel_format: PixelFormat::Yuv420,
-        colorspace: ColorSpace::Bt709,
         bit_depth,
     })
 }
@@ -181,7 +152,6 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         frames: lines[2].replace("Frames: ", "").trim().parse()?,
         fps: (fps[0].clone()?, fps[1].clone()?),
         pixel_format: PixelFormat::from_vapoursynth_format(&lines[4].replace("Format Name: ", "")),
-        colorspace: ColorSpace::from_dimensions(width, height),
         bit_depth,
     })
 }
