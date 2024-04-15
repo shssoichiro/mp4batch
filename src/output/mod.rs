@@ -128,7 +128,7 @@ pub fn mux_video(
             }
         }
         if copy_fonts {
-            todo!("copy fonts not currently implemented for mkv");
+            eprintln!("WARNING: copy fonts not currently implemented for mkv");
         }
         command.arg("--track-order").arg(track_order.join(","));
 
