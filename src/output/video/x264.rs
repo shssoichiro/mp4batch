@@ -1,6 +1,10 @@
 use std::{
+    env::temp_dir,
+    fs::File,
+    io::Write,
     path::Path,
     process::{Command, Stdio},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use ansi_term::Color::Yellow;
@@ -14,6 +18,7 @@ use crate::{
     output::Profile,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn convert_video_x264(
     vpy_input: &Path,
     output: &Path,
@@ -21,6 +26,7 @@ pub fn convert_video_x264(
     profile: Profile,
     compat: bool,
     dimensions: VideoDimensions,
+    force_keyframes: &Option<String>,
     colorimetry: &Colorimetry,
 ) -> anyhow::Result<()> {
     if dimensions.width % 8 != 0 {
@@ -63,7 +69,14 @@ pub fn convert_video_x264(
         .arg("y4m")
         .arg("--frames")
         .arg(dimensions.frames.to_string());
-    let args = build_x264_args_string(crf, dimensions, profile, compat, colorimetry);
+    let args = build_x264_args_string(
+        crf,
+        dimensions,
+        profile,
+        compat,
+        force_keyframes,
+        colorimetry,
+    )?;
     eprintln!("x264 args: {args}");
     for arg in args.split_ascii_whitespace() {
         command.arg(arg);
@@ -83,7 +96,7 @@ pub fn convert_video_x264(
         Ok(())
     } else {
         Err(anyhow::anyhow!(
-            "Failed to execute av1an: Exited with code {:x}",
+            "Failed to execute x264: Exited with code {:x}",
             status.code().unwrap_or(-1)
         ))
     }
@@ -94,8 +107,9 @@ pub fn build_x264_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     compat: bool,
+    force_keyframes: &Option<String>,
     colorimetry: &Colorimetry,
-) -> String {
+) -> anyhow::Result<String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     let min_keyint = if profile == Profile::Anime {
         fps / 2
@@ -222,12 +236,29 @@ pub fn build_x264_args_string(
         PixelFormat::Yuv444 => "--profile high444 --output-csp i444",
         _ => "",
     };
-    format!(
+    let qpfile = if let Some(list) = force_keyframes {
+        let path = temp_dir().join(format!(
+            "x264-qp-{}.txt",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("System time is broken")
+                .as_millis()
+        ));
+        let mut file = File::create(&path)?;
+        for kf in list.split(',') {
+            file.write_all(format!("{} I -1", kf).as_bytes())?;
+        }
+        file.flush()?;
+        format!("--qpfile {}", path.to_string_lossy())
+    } else {
+        String::new()
+    };
+    Ok(format!(
         " --crf {crf} --preset {preset} --bframes {bframes} --psy-rd {psy_rd} --deblock {deblock} \
          --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i \
          {min_keyint} -I {max_keyint} --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 \
          --no-fast-pskip --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer \
          {transfer} --input-range {range} --range {range} {csp} --output-depth {depth} {vbv} \
-         {level} "
-    )
+         {level} {qpfile} "
+    ))
 }

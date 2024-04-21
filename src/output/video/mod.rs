@@ -283,7 +283,14 @@ pub fn convert_video_av1an(
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
-        .arg(&encoder.get_args_string(dimensions, colorimetry, threads_per_worker, cores, workers))
+        .arg(&encoder.get_args_string(
+            dimensions,
+            colorimetry,
+            threads_per_worker,
+            cores,
+            workers,
+            force_keyframes,
+        )?)
         .arg("--sc-method")
         .arg("standard")
         .arg("-x")
@@ -426,8 +433,9 @@ impl VideoEncoder {
         computed_threads: NonZeroUsize,
         cores: NonZeroUsize,
         workers: NonZeroUsize,
-    ) -> String {
-        match self {
+        force_keyframes: &Option<String>,
+    ) -> anyhow::Result<String> {
+        Ok(match self {
             VideoEncoder::Aom {
                 crf,
                 speed,
@@ -455,7 +463,14 @@ impl VideoEncoder {
                 crf,
                 profile,
                 compat,
-            } => build_x264_args_string(crf, dimensions, profile, compat, colorimetry),
+            } => build_x264_args_string(
+                crf,
+                dimensions,
+                profile,
+                compat,
+                force_keyframes,
+                colorimetry,
+            )?,
             VideoEncoder::X265 {
                 crf,
                 profile,
@@ -470,7 +485,7 @@ impl VideoEncoder {
                 computed_threads,
             ),
             VideoEncoder::Copy => unreachable!(),
-        }
+        })
     }
 
     pub const fn uses_av1an_thread_pinning(self) -> bool {

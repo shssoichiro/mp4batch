@@ -388,6 +388,7 @@ fn process_file(
                     profile,
                     compat,
                     dimensions,
+                    force_keyframes,
                     &colorimetry,
                 )?;
             }
