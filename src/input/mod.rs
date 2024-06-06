@@ -70,25 +70,25 @@ fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
     let mediainfo = get_video_mediainfo(input)?;
 
     let width = mediainfo
-        .get(&"Width".to_string())
+        .get("Width")
         .expect("Width should be specified in ffprobe output")
         .replace(' ', "")
         .parse()?;
     let height = mediainfo
-        .get(&"Height".to_string())
+        .get("Height")
         .expect("Height should be specified in ffprobe output")
         .replace(' ', "")
         .parse()?;
     let fps = (
         mediainfo
-            .get(&"Frame rate".to_string())
+            .get("Frame rate")
             .expect("Frame rate should be specified in ffprobe output")
             .parse::<f32>()?
             .round() as u32,
         1,
     );
     let bit_depth = mediainfo
-        .get(&"Bit depth".to_string())
+        .get("Bit depth")
         .expect("Bit depth should be specified in ffprobe output")
         .parse()?;
 

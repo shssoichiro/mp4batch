@@ -11,7 +11,7 @@ anyhow = "1.0"
 av-data = "0.4.1"
 clap = { version = "4.0.8", features = ["derive"] }
 dotenvy_macro = "0.15"
-itertools = "0.12"
+itertools = "0.13"
 lexical-sort = "0.3"
 nom = "7.1.0"
 once_cell = "1.14.0"

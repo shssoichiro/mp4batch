@@ -648,13 +648,13 @@ fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
             output.audio.kbps_per_channel = arg;
         }
         ParsedFilter::AudioTracks(args) => {
-            output.audio_tracks = args.clone();
+            output.audio_tracks.clone_from(args);
         }
         ParsedFilter::AudioNormalize => {
             output.audio.normalize = true;
         }
         ParsedFilter::SubtitleTracks(args) => {
-            output.sub_tracks = args.clone();
+            output.sub_tracks.clone_from(args);
         }
     }
 }
