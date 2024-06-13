@@ -70,6 +70,8 @@ pub fn mux_video(
                     0
                 } else {
                     // If we're reencoding the audio, then we need to manually apply the sync.
+                    // Note that mediainfo can give unparseable and wrong results for some formats
+                    // like PCM, so we just assume 0 for those.
                     get_audio_delay_ms(
                         &match audio.1.source {
                             TrackSource::FromVideo(_) => find_source_file(input),
@@ -79,7 +81,8 @@ pub fn mux_video(
                             TrackSource::FromVideo(id) => id as usize,
                             TrackSource::External(_) => 0,
                         },
-                    )?
+                    )
+                    .unwrap_or(0)
                 };
 
                 command
