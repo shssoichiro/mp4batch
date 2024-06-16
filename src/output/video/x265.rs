@@ -26,12 +26,17 @@ pub fn build_x265_args_string(
         Profile::Anime | Profile::AnimeDetailed | Profile::AnimeGrain => 8,
         Profile::Fast => 3,
     };
+    let refframes = match profile {
+        Profile::Film | Profile::Grain | Profile::AnimeGrain => 4,
+        Profile::Anime | Profile::AnimeDetailed => 6,
+        Profile::Fast => 3,
+    };
     let sao = if crf >= 22 {
         "--sao"
     } else if crf >= 17 {
         "--limit-sao"
     } else {
-        "--no-sao"
+        "--no-sao --no-strong-intra-smoothing"
     };
     let psy_rd = match profile {
         Profile::Anime | Profile::Fast => "1.0",
@@ -129,13 +134,11 @@ pub fn build_x265_args_string(
         ""
     };
     format!(
-        " --crf {crf} --preset slow --bframes {bframes} --keyint -1 --min-keyint 1 --no-scenecut \
-         {sao} --deblock {deblock}:{deblock} --psy-rd {psy_rd} --psy-rdoq {psy_rdo} --qcomp 0.65 \
+        " --crf {crf} --preset slow --bframes {bframes} --ref {refframes} --keyint -1 --min-keyint 1 \
+          --no-scenecut {sao} --deblock {deblock}:{deblock} --psy-rd {psy_rd} --psy-rdoq {psy_rdo} --qcomp 0.65 \
          --aq-mode 3 --aq-strength {aq_str} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} \
-         --no-open-gop --no-cutree --rc-lookahead 60 --lookahead-slices 1 --lookahead-threads \
-         {threads} --weightb --b-intra --tu-intra-depth 2 --tu-inter-depth 2 --limit-tu 1 \
-         --no-limit-modes --no-strong-intra-smoothing --limit-refs 1 --colorprim {prim} \
-         --colormatrix {matrix} --transfer {transfer} --range {range} {csp} --output-depth \
-         {depth} --frame-threads {threads} --y4m {level} {hdr} "
+         --no-open-gop --no-cutree --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
+         --range {range} {csp} --output-depth {depth} --frame-threads {threads} --lookahead-threads {threads} \
+         --y4m {level} {hdr} "
     )
 }
