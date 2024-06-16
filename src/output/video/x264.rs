@@ -111,12 +111,8 @@ pub fn build_x264_args_string(
     colorimetry: &Colorimetry,
 ) -> anyhow::Result<String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
-    let min_keyint = if profile == Profile::Anime {
-        fps / 2
-    } else {
-        fps
-    };
-    let max_keyint = if profile == Profile::Anime {
+    let min_keyint = if profile.is_anime() { fps / 2 } else { fps };
+    let max_keyint = if profile.is_anime() {
         fps * 15
     } else {
         fps * 10
@@ -127,19 +123,19 @@ pub fn build_x264_args_string(
         "veryslow"
     };
     let bframes = match profile {
-        Profile::Film => 5,
-        Profile::Anime => 8,
+        Profile::Film | Profile::Grain => 5,
+        Profile::Anime | Profile::AnimeDetailed | Profile::AnimeGrain => 8,
         Profile::Fast => 3,
     };
-    let psy_rd = match profile {
-        Profile::Film => format!("{:.1}:{:.1}", 1.0, 0.0),
-        Profile::Anime => format!("{:.1}:{:.1}", 0.7, 0.0),
-        Profile::Fast => format!("{:.1}:{:.1}", 0.0, 0.0),
+    let psy_rd = if profile.is_anime() {
+        format!("{:.1}:{:.1}", 0.7, 0.0)
+    } else {
+        format!("{:.1}:{:.1}", 1.0, 0.0)
     };
-    let deblock = match profile {
-        Profile::Film => format!("{}:{}", -3, -3),
-        Profile::Anime => format!("{}:{}", -2, -1),
-        Profile::Fast => format!("{}:{}", 0, 0),
+    let deblock = if profile.is_anime() {
+        format!("{}:{}", -2, -1)
+    } else {
+        format!("{}:{}", -3, -3)
     };
     let merange = if dimensions.width > 1440 {
         48
@@ -149,17 +145,14 @@ pub fn build_x264_args_string(
         24
     };
     let aq_str = match profile {
-        Profile::Film => 0.8,
-        Profile::Anime | Profile::Fast => 0.7,
-    };
-    let mbtree = match profile {
-        // mbtree works fine on live action, but on anime it has undesirable effects
-        Profile::Anime => "--no-mbtree",
-        _ => "",
+        Profile::Grain => "0.9",
+        Profile::Film | Profile::AnimeGrain => "0.8",
+        Profile::Anime | Profile::AnimeDetailed | Profile::Fast => "0.7",
     };
     let qcomp = match profile {
-        Profile::Film | Profile::Fast => 0.75,
-        Profile::Anime => 0.65,
+        Profile::Film | Profile::Grain | Profile::Fast => 0.75,
+        Profile::AnimeGrain => 0.7,
+        Profile::Anime | Profile::AnimeDetailed => 0.65,
     };
     let prim = match colorimetry.primaries {
         ColorPrimaries::BT709 => "bt709",
@@ -255,7 +248,7 @@ pub fn build_x264_args_string(
     };
     Ok(format!(
         " --crf {crf} --preset {preset} --bframes {bframes} --psy-rd {psy_rd} --deblock {deblock} \
-         --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} {mbtree} -i \
+         --merange {merange} --rc-lookahead 96 --aq-mode 3 --aq-strength {aq_str} --no-mbtree -i \
          {min_keyint} -I {max_keyint} --qcomp {qcomp} --ipratio 1.30 --pbratio 1.20 \
          --no-fast-pskip --no-dct-decimate --colorprim {prim} --colormatrix {matrix} --transfer \
          {transfer} --input-range {range} --range {range} {csp} --output-depth {depth} {vbv} \

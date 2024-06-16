@@ -10,7 +10,6 @@ use std::{
 use ansi_term::Colour::{Green, Yellow};
 use anyhow::Result;
 
-pub use self::x264::convert_video_x264;
 use crate::{
     absolute_path,
     input::{get_video_frame_count, Colorimetry, PixelFormat, VideoDimensions},
@@ -20,6 +19,8 @@ use crate::{
         x265::build_x265_args_string,
     },
 };
+
+pub use self::x264::convert_video_x264;
 
 mod aom;
 mod rav1e;
@@ -53,7 +54,10 @@ impl Default for VideoOutput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     Film,
+    Grain,
     Anime,
+    AnimeDetailed,
+    AnimeGrain,
     Fast,
 }
 
@@ -71,6 +75,9 @@ impl FromStr for Profile {
             "film" => Profile::Film,
             "anime" => Profile::Anime,
             "fast" => Profile::Fast,
+            "grain" => Profile::Grain,
+            "anime_detailed" => Profile::AnimeDetailed,
+            "anime_grain" => Profile::AnimeGrain,
             _ => {
                 return Err("Unrecognized profile");
             }
@@ -87,7 +94,19 @@ impl Display for Profile {
                 Profile::Film => "film",
                 Profile::Anime => "anime",
                 Profile::Fast => "fast",
+                Profile::Grain => "grain",
+                Profile::AnimeDetailed => "anime_detailed",
+                Profile::AnimeGrain => "anime_grain",
             }
+        )
+    }
+}
+
+impl Profile {
+    pub const fn is_anime(self) -> bool {
+        matches!(
+            self,
+            Profile::Anime | Profile::AnimeDetailed | Profile::AnimeGrain
         )
     }
 }
@@ -300,10 +319,13 @@ pub fn convert_video_av1an(
                 | VideoEncoder::Rav1e { profile, .. }
                 | VideoEncoder::SvtAv1 { profile, .. }
                 | VideoEncoder::X264 { profile, .. }
-                | VideoEncoder::X265 { profile, .. } => match profile {
-                    Profile::Film | Profile::Fast => fps * 10,
-                    Profile::Anime => fps * 15,
-                },
+                | VideoEncoder::X265 { profile, .. } => {
+                    if profile.is_anime() {
+                        fps * 15
+                    } else {
+                        fps * 10
+                    }
+                }
                 VideoEncoder::Copy => unreachable!(),
             }
             .to_string(),
@@ -315,10 +337,13 @@ pub fn convert_video_av1an(
                 | VideoEncoder::Rav1e { profile, .. }
                 | VideoEncoder::SvtAv1 { profile, .. }
                 | VideoEncoder::X264 { profile, .. }
-                | VideoEncoder::X265 { profile, .. } => match profile {
-                    Profile::Film | Profile::Fast => fps,
-                    Profile::Anime => fps / 2,
-                },
+                | VideoEncoder::X265 { profile, .. } => {
+                    if profile.is_anime() {
+                        fps / 2
+                    } else {
+                        fps
+                    }
+                }
                 VideoEncoder::Copy => unreachable!(),
             }
             .to_string(),

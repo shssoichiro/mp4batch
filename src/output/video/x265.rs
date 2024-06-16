@@ -19,35 +19,35 @@ pub fn build_x265_args_string(
 ) -> String {
     // TODO: Add full HDR metadata
 
-    let deblock = match profile {
-        Profile::Film => -2,
-        Profile::Anime | Profile::Fast => -1,
-    };
-    let chroma_offset = match profile {
-        Profile::Film | Profile::Fast => 0,
-        Profile::Anime => -2,
-    };
+    let deblock = if profile.is_anime() { -1 } else { -2 };
+    let chroma_offset = if profile.is_anime() { -2 } else { 0 };
     let bframes = match profile {
-        Profile::Film => 5,
-        Profile::Anime => 8,
+        Profile::Film | Profile::Grain => 5,
+        Profile::Anime | Profile::AnimeDetailed | Profile::AnimeGrain => 8,
         Profile::Fast => 3,
     };
-    let sao = if (profile == Profile::Anime && crf >= 17) || crf >= 19 {
+    let sao = if crf >= 22 {
+        "--sao"
+    } else if crf >= 17 {
         "--limit-sao"
     } else {
         "--no-sao"
     };
     let psy_rd = match profile {
-        Profile::Film => "1.5",
         Profile::Anime | Profile::Fast => "1.0",
+        Profile::Film | Profile::AnimeDetailed => "1.5",
+        Profile::Grain | Profile::AnimeGrain => "2.0",
     };
     let psy_rdo = match profile {
-        Profile::Film => "3.0",
-        Profile::Anime | Profile::Fast => "1.5",
+        Profile::Anime | Profile::Fast => "1.0",
+        Profile::AnimeDetailed => "1.5",
+        Profile::Film | Profile::AnimeGrain => "2.0",
+        Profile::Grain => "4.0",
     };
     let aq_str = match profile {
-        Profile::Film => "0.8",
-        Profile::Anime | Profile::Fast => "0.7",
+        Profile::Grain => "0.9",
+        Profile::Film | Profile::AnimeGrain => "0.8",
+        Profile::Anime | Profile::AnimeDetailed | Profile::Fast => "0.7",
     };
     let prim = match colorimetry.primaries {
         ColorPrimaries::BT709 => "bt709",

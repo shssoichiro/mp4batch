@@ -21,7 +21,11 @@ pub fn build_aom_args_string(
     let tile_rows = i32::from(
         dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600),
     );
-    let arnr_str = if profile == Profile::Anime { 1 } else { 3 };
+    let arnr_str = if profile == Profile::Anime || profile == Profile::AnimeDetailed {
+        1
+    } else {
+        3
+    };
     let deltaq_mode = if colorimetry.is_hdr() { 5 } else { 1 };
     let prim = match colorimetry.primaries {
         ColorPrimaries::BT709 => "bt709",
