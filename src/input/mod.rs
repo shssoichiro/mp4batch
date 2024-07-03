@@ -219,7 +219,8 @@ pub fn find_source_file(input: &Path) -> PathBuf {
 fn parse_sources(script: &str) -> Vec<PathBuf> {
     // If you have a quotation mark in your filename then go to hell
     static PATTERN: OnceCell<Regex> = OnceCell::new();
-    let pattern = PATTERN.get_or_init(|| Regex::new("source=['\"](.+)['\"]").expect("Valid regex"));
+    let pattern = PATTERN
+        .get_or_init(|| Regex::new("source=['\"](.+\\.\\w{2,4})['\"]").expect("Valid regex"));
     pattern
         .captures_iter(script)
         .map(|cap| PathBuf::from(&cap[1]))
