@@ -239,7 +239,7 @@ pub fn build_x264_args_string(
         ));
         let mut file = File::create(&path)?;
         for kf in list.split(',') {
-            file.write_all(format!("{} I -1", kf).as_bytes())?;
+            file.write_all(format!("{} I -1\n", kf).as_bytes())?;
         }
         file.flush()?;
         format!("--qpfile {}", path.to_string_lossy())
