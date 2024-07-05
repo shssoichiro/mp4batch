@@ -229,7 +229,7 @@ fn main() {
         );
         if let Err(err) = result {
             eprintln!(
-                "{} {}: {}",
+                "{} Failed processing file {}: {}",
                 Red.bold().paint("[Error]"),
                 Red.paint(
                     input
