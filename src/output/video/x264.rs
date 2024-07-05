@@ -60,7 +60,7 @@ pub fn convert_video_x264(
         .arg("-")
         .stdout(Stdio::piped())
         .spawn()
-        .expect("Unable to run vspipe, is it installed and in PATH?");
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for x264 encoding: {}", e))?;
 
     let mut command = Command::new("nice");
     command

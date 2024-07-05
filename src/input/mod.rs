@@ -116,7 +116,10 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         .arg("-i")
         .arg(input)
         .arg("-")
-        .output()?;
+        .output()
+        .map_err(|e| {
+            anyhow::anyhow!("Failed to execute vspipe -i to get video dimensions: {}", e)
+        })?;
     // Width: 1280
     // Height: 720
     // Frames: 17982

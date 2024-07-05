@@ -166,7 +166,7 @@ pub fn create_lossless(
         .arg(input)
         .arg("-")
         .status()
-        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
 
     let filename = input
         .file_name()
@@ -180,7 +180,7 @@ pub fn create_lossless(
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
-            .expect("Unable to run vspipe, is it installed and in PATH?")
+            .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for lossless encoding: {}", e))?
     } else {
         panic!("Unrecognized input type");
     };

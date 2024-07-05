@@ -269,7 +269,7 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
             .arg("-")
             .stdout(Stdio::piped())
             .spawn()
-            .expect("Unable to run vspipe, is it installed and in PATH?")
+            .map_err(|e| anyhow::anyhow!("Failed to start vspipe to extract wav audio: {}", e))?
     } else {
         panic!("Unrecognized input type");
     };
