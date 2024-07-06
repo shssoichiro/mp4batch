@@ -53,7 +53,7 @@ pub fn convert_video_x264(
         return Ok(());
     }
 
-    let pipe = Command::new("vspipe")
+    let mut pipe = Command::new("vspipe")
         .arg("-c")
         .arg("y4m")
         .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
@@ -86,11 +86,12 @@ pub fn convert_video_x264(
         .arg(absolute_path(output).expect("Unable to get absolute path"))
         .arg("-");
     command
-        .stdin(pipe.stdout.expect("stdout should be writeable"))
+        .stdin(pipe.stdout.take().expect("stdout should be writeable"))
         .stderr(Stdio::inherit());
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
+    pipe.wait()?;
 
     if status.success() {
         Ok(())

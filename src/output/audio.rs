@@ -259,7 +259,7 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
         .file_name()
         .expect("File should have a name")
         .to_string_lossy();
-    let pipe = if filename.ends_with(".vpy") {
+    let mut pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
             .arg("-o")
             .arg("1")
@@ -289,10 +289,11 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
         .arg("-compression_level")
         .arg("9")
         .arg(output)
-        .stdin(pipe.stdout.expect("stdout should be writeable"))
+        .stdin(pipe.stdout.take().expect("stdout should be writeable"))
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    pipe.wait()?;
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",

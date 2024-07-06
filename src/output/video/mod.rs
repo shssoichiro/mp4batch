@@ -172,7 +172,7 @@ pub fn create_lossless(
         .file_name()
         .expect("File should have a name")
         .to_string_lossy();
-    let pipe = if filename.ends_with(".vpy") {
+    let mut pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
             .arg("-c")
             .arg("y4m")
@@ -201,10 +201,11 @@ pub fn create_lossless(
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)
-        .stdin(pipe.stdout.expect("stdout should be writeable"))
+        .stdin(pipe.stdout.take().expect("stdout should be writeable"))
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    pipe.wait()?;
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",
