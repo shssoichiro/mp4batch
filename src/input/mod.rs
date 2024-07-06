@@ -231,6 +231,7 @@ fn parse_sources(script: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Colorimetry {
     pub range: YUVRange,
     pub primaries: ColorPrimaries,
@@ -248,7 +249,7 @@ impl Colorimetry {
 
 pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
     let env = Environment::from_file(input, EvalFlags::SetWorkingDir)?;
-    let (node, _) = env.get_output(0).unwrap();
+    let (node, _) = env.get_output(0)?;
     let frame = node.get_frame(0)?;
     let props = frame.props();
     Ok(Colorimetry {
