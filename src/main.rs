@@ -733,7 +733,7 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     writeln!(script, "core.max_cache_size=1024").unwrap();
     writeln!(
         script,
-        "clip = core.lsmas.LWLibavSource(source=\"{}\")",
+        "clip = core.bs.VideoSource(source=\"{}\", cachepath=\"/\")",
         escape_python_string(
             &absolute_path(input.with_extension("lossless.mkv"))
                 .expect("Should be able to get absolute filepath")
