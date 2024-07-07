@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use av_data::pixel::{
     ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
     YUVRange,
@@ -117,9 +117,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         .arg(input)
         .arg("-")
         .output()
-        .map_err(|e| {
-            anyhow::anyhow!("Failed to execute vspipe -i to get video dimensions: {}", e)
-        })?;
+        .map_err(|e| anyhow!("Failed to execute vspipe -i to get video dimensions: {}", e))?;
     // Width: 1280
     // Height: 720
     // Frames: 17982
@@ -248,7 +246,12 @@ impl Colorimetry {
 }
 
 pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
-    let env = Environment::from_file(input, EvalFlags::SetWorkingDir)?;
+    let env = Environment::from_file(input, EvalFlags::SetWorkingDir).map_err(|e| match e {
+        vapoursynth::vsscript::Error::VSScript(e) => {
+            anyhow!("An error occurred in VSScript: {}", e)
+        }
+        _ => anyhow!("{}", e),
+    })?;
     let (node, _) = env.get_output(0)?;
     let frame = node.get_frame(0)?;
     let props = frame.props();
