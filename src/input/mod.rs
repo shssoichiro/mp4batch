@@ -132,9 +132,24 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     let output = String::from_utf8_lossy(&command.stdout);
 
     let lines = output.lines().collect::<Vec<_>>();
-    let width = lines[0].replace("Width: ", "").trim().parse()?;
-    let height = lines[1].replace("Height: ", "").trim().parse()?;
-    let fps: Vec<_> = lines[3]
+    let width = lines
+        .iter()
+        .find(|l| l.starts_with("Width: "))
+        .unwrap()
+        .replace("Width: ", "")
+        .trim()
+        .parse()?;
+    let height = lines
+        .iter()
+        .find(|l| l.starts_with("Height: "))
+        .unwrap()
+        .replace("Height: ", "")
+        .trim()
+        .parse()?;
+    let fps: Vec<_> = lines
+        .iter()
+        .find(|l| l.starts_with("FPS: "))
+        .unwrap()
         .replace("FPS: ", "")
         .split_whitespace()
         .next()
@@ -142,7 +157,10 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         .split('/')
         .map(|num| num.parse())
         .collect();
-    let bit_depth = lines[8]
+    let bit_depth = lines
+        .iter()
+        .find(|l| l.starts_with("Bits: "))
+        .unwrap()
         .replace("Bits: ", "")
         .trim()
         .parse()
@@ -150,9 +168,21 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     Ok(VideoDimensions {
         width,
         height,
-        frames: lines[2].replace("Frames: ", "").trim().parse()?,
+        frames: lines
+            .iter()
+            .find(|l| l.starts_with("Frames: "))
+            .unwrap()
+            .replace("Frames: ", "")
+            .trim()
+            .parse()?,
         fps: (fps[0].clone()?, fps[1].clone()?),
-        pixel_format: PixelFormat::from_vapoursynth_format(&lines[4].replace("Format Name: ", "")),
+        pixel_format: PixelFormat::from_vapoursynth_format(
+            &lines
+                .iter()
+                .find(|l| l.starts_with("Format Name: "))
+                .unwrap()
+                .replace("Format Name: ", ""),
+        ),
         bit_depth,
     })
 }
