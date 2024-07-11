@@ -324,6 +324,7 @@ fn process_file(
             ),
             Blue.paint("lossless")
         );
+        let mut retry_count = 0;
         loop {
             // I hate this lazy workaround,
             // but this is due to a heisenbug in Vapoursynth
@@ -338,7 +339,7 @@ fn process_file(
                     break;
                 }
                 Err(e) => {
-                    if no_retry {
+                    if no_retry || retry_count >= 3 {
                         bail!(
                             "{} {}: {}",
                             Red.bold().paint("[Error]"),
@@ -346,6 +347,7 @@ fn process_file(
                             e
                         );
                     } else {
+                        retry_count += 1;
                         eprintln!(
                             "{} {}: {}",
                             Red.bold().paint("[Error]"),
