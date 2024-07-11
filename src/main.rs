@@ -8,7 +8,7 @@ use std::{
 };
 
 use ansi_term::Colour::{Blue, Green, Red};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use dotenvy_macro::dotenv;
 use itertools::Itertools;
@@ -99,6 +99,10 @@ struct InputArgs {
     /// Do not copy audio delay to the output
     #[clap(long)]
     pub no_delay: bool,
+
+    /// Instead of retrying failed encodes, exit immediately
+    #[clap(long)]
+    pub no_retry: bool,
 }
 
 fn main() {
@@ -226,6 +230,7 @@ fn main() {
             &args.force_keyframes,
             !args.no_verify,
             args.no_delay,
+            args.no_retry,
         );
         if let Err(err) = result {
             eprintln!(
@@ -266,6 +271,7 @@ fn process_file(
     force_keyframes: &Option<String>,
     verify_frame_count: bool,
     ignore_delay: bool,
+    no_retry: bool,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -332,12 +338,21 @@ fn process_file(
                     break;
                 }
                 Err(e) => {
-                    eprintln!(
-                        "{} {}: {}",
-                        Red.bold().paint("[Error]"),
-                        Red.paint("While encoding lossless"),
-                        e
-                    );
+                    if no_retry {
+                        bail!(
+                            "{} {}: {}",
+                            Red.bold().paint("[Error]"),
+                            Red.paint("While encoding lossless"),
+                            e
+                        );
+                    } else {
+                        eprintln!(
+                            "{} {}: {}",
+                            Red.bold().paint("[Error]"),
+                            Red.paint("While encoding lossless"),
+                            e
+                        );
+                    }
                 }
             }
         }
