@@ -197,7 +197,7 @@ pub fn create_lossless(
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
-        .arg("superfast")
+        .arg("ultrafast")
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)
