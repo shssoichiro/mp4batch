@@ -171,9 +171,15 @@ fn main() {
                         }) {
                             match encoder.to_lowercase().as_str() {
                                 "x264" => {
+                                    which("x264")
+                                        .map_err(|_| anyhow!("x264 not installed or not in PATH!"))
+                                        .unwrap();
                                     // This is the default, do nothing
                                 }
                                 "x265" => {
+                                    which("x265")
+                                        .map_err(|_| anyhow!("x265 not installed or not in PATH!"))
+                                        .unwrap();
                                     output.video.encoder = VideoEncoder::X265 {
                                         crf: 18,
                                         profile: Profile::Film,
@@ -181,6 +187,11 @@ fn main() {
                                     }
                                 }
                                 "aom" => {
+                                    which("aomenc")
+                                        .map_err(|_| {
+                                            anyhow!("aomenc not installed or not in PATH!")
+                                        })
+                                        .unwrap();
                                     output.video.encoder = VideoEncoder::Aom {
                                         crf: 16,
                                         speed: 4,
@@ -190,6 +201,9 @@ fn main() {
                                     }
                                 }
                                 "rav1e" => {
+                                    which("rav1e")
+                                        .map_err(|_| anyhow!("rav1e not installed or not in PATH!"))
+                                        .unwrap();
                                     output.video.encoder = VideoEncoder::Rav1e {
                                         crf: 40,
                                         speed: 5,
@@ -198,6 +212,11 @@ fn main() {
                                     }
                                 }
                                 "svt" => {
+                                    which("SvtAv1EncApp")
+                                        .map_err(|_| {
+                                            anyhow!("SvtAv1EncApp not installed or not in PATH!")
+                                        })
+                                        .unwrap();
                                     output.video.encoder = VideoEncoder::SvtAv1 {
                                         crf: 16,
                                         speed: 4,
@@ -254,7 +273,6 @@ fn check_for_required_apps() -> Result<()> {
     which("mkvmerge").map_err(|_| anyhow!("mkvmerge not installed or not in PATH!"))?;
     which("vspipe").map_err(|_| anyhow!("vspipe not installed or not in PATH!"))?;
     which("ffmpeg").map_err(|_| anyhow!("ffmpeg not installed or not in PATH!"))?;
-    which("x264").map_err(|_| anyhow!("x264 not installed or not in PATH!"))?;
 
     Ok(())
 }
