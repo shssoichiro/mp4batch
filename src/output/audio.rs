@@ -274,9 +274,8 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
         panic!("Unrecognized input type");
     };
 
-    let mut command = Command::new("nice");
+    let mut command = Command::new("ffmpeg");
     let status = command
-        .arg("ffmpeg")
         .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")

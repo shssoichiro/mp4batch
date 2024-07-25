@@ -184,9 +184,8 @@ pub fn create_lossless(
     } else {
         panic!("Unrecognized input type");
     };
-    let mut command = Command::new("nice");
+    let mut command = Command::new("ffmpeg");
     let status = command
-        .arg("ffmpeg")
         .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")
@@ -295,9 +294,8 @@ pub fn convert_video_av1an(
         (cores.get() as f32 / workers.get() as f32 * 1.5).ceil() as usize + 2,
     ))
     .unwrap();
-    let mut command = Command::new("nice");
+    let mut command = Command::new("av1an");
     command
-        .arg("av1an")
         .arg("-i")
         .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
         .arg("-e")

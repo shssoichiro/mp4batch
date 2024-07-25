@@ -62,9 +62,8 @@ pub fn convert_video_x264(
         .spawn()
         .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for x264 encoding: {}", e))?;
 
-    let mut command = Command::new("nice");
+    let mut command = Command::new("x264");
     command
-        .arg("x264")
         .arg("--demuxer")
         .arg("y4m")
         .arg("--frames")
