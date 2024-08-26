@@ -137,7 +137,7 @@ pub fn build_x265_args_string(
         " --crf {crf} --preset slow --bframes {bframes} --ref {refframes} --keyint -1 --min-keyint 1 \
           --no-scenecut {sao} --deblock {deblock}:{deblock} --psy-rd {psy_rd} --psy-rdoq {psy_rdo} --qcomp 0.65 \
          --aq-mode 3 --aq-strength {aq_str} --cbqpoffs {chroma_offset} --crqpoffs {chroma_offset} \
-         --no-open-gop --no-cutree --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
+         --no-open-gop --no-cutree --fades --colorprim {prim} --colormatrix {matrix} --transfer {transfer} \
          --range {range} {csp} --output-depth {depth} --frame-threads {threads} --lookahead-threads {threads} \
          --y4m {level} {hdr} "
     )
