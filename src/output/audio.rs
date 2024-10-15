@@ -188,7 +188,7 @@ pub fn convert_audio(
         .arg("-1");
     if normalize {
         let params = fp_data.unwrap();
-        command.arg("-af").arg(&format!(
+        command.arg("-af").arg(format!(
             "loudnorm=I=-16:dual_mono=true:TP=-1.5:LRA=11:measured_I={:.1}:measured_TP={:.1}:\
              measured_LRA={:.1}:measured_thresh={:.1}:offset={:.1}:linear=true:\
              print_format=summary",
@@ -232,7 +232,7 @@ pub fn convert_audio(
                 .arg("-acodec")
                 .arg("libopus")
                 .arg("-b:a")
-                .arg(&format!("{}k", audio_bitrate * channels))
+                .arg(format!("{}k", audio_bitrate * channels))
                 .arg("-af")
                 .arg("aformat=channel_layouts=7.1|5.1|stereo")
                 .arg("-mapping_family")

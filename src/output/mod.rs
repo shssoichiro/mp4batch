@@ -93,7 +93,7 @@ pub fn mux_video(
                     .arg("--no-attachments")
                     .arg("--no-chapters");
                 if audio_delay != 0 {
-                    command.arg("--sync").arg(&format!("{}:{}", 0, audio_delay));
+                    command.arg("--sync").arg(format!("{}:{}", 0, audio_delay));
                 }
                 command
                     .arg("--language")
@@ -170,27 +170,27 @@ pub fn mux_video(
         command.arg("-map").arg("0:v:0");
         let mut i = 1;
         for (j, audio) in audios.iter().enumerate() {
-            command.arg("-map").arg(&format!("{}:a:0", i));
+            command.arg("-map").arg(format!("{}:a:0", i));
             if audio.1.forced {
-                command.arg(&format!("-disposition:a:{}", j)).arg("forced");
+                command.arg(format!("-disposition:a:{}", j)).arg("forced");
             } else if audio.1.enabled {
-                command.arg(&format!("-disposition:a:{}", j)).arg("default");
+                command.arg(format!("-disposition:a:{}", j)).arg("default");
             }
             i += 1;
         }
         for (j, subtitle) in subtitles.iter().enumerate() {
-            command.arg("-map").arg(&format!("{}:s:0", i));
+            command.arg("-map").arg(format!("{}:s:0", i));
             if subtitle.2 {
-                command.arg(&format!("-disposition:s:{}", j)).arg("forced");
+                command.arg(format!("-disposition:s:{}", j)).arg("forced");
             } else if subtitle.1 {
-                command.arg(&format!("-disposition:s:{}", j)).arg("default");
+                command.arg(format!("-disposition:s:{}", j)).arg("default");
             }
             i += 1;
         }
         if copy_fonts {
             command
                 .arg("-map")
-                .arg(&format!("{}:t?", 1 + audios.len() + subtitles.len()));
+                .arg(format!("{}:t?", 1 + audios.len() + subtitles.len()));
         } else {
             let fonts_dir = input
                 .parent()
@@ -219,7 +219,7 @@ pub fn mux_video(
                             eprintln!(
                                 "{} {}",
                                 Yellow.bold().paint("[Warning]"),
-                                Yellow.paint(&format!(
+                                Yellow.paint(format!(
                                     "Attachment with unrecognized extension skipped: {}",
                                     font.path().to_string_lossy()
                                 )),
@@ -230,8 +230,8 @@ pub fn mux_video(
                     command
                         .arg("-attach")
                         .arg(font.path())
-                        .arg(&format!("-metadata:s:t:{}", i))
-                        .arg(&format!("mimetype={}", mimetype));
+                        .arg(format!("-metadata:s:t:{}", i))
+                        .arg(format!("mimetype={}", mimetype));
                     i += 1;
                 }
             }
@@ -263,7 +263,7 @@ pub fn extract_subtitles(input: &Path, track: u8, output: &Path) -> Result<()> {
         .arg("-c:s")
         .arg("copy")
         .arg("-map")
-        .arg(&format!("0:s:{}", track))
+        .arg(format!("0:s:{}", track))
         .arg(output);
     let status = command.arg(output).status()?;
     if status.success() {
