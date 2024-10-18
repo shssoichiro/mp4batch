@@ -76,8 +76,8 @@ impl FromStr for Profile {
             "anime" => Profile::Anime,
             "fast" => Profile::Fast,
             "grain" => Profile::Grain,
-            "anime_detailed" => Profile::AnimeDetailed,
-            "anime_grain" => Profile::AnimeGrain,
+            "animedetailed" => Profile::AnimeDetailed,
+            "animegrain" => Profile::AnimeGrain,
             _ => {
                 return Err("Unrecognized profile");
             }
@@ -95,8 +95,8 @@ impl Display for Profile {
                 Profile::Anime => "anime",
                 Profile::Fast => "fast",
                 Profile::Grain => "grain",
-                Profile::AnimeDetailed => "anime_detailed",
-                Profile::AnimeGrain => "anime_grain",
+                Profile::AnimeDetailed => "animedetailed",
+                Profile::AnimeGrain => "animegrain",
             }
         )
     }
