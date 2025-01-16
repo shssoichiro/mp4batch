@@ -11,7 +11,7 @@ anyhow = "1.0"
 av-data = "0.4.1"
 clap = { version = "4.0.8", features = ["derive"] }
 dotenvy_macro = "0.15"
-itertools = "0.13"
+itertools = "0.14"
 lexical-sort = "0.3"
 nom = "7.1.0"
 once_cell = "1.14.0"
@@ -24,7 +24,7 @@ vapoursynth = { version = "0.4.0", features = [
     "vsscript-api-32",
 ] }
 walkdir = "2"
-which = "6.0.0"
+which = "7.0.0"
 
 [profile.release]
 lto = "thin"
