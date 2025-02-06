@@ -476,11 +476,17 @@ impl VideoEncoder {
             VideoEncoder::Rav1e { crf, speed, .. } => {
                 build_rav1e_args_string(crf, speed, dimensions, colorimetry)
             }
-            VideoEncoder::SvtAv1 { crf, speed, .. } => build_svtav1_args_string(
+            VideoEncoder::SvtAv1 {
+                crf,
+                speed,
+                profile,
+                ..
+            } => build_svtav1_args_string(
                 crf,
                 speed,
                 cores.get() / workers.get(),
                 dimensions,
+                profile,
                 colorimetry,
             ),
             VideoEncoder::X264 {
