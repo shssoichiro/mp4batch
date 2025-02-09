@@ -31,12 +31,13 @@ pub fn build_svtav1_args_string(
         ChromaLocation::Left => "left",
         _ => "unknown",
     };
-    let qm_min = match crf {
-        ..10 => 8,
-        10..12 => 5,
-        12..14 => 3,
-        14..18 => 2,
-        _ => 0,
+    let qm_min = match profile {
+        Profile::Grain => 8,
+        Profile::AnimeGrain => 5,
+        Profile::Film if crf <= 13 => 5,
+        Profile::Film if crf <= 15 => 3,
+        Profile::AnimeDetailed if crf <= 13 => 3,
+        _ => 2,
     };
     let psy_rd = match profile {
         Profile::Film => "0.5",
