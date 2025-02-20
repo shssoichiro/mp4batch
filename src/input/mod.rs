@@ -115,6 +115,8 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     let command = Command::new("vspipe")
         .arg("-i")
         .arg(input)
+        .arg("-o")
+        .arg("0")
         .arg("-")
         .output()
         .map_err(|e| anyhow!("Failed to execute vspipe -i to get video dimensions: {}", e))?;

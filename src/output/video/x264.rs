@@ -56,6 +56,8 @@ pub fn convert_video_x264(
     let mut pipe = Command::new("vspipe")
         .arg("-c")
         .arg("y4m")
+        .arg("-o")
+        .arg("0")
         .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
         .arg("-")
         .stdout(Stdio::piped())

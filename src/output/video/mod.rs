@@ -164,6 +164,8 @@ pub fn create_lossless(
     Command::new("vspipe")
         .arg("-i")
         .arg(input)
+        .arg("-o")
+        .arg("0")
         .arg("-")
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
@@ -178,6 +180,8 @@ pub fn create_lossless(
             .arg("y4m")
             .arg(input)
             .arg("-")
+            .arg("-o")
+            .arg("0")
             .stdout(Stdio::piped())
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for lossless encoding: {}", e))?
