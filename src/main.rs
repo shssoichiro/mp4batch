@@ -450,7 +450,8 @@ fn process_file(
         } else {
             output.audio_tracks.clone()
         };
-        let has_vpy_audio = fs::read_to_string(input_vpy)?.contains(".set_output(1)");
+        // FIXME: We need a better way of determining if the vpy has audio
+        let has_vpy_audio = false;
         if has_vpy_audio {
             let audio_path = input_vpy.with_extension("flac");
             save_vpy_audio(input_vpy, &audio_path)?;
