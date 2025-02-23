@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use av_data::pixel::{
     ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
     YUVRange,
@@ -26,17 +26,12 @@ pub struct VideoDimensions {
     pub bit_depth: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PixelFormat {
+    #[default]
     Yuv420,
     Yuv422,
     Yuv444,
-}
-
-impl Default for PixelFormat {
-    fn default() -> Self {
-        PixelFormat::Yuv420
-    }
 }
 
 impl PixelFormat {

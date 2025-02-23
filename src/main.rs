@@ -2,13 +2,13 @@ use std::{
     env,
     fmt::Write as FmtWrite,
     fs,
-    fs::{read_to_string, File},
+    fs::{File, read_to_string},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
 use ansi_term::Colour::{Blue, Green, Red};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use dotenvy_macro::dotenv;
 use itertools::Itertools;
@@ -18,7 +18,7 @@ use size::Size;
 use walkdir::WalkDir;
 use which::which;
 
-use crate::cli::{parse_filters, ParsedFilter, Track, TrackSource};
+use crate::cli::{ParsedFilter, Track, TrackSource, parse_filters};
 
 use self::{input::*, output::*};
 
@@ -106,8 +106,6 @@ struct InputArgs {
 }
 
 fn main() {
-    env::set_var("RUST_BACKTRACE", "1");
-
     check_for_required_apps().unwrap();
 
     let args = InputArgs::parse();

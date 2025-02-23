@@ -12,7 +12,7 @@ use anyhow::Result;
 
 use crate::{
     absolute_path,
-    input::{get_video_frame_count, Colorimetry, PixelFormat, VideoDimensions},
+    input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
     output::video::{
         aom::build_aom_args_string, rav1e::build_rav1e_args_string,
         svt_av1::build_svtav1_args_string, x264::build_x264_args_string,
@@ -51,20 +51,15 @@ impl Default for VideoOutput {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Profile {
+    #[default]
     Film,
     Grain,
     Anime,
     AnimeDetailed,
     AnimeGrain,
     Fast,
-}
-
-impl Default for Profile {
-    fn default() -> Self {
-        Profile::Film
-    }
 }
 
 impl FromStr for Profile {

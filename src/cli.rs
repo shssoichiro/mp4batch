@@ -4,13 +4,13 @@ use std::{
 };
 
 use nom::{
+    IResult, Parser,
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, char, digit1},
     combinator::{opt, recognize},
     multi::separated_list1,
     sequence::preceded,
-    IResult, Parser,
 };
 
 use crate::{AudioEncoder, Profile, VideoEncoder};

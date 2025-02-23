@@ -14,7 +14,7 @@ use av_data::pixel::{
 
 use crate::{
     absolute_path,
-    input::{get_video_frame_count, Colorimetry, PixelFormat, VideoDimensions},
+    input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
     output::Profile,
 };
 
