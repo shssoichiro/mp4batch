@@ -327,3 +327,27 @@ pub fn get_audio_delay_ms(input: &Path, track: usize) -> Result<i32> {
         .unwrap_or_else(|| panic!("Expected {} tracks, did not find enough", track + 1))
         .parse::<i32>()?)
 }
+
+// Returns `Some(track_num)` if audio found
+pub fn vspipe_has_audio(input: &Path) -> Result<Option<usize>> {
+    let command = Command::new("vspipe")
+        .arg("-i")
+        .arg(input)
+        .arg("-")
+        .output()
+        .map_err(|e| anyhow!("Failed to execute vspipe -i to get video dimensions: {}", e))?;
+    let output = String::from_utf8_lossy(&command.stdout);
+    let mut iter = output.lines().peekable();
+    while let Some(line) = iter.next() {
+        let line = line.trim();
+        if line.starts_with("Output Index:") {
+            if let Some(next_line) = iter.peek() {
+                if next_line.trim() == "Type: Audio" {
+                    let (_, index) = line.split_once(": ").unwrap();
+                    return Ok(Some(index.parse()?));
+                }
+            }
+        }
+    }
+    Ok(None)
+}

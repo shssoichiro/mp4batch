@@ -254,7 +254,7 @@ pub fn convert_audio(
     }
 }
 
-pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
+pub fn save_vpy_audio(input: &Path, track: usize, output: &Path) -> Result<()> {
     let filename = input
         .file_name()
         .expect("File should have a name")
@@ -262,7 +262,7 @@ pub fn save_vpy_audio(input: &Path, output: &Path) -> Result<()> {
     let mut pipe = if filename.ends_with(".vpy") {
         Command::new("vspipe")
             .arg("-o")
-            .arg("1")
+            .arg(track.to_string())
             .arg("-c")
             .arg("wav")
             .arg(input)

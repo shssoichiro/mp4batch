@@ -448,11 +448,10 @@ fn process_file(
         } else {
             output.audio_tracks.clone()
         };
-        // FIXME: We need a better way of determining if the vpy has audio
-        let has_vpy_audio = false;
-        if has_vpy_audio {
+        let has_vpy_audio = vspipe_has_audio(input_vpy)?;
+        if let Some(track) = has_vpy_audio {
             let audio_path = input_vpy.with_extension("flac");
-            save_vpy_audio(input_vpy, &audio_path)?;
+            save_vpy_audio(input_vpy, track, &audio_path)?;
             audio_tracks = vec![Track {
                 source: TrackSource::External(audio_path),
                 enabled: true,
