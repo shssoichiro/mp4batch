@@ -523,7 +523,7 @@ fn process_file(
                 .sub_tracks
                 .iter()
                 .any(|track| matches!(track.source, TrackSource::FromVideo(_))),
-            ignore_delay,
+            ignore_delay || has_vpy_audio.is_some(),
             &output_path,
         )?;
 
