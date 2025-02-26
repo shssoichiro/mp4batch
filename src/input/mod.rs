@@ -273,7 +273,7 @@ impl Colorimetry {
 }
 
 pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
-    let env = Environment::from_file(input, EvalFlags::SetWorkingDir).map_err(|e| match e {
+    let env = Environment::from_file(input, EvalFlags::Nothing).map_err(|e| match e {
         vapoursynth::vsscript::Error::VSScript(e) => {
             anyhow!("An error occurred in VSScript: {}", e)
         }
