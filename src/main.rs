@@ -113,6 +113,9 @@ fn main() {
     let input = Path::new(&args.input);
     assert!(input.exists(), "Input path does not exist");
 
+    eprintln!("DID YOU INSTALL FONTS???");
+    eprintln!();
+
     let inputs = if input.is_file() {
         vec![input.to_path_buf()]
     } else if input.is_dir() {
