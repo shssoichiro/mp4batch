@@ -453,7 +453,7 @@ fn process_file(
         };
         let has_vpy_audio = vspipe_has_audio(input_vpy)?;
         if let Some(track) = has_vpy_audio {
-            let audio_path = input_vpy.with_extension("flac");
+            let audio_path = input_vpy.with_extension("vpy.flac");
             save_vpy_audio(input_vpy, track, &audio_path)?;
             audio_tracks = vec![Track {
                 source: TrackSource::External(audio_path),
