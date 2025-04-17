@@ -1,20 +1,22 @@
+use ansi_term::Color::Yellow;
+use av_data::pixel::{
+    ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
+};
+use std::sync::atomic::Ordering;
 use std::{
     env::temp_dir,
     fs::File,
     io::Write,
     path::Path,
     process::{Command, Stdio},
+    sync::{Arc, atomic::AtomicBool},
     time::{SystemTime, UNIX_EPOCH},
-};
-
-use ansi_term::Color::Yellow;
-use av_data::pixel::{
-    ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
 };
 
 use crate::{
     absolute_path,
     input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
+    monitor_for_sigterm,
     output::Profile,
 };
 
@@ -28,6 +30,7 @@ pub fn convert_video_x264(
     dimensions: VideoDimensions,
     force_keyframes: &Option<String>,
     colorimetry: &Colorimetry,
+    sigterm: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -92,7 +95,10 @@ pub fn convert_video_x264(
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
+    let is_done = Arc::new(AtomicBool::new(false));
+    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
     pipe.wait()?;
+    is_done.store(true, Ordering::Relaxed);
 
     if status.success() {
         Ok(())

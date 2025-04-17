@@ -1,15 +1,15 @@
+use crate::{
+    cli::{Track, TrackSource},
+    find_source_file, monitor_for_sigterm,
+};
+use ansi_term::Colour::Green;
+use anyhow::Result;
+use std::sync::atomic::Ordering;
 use std::{
     fmt::Display,
     path::Path,
     process::{Command, Stdio},
-};
-
-use ansi_term::Colour::Green;
-use anyhow::Result;
-
-use crate::{
-    cli::{Track, TrackSource},
-    find_source_file,
+    sync::{Arc, atomic::AtomicBool},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -254,7 +254,12 @@ pub fn convert_audio(
     }
 }
 
-pub fn save_vpy_audio(input: &Path, track: usize, output: &Path) -> Result<()> {
+pub fn save_vpy_audio(
+    input: &Path,
+    track: usize,
+    output: &Path,
+    sigterm: Arc<AtomicBool>,
+) -> Result<()> {
     let filename = input
         .file_name()
         .expect("File should have a name")
@@ -292,7 +297,10 @@ pub fn save_vpy_audio(input: &Path, track: usize, output: &Path) -> Result<()> {
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    let is_done = Arc::new(AtomicBool::new(false));
+    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
     pipe.wait()?;
+    is_done.store(true, Ordering::Relaxed);
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",

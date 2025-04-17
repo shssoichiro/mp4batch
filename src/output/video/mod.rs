@@ -1,18 +1,20 @@
+use ansi_term::Colour::{Green, Yellow};
+use anyhow::Result;
+use std::sync::atomic::Ordering;
 use std::{
     fmt::Display,
     num::NonZeroUsize,
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
+    sync::{Arc, atomic::AtomicBool},
     thread::available_parallelism,
 };
-
-use ansi_term::Colour::{Green, Yellow};
-use anyhow::Result;
 
 use crate::{
     absolute_path,
     input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
+    monitor_for_sigterm,
     output::video::{
         aom::build_aom_args_string, rav1e::build_rav1e_args_string,
         svt_av1::build_svtav1_args_string, x264::build_x264_args_string,
@@ -136,6 +138,7 @@ pub fn create_lossless(
     input: &Path,
     dimensions: VideoDimensions,
     verify_frame_count: bool,
+    sigterm: Arc<AtomicBool>,
 ) -> Result<()> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
@@ -203,7 +206,10 @@ pub fn create_lossless(
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+    let is_done = Arc::new(AtomicBool::new(false));
+    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
     pipe.wait()?;
+    is_done.store(true, Ordering::Relaxed);
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",

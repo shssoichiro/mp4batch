@@ -1,12 +1,3 @@
-use std::{
-    env,
-    fmt::Write as FmtWrite,
-    fs,
-    fs::{File, read_to_string},
-    io::{self, BufWriter, Write},
-    path::{Path, PathBuf},
-};
-
 use ansi_term::Colour::{Blue, Green, Red};
 use anyhow::{Result, anyhow, bail};
 use clap::Parser;
@@ -14,7 +5,23 @@ use dotenvy_macro::dotenv;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
 use path_clean::PathClean;
+use signal_hook::{
+    consts::{SIGINT, SIGTERM},
+    flag::register,
+};
 use size::Size;
+use std::process::Child;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::{
+    env,
+    fmt::Write as FmtWrite,
+    fs::{self, File, read_to_string},
+    io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
+    sync::{Arc, atomic::AtomicBool},
+    thread,
+};
 use walkdir::WalkDir;
 use which::which;
 
@@ -107,6 +114,10 @@ struct InputArgs {
 
 fn main() {
     check_for_required_apps().unwrap();
+
+    let sigterm = Arc::new(AtomicBool::new(false));
+    register(SIGTERM, Arc::clone(&sigterm)).unwrap();
+    register(SIGINT, Arc::clone(&sigterm)).unwrap();
 
     let args = InputArgs::parse();
 
@@ -251,6 +262,7 @@ fn main() {
             !args.no_verify,
             args.no_delay,
             args.no_retry,
+            Arc::clone(&sigterm),
         );
         if let Err(err) = result {
             eprintln!(
@@ -266,6 +278,9 @@ fn main() {
             );
         }
         eprintln!();
+        if sigterm.load(Ordering::Relaxed) {
+            return;
+        }
     }
 }
 
@@ -291,6 +306,7 @@ fn process_file(
     verify_frame_count: bool,
     ignore_delay: bool,
     no_retry: bool,
+    sigterm: Arc<AtomicBool>,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -345,6 +361,9 @@ fn process_file(
         );
         let mut retry_count = 0;
         loop {
+            if sigterm.load(Ordering::Relaxed) {
+                bail!("Exited via Ctrl+C");
+            }
             // I hate this lazy workaround,
             // but this is due to a heisenbug in Vapoursynth
             // due to some sort of race condition,
@@ -352,7 +371,12 @@ fn process_file(
             //
             // Essentially, we retry the encode until it works.
             let dimensions = get_video_dimensions(input_vpy)?;
-            let result = create_lossless(input_vpy, dimensions, verify_frame_count);
+            let result = create_lossless(
+                input_vpy,
+                dimensions,
+                verify_frame_count,
+                Arc::clone(&sigterm),
+            );
             match result {
                 Ok(_) => {
                     break;
@@ -426,6 +450,7 @@ fn process_file(
                     dimensions,
                     force_keyframes,
                     &colorimetry,
+                    Arc::clone(&sigterm),
                 )?;
             }
             encoder => {
@@ -454,7 +479,7 @@ fn process_file(
         let has_vpy_audio = vspipe_has_audio(input_vpy)?;
         if let Some(track) = has_vpy_audio {
             let audio_path = input_vpy.with_extension("vpy.flac");
-            save_vpy_audio(input_vpy, track, &audio_path)?;
+            save_vpy_audio(input_vpy, track, &audio_path, Arc::clone(&sigterm))?;
             audio_tracks = vec![Track {
                 source: TrackSource::External(audio_path),
                 enabled: true,
@@ -834,4 +859,45 @@ fn write_filters(output: &Output, script: &mut BufWriter<File>, clip: Option<&st
         writeln!(script, "import vsutil").unwrap();
         writeln!(script, "{clip} = vsutil.depth({clip}, {bd})").unwrap();
     }
+}
+
+fn monitor_for_sigterm(child: &Child, sigterm: Arc<AtomicBool>, child_is_done: Arc<AtomicBool>) {
+    let child_pid = child.id();
+    thread::spawn(move || {
+        while !sigterm.load(Ordering::Relaxed) {
+            if child_is_done.load(Ordering::Relaxed) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(250));
+        }
+
+        eprintln!("Received sigterm or sigint, killing child processes");
+        // We have to do this manually, we can't use `child.kill()` because
+        // we can't borrow `child` mutably here.
+        #[cfg(unix)]
+        {
+            use nix::libc::SIGKILL;
+            use nix::libc::pid_t;
+
+            unsafe {
+                let _ = nix::libc::kill(child_pid as pid_t, SIGKILL);
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            use winapi::um::handleapi::CloseHandle;
+            use winapi::um::processthreadsapi::OpenProcess;
+            use winapi::um::processthreadsapi::TerminateProcess;
+            use winapi::um::winnt::PROCESS_TERMINATE;
+
+            unsafe {
+                let handle = OpenProcess(PROCESS_TERMINATE, false, child_pid);
+                if !handle.is_null() {
+                    TerminateProcess(handle, 1);
+                    CloseHandle(handle);
+                }
+            }
+        }
+    });
 }
