@@ -47,11 +47,16 @@ pub fn build_svtav1_args_string(
         Profile::AnimeGrain => "0.5",
         Profile::Fast => "0.0",
     };
+    let hbd_mds = if psy_rd.parse::<f32>().unwrap() > 0.0 {
+        "1"
+    } else {
+        "0"
+    };
     format!(
         " --input-depth {depth} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
          --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --enable-qm 1 \
-         --qm-min {qm_min} --psy-rd {psy_rd} --tune 3 --scd 0 --keyint -1 --lp {threads} \
-         --pin 0 --color-primaries {prim} --matrix-coefficients {matrix} \
+         --qm-min {qm_min} --psy-rd {psy_rd} --hbd-mds {hbd_mds} --tune 3 --scd 0 --keyint -1 \
+         --lp {threads} --pin 0 --color-primaries {prim} --matrix-coefficients {matrix} \
          --transfer-characteristics {transfer} --color-range {range} --chroma-sample-position \
          {csp} "
     )
