@@ -53,11 +53,13 @@ pub fn build_svtav1_args_string(
         "0"
     };
     format!(
-        " --input-depth {depth} --scm 0 --preset {speed} --crf {crf} --film-grain-denoise 0 \
-         --tile-columns {tile_cols} --tile-rows {tile_rows} --rc 0 --enable-qm 1 \
-         --qm-min {qm_min} --psy-rd {psy_rd} --hbd-mds {hbd_mds} --tune 3 --scd 0 --keyint -1 \
-         --lp {threads} --pin 0 --color-primaries {prim} --matrix-coefficients {matrix} \
-         --transfer-characteristics {transfer} --color-range {range} --chroma-sample-position \
-         {csp} "
+        " --input-depth {depth} --rc 0 --enable-qm 1 \
+        --scd 0 --keyint -1  --scm 0 --film-grain-denoise 0 \
+        --preset {speed} --crf {crf} --tune 3 \
+        --qm-min {qm_min} --psy-rd {psy_rd} --hbd-mds {hbd_mds} \
+        --tile-columns {tile_cols} --tile-rows {tile_rows} --lp {threads} --pin 0 \
+        --color-primaries {prim} --matrix-coefficients {matrix} \
+        --transfer-characteristics {transfer} --color-range {range} \
+        --chroma-sample-position {csp} "
     )
 }
