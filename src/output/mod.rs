@@ -25,11 +25,13 @@ pub struct Output {
     pub sub_tracks: Vec<Track>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn mux_video(
     input: &Path,
     video: &Path,
     audios: &[(PathBuf, Track, AudioEncoder)],
     subtitles: &[(PathBuf, bool, bool)],
+    timestamps: Option<&Path>,
     copy_fonts: bool,
     ignore_delay: bool,
     output: &Path,
@@ -92,6 +94,11 @@ pub fn mux_video(
                     .arg("--no-subtitles")
                     .arg("--no-attachments")
                     .arg("--no-chapters");
+                if let Some(timestamps) = timestamps {
+                    command
+                        .arg("--timestamps")
+                        .arg(format!("0:{}", timestamps.to_string_lossy()));
+                }
                 if audio_delay != 0 {
                     command.arg("--sync").arg(format!("{}:{}", 0, audio_delay));
                 }

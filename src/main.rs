@@ -542,11 +542,26 @@ fn process_file(
             }
         }
 
+        let timestamps = fs::read_dir(input_vpy.parent().expect("file has a parent dir"))?
+            .filter_map(Result::ok)
+            .find_map(|item| {
+                let path = item.path();
+                let file_name = path.file_name().unwrap().to_string_lossy();
+                if file_name.starts_with(input_vpy.file_stem().unwrap().to_str().unwrap())
+                    && file_name.contains(".vfr.")
+                {
+                    Some(path)
+                } else {
+                    None
+                }
+            });
+
         mux_video(
             &source_video,
             &video_out,
             &audio_outputs,
             &subtitle_outputs,
+            timestamps.as_deref(),
             output
                 .sub_tracks
                 .iter()
