@@ -531,7 +531,7 @@ impl VideoEncoder {
     }
 }
 
-pub fn copy_hdr_data(input: &Path, target: &Path) -> Result<()> {
+pub fn copy_extra_data(input: &Path, target: &Path) -> Result<()> {
     let status = Command::new("hdrcopier")
         .arg("copy")
         .arg("--chapters")

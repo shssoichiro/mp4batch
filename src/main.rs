@@ -570,9 +570,7 @@ fn process_file(
             &output_path,
         )?;
 
-        if colorimetry.is_hdr() {
-            copy_hdr_data(&source_video, &output_path)?;
-        }
+        copy_extra_data(&source_video, &output_path)?;
 
         eprintln!(
             "{} {} {}",

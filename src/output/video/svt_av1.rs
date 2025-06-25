@@ -25,8 +25,6 @@ pub fn build_svtav1_args_string(
         YUVRange::Full => 1,
     };
     let csp = match colorimetry.chroma_location {
-        ChromaLocation::Top => "vertical",
-        ChromaLocation::Center => "colocated",
         ChromaLocation::TopLeft => "topleft",
         ChromaLocation::Left => "left",
         _ => "unknown",

@@ -79,8 +79,8 @@ pub fn build_aom_args_string(
         _ => unimplemented!("Matrix coefficients not implemented for aom"),
     };
     let csp = match colorimetry.chroma_location {
-        ChromaLocation::Top => "vertical",
-        ChromaLocation::Center => "colocated",
+        ChromaLocation::Left => "left",
+        ChromaLocation::TopLeft => "colocated",
         _ => "unknown",
     };
     format!(
