@@ -25,7 +25,7 @@ vapoursynth = { version = "0.4.0", features = [
     "vsscript-api-32",
 ] }
 walkdir = "2"
-which = "7.0.0"
+which = "8.0.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.30.1"
