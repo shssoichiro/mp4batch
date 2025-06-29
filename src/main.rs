@@ -528,13 +528,15 @@ fn process_file(
                             .expect("Output file should have an extension")
                             .to_string_lossy();
                         subtitle_out = input_vpy.with_extension(format!("{}.{}", i, ext));
-                        fs::copy(path, &subtitle_out)?;
+                        fs::copy(path, &subtitle_out)
+                            .map_err(|e| anyhow!("Failed to copy subtitle track: {e}"))?;
                     }
                     TrackSource::FromVideo(j) => {
                         subtitle_out = input_vpy.with_extension(format!("{}.ass", i));
                         if extract_subtitles(&source_video, *j, &subtitle_out).is_err() {
                             subtitle_out = input_vpy.with_extension(format!("{}.srt", i));
-                            extract_subtitles(&source_video, *j, &subtitle_out)?;
+                            extract_subtitles(&source_video, *j, &subtitle_out)
+                                .map_err(|e| anyhow!("Failed to extract subtitle track: {e}"))?;
                         }
                     }
                 }
@@ -542,7 +544,8 @@ fn process_file(
             }
         }
 
-        let timestamps = fs::read_dir(input_vpy.parent().expect("file has a parent dir"))?
+        let timestamps = fs::read_dir(input_vpy.parent().expect("file has a parent dir"))
+            .map_err(|e| anyhow!("Failed to read script's parent directory: {e}"))?
             .filter_map(Result::ok)
             .find_map(|item| {
                 let path = item.path();
@@ -568,9 +571,11 @@ fn process_file(
                 .any(|track| matches!(track.source, TrackSource::FromVideo(_))),
             ignore_delay || has_vpy_audio.is_some(),
             &output_path,
-        )?;
+        )
+        .map_err(|e| anyhow!("Failed to mux vide: {e}"))?;
 
-        copy_extra_data(&source_video, &output_path)?;
+        copy_extra_data(&source_video, &output_path)
+            .map_err(|e| anyhow!("Failed to copy extra data: {e}"))?;
 
         eprintln!(
             "{} {} {}",
