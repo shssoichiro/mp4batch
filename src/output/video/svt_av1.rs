@@ -50,10 +50,15 @@ pub fn build_svtav1_args_string(
     } else {
         "0"
     };
+    let tune = match profile {
+        Profile::Film | Profile::Grain | Profile::AnimeGrain => '2',
+        Profile::Anime | Profile::AnimeDetailed => '1',
+        Profile::Fast => '0',
+    };
     format!(
         " --input-depth {depth} --rc 0 --enable-qm 1 \
         --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 --complex-hvs 1 \
-        --preset {speed} --crf {crf} --tune 2 \
+        --preset {speed} --crf {crf} --tune {tune} \
         --qm-min {qm_min} --psy-rd {psy_rd} --hbd-mds {hbd_mds} \
         --tile-columns {tile_cols} --tile-rows {tile_rows} --lp {threads} --pin 0 \
         --color-primaries {prim} --matrix-coefficients {matrix} \
