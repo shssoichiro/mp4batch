@@ -579,8 +579,8 @@ fn process_file(
         )
         .map_err(|e| anyhow!("Failed to mux video: {e}"))?;
 
-        copy_extra_data(&source_video, &output_path)
-            .map_err(|e| anyhow!("Failed to copy extra data: {e}"))?;
+        let _ = copy_extra_data(&source_video, &output_path)
+            .map_err(|e| anyhow!("Failed to copy extra data: {e}"));
 
         eprintln!(
             "{} {} {}",
