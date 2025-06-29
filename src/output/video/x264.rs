@@ -1,7 +1,7 @@
-use ansi_term::Color::Yellow;
 use av_data::pixel::{
     ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
 };
+use colored::*;
 use std::sync::atomic::Ordering;
 use std::{
     env::temp_dir,
@@ -35,19 +35,19 @@ pub fn convert_video_x264(
     if dimensions.width % 8 != 0 {
         eprintln!(
             "{} {} {} {}",
-            Yellow.bold().paint("[Warning]"),
-            Yellow.paint("Width"),
-            Yellow.paint(dimensions.width.to_string()),
-            Yellow.paint("is not divisble by 8")
+            "[Warning]".yellow().bold(),
+            "Width".yellow(),
+            dimensions.width.to_string().yellow(),
+            "is not divisble by 8".yellow()
         );
     }
     if dimensions.height % 8 != 0 {
         eprintln!(
             "{} {} {} {}",
-            Yellow.bold().paint("[Warning]"),
-            Yellow.paint("Height"),
-            Yellow.paint(dimensions.height.to_string()),
-            Yellow.paint("is not divisble by 8")
+            "[Warning]".yellow().bold(),
+            "Height".yellow(),
+            dimensions.height.to_string().yellow(),
+            "is not divisble by 8".yellow()
         );
     }
 

@@ -2,8 +2,8 @@ use crate::{
     cli::{Track, TrackSource},
     find_source_file, monitor_for_sigterm,
 };
-use ansi_term::Colour::Green;
 use anyhow::Result;
+use colored::*;
 use std::sync::atomic::Ordering;
 use std::{
     fmt::Display,
@@ -310,8 +310,8 @@ pub fn save_vpy_audio(
 
     eprintln!(
         "{} {}",
-        Green.bold().paint("[Success]"),
-        Green.paint("Finished extracting Vapoursynth audio"),
+        "[Success]".green().bold(),
+        "Finished extracting Vapoursynth audio".green(),
     );
 
     Ok(())

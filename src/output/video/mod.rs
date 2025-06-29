@@ -1,5 +1,5 @@
-use ansi_term::Colour::{Green, Yellow};
 use anyhow::Result;
+use colored::*;
 use std::sync::atomic::Ordering;
 use std::{
     fmt::Display,
@@ -150,8 +150,8 @@ pub fn create_lossless(
             if !verify_frame_count || diff <= allowance {
                 eprintln!(
                     "{} {}",
-                    Green.bold().paint("[Success]"),
-                    Green.paint("Lossless already exists"),
+                    "[Success]".green().bold(),
+                    "Lossless already exists".green(),
                 );
                 return Ok(());
             }
@@ -231,8 +231,8 @@ pub fn create_lossless(
 
     eprintln!(
         "{} {}",
-        Green.bold().paint("[Success]"),
-        Green.paint("Finished encoding lossless"),
+        "[Success]".green().bold(),
+        "Finished encoding lossless".green(),
     );
 
     Ok(())
@@ -249,19 +249,19 @@ pub fn convert_video_av1an(
     if dimensions.width % 8 != 0 {
         eprintln!(
             "{} {} {} {}",
-            Yellow.bold().paint("[Warning]"),
-            Yellow.paint("Width"),
-            Yellow.paint(dimensions.width.to_string()),
-            Yellow.paint("is not divisble by 8")
+            "[Warning]".yellow().bold(),
+            "Width".yellow(),
+            dimensions.width.to_string().yellow(),
+            "is not divisble by 8".yellow()
         );
     }
     if dimensions.height % 8 != 0 {
         eprintln!(
             "{} {} {} {}",
-            Yellow.bold().paint("[Warning]"),
-            Yellow.paint("Height"),
-            Yellow.paint(dimensions.height.to_string()),
-            Yellow.paint("is not divisble by 8")
+            "[Warning]".yellow().bold(),
+            "Height".yellow(),
+            dimensions.height.to_string().yellow(),
+            "is not divisble by 8".yellow()
         );
     }
 

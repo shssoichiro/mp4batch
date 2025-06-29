@@ -1,6 +1,6 @@
-use ansi_term::Colour::{Blue, Green, Red};
 use anyhow::{Result, anyhow, bail};
 use clap::Parser;
+use colored::*;
 use dotenvy_macro::dotenv;
 use itertools::Itertools;
 use lexical_sort::natural_lexical_cmp;
@@ -267,14 +267,13 @@ fn main() {
         if let Err(err) = result {
             eprintln!(
                 "{} Failed processing file {}: {}",
-                Red.bold().paint("[Error]"),
-                Red.paint(
-                    input
-                        .file_name()
-                        .expect("File should have a name")
-                        .to_string_lossy()
-                ),
-                Red.paint(err.to_string())
+                "[Error]".red().bold(),
+                input
+                    .file_name()
+                    .expect("File should have a name")
+                    .to_string_lossy()
+                    .red(),
+                err.to_string().red()
             );
         }
         eprintln!();
@@ -313,32 +312,32 @@ fn process_file(
     let colorimetry = get_video_colorimetry(input_vpy)?;
     eprintln!(
         "{} {} {}{}{}{}",
-        Blue.bold().paint("[Info]"),
-        Blue.bold().paint(
+        "[Info]".blue().bold(),
+        source_video
+            .file_name()
+            .expect("File should have a name")
+            .to_string_lossy()
+            .blue()
+            .bold(),
+        "(".blue(),
+        Size::from_bytes(
             source_video
-                .file_name()
-                .expect("File should have a name")
-                .to_string_lossy()
-        ),
-        Blue.paint("("),
-        Blue.bold().paint(
-            Size::from_bytes(
-                source_video
-                    .metadata()
-                    .expect("Unable to get source file metadata")
-                    .len()
-            )
-            .format()
-            .to_string()
-        ),
+                .metadata()
+                .expect("Unable to get source file metadata")
+                .len()
+        )
+        .format()
+        .to_string()
+        .blue()
+        .bold(),
         mediainfo
             .get("Stream size")
             .map_or_else(String::new, |stream_size| format!(
                 "{}{}",
-                Blue.paint(" - Video stream: "),
-                Blue.bold().paint(stream_size)
+                " - Video stream: ".blue(),
+                stream_size.blue().bold()
             )),
-        Blue.paint(")")
+        ")".blue(),
     );
     if outputs
         .iter()
@@ -349,15 +348,14 @@ fn process_file(
     if !skip_lossless {
         eprintln!(
             "{} {} {} {}",
-            Blue.bold().paint("[Info]"),
-            Blue.paint("Encoding"),
-            Blue.paint(
-                input_vpy
-                    .file_name()
-                    .expect("File should have a name")
-                    .to_string_lossy()
-            ),
-            Blue.paint("lossless")
+            "[Info]".blue().bold(),
+            "Encoding".blue(),
+            input_vpy
+                .file_name()
+                .expect("File should have a name")
+                .to_string_lossy()
+                .blue(),
+            "lossless".blue()
         );
         let mut retry_count = 0;
         loop {
@@ -385,16 +383,16 @@ fn process_file(
                     if no_retry || retry_count >= 3 {
                         bail!(
                             "{} {}: {}",
-                            Red.bold().paint("[Error]"),
-                            Red.paint("While encoding lossless"),
+                            "[Error]".red().bold(),
+                            "While encoding lossless".red(),
                             e
                         );
                     } else {
                         retry_count += 1;
                         eprintln!(
                             "{} {}: {}",
-                            Red.bold().paint("[Error]"),
-                            Red.paint("While encoding lossless"),
+                            "[Error]".red().bold(),
+                            "While encoding lossless".red(),
                             e
                         );
                     }
@@ -419,14 +417,13 @@ fn process_file(
         let output_vpy = input_vpy.with_extension(format!("{}.vpy", video_suffix));
         eprintln!(
             "{} {} {}",
-            Blue.bold().paint("[Info]"),
-            Blue.paint("Encoding"),
-            Blue.paint(
-                output_vpy
-                    .file_name()
-                    .expect("File should have a name")
-                    .to_string_lossy()
-            )
+            "[Info]".blue().bold(),
+            "Encoding".blue(),
+            output_vpy
+                .file_name()
+                .expect("File should have a name")
+                .to_string_lossy()
+                .blue()
         );
 
         let video_out = output_vpy.with_extension("mkv");
@@ -584,14 +581,13 @@ fn process_file(
 
         eprintln!(
             "{} {} {}",
-            Green.bold().paint("[Success]"),
-            Green.paint("Finished encoding"),
-            Green.paint(
-                output_vpy
-                    .file_name()
-                    .expect("File should have a name")
-                    .to_string_lossy()
-            )
+            "[Success]".green().bold(),
+            "Finished encoding".green(),
+            output_vpy
+                .file_name()
+                .expect("File should have a name")
+                .to_string_lossy()
+                .green()
         );
         eprintln!();
     }
@@ -915,7 +911,7 @@ fn monitor_for_sigterm(child: &Child, sigterm: Arc<AtomicBool>, child_is_done: A
             use winapi::um::winnt::PROCESS_TERMINATE;
 
             unsafe {
-                let handle = OpenProcess(PROCESS_TERMINATE, false, child_pid);
+                let handle = OpenProcess(PROCESS_TERMINATE, 0, child_pid);
                 if !handle.is_null() {
                     TerminateProcess(handle, 1);
                     CloseHandle(handle);
