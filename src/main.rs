@@ -544,20 +544,25 @@ fn process_file(
             }
         }
 
-        let timestamps = fs::read_dir(input_vpy.parent().expect("file has a parent dir"))
-            .map_err(|e| anyhow!("Failed to read script's parent directory: {e}"))?
-            .filter_map(Result::ok)
-            .find_map(|item| {
-                let path = item.path();
-                let file_name = path.file_name().unwrap().to_string_lossy();
-                if file_name.starts_with(input_vpy.file_stem().unwrap().to_str().unwrap())
-                    && file_name.contains(".vfr.")
-                {
-                    Some(path)
-                } else {
-                    None
-                }
-            });
+        let timestamps = fs::read_dir(
+            input_vpy
+                .canonicalize()?
+                .parent()
+                .expect("file has a parent dir"),
+        )
+        .map_err(|e| anyhow!("Failed to read script's parent directory: {e}"))?
+        .filter_map(Result::ok)
+        .find_map(|item| {
+            let path = item.path();
+            let file_name = path.file_name().unwrap().to_string_lossy();
+            if file_name.starts_with(input_vpy.file_stem().unwrap().to_str().unwrap())
+                && file_name.contains(".vfr.")
+            {
+                Some(path)
+            } else {
+                None
+            }
+        });
 
         mux_video(
             &source_video,
@@ -572,7 +577,7 @@ fn process_file(
             ignore_delay || has_vpy_audio.is_some(),
             &output_path,
         )
-        .map_err(|e| anyhow!("Failed to mux vide: {e}"))?;
+        .map_err(|e| anyhow!("Failed to mux video: {e}"))?;
 
         copy_extra_data(&source_video, &output_path)
             .map_err(|e| anyhow!("Failed to copy extra data: {e}"))?;
