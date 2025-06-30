@@ -36,6 +36,8 @@ pub fn mux_video(
 ) -> Result<()> {
     let mut track_order = vec!["0:0".to_string()];
     let mut inputs_read = 1;
+
+    // Base command and video input
     let mut command = Command::new("mkvmerge");
     command
         .arg("--output")
@@ -49,6 +51,13 @@ pub fn mux_video(
         .arg("(")
         .arg(video)
         .arg(")");
+    // Attach timestamps to video
+    if let Some(timestamps) = timestamps {
+        command
+            .arg("--timestamps")
+            .arg(format!("0:{}", timestamps.to_string_lossy()));
+    }
+
     if !audios.is_empty() {
         for audio in audios {
             let audio_delay = if ignore_delay || audio.2 == AudioEncoder::Copy {
@@ -78,11 +87,7 @@ pub fn mux_video(
                 .arg("--no-subtitles")
                 .arg("--no-attachments")
                 .arg("--no-chapters");
-            if let Some(timestamps) = timestamps {
-                command
-                    .arg("--timestamps")
-                    .arg(format!("0:{}", timestamps.to_string_lossy()));
-            }
+
             if audio_delay != 0 {
                 command.arg("--sync").arg(format!("{}:{}", 0, audio_delay));
             }
