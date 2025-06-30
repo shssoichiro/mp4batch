@@ -55,10 +55,15 @@ pub fn build_svtav1_args_string(
         Profile::Anime | Profile::AnimeDetailed => '1',
         Profile::Fast => '0',
     };
+    let complex_hvs = if psy_rd.parse::<f32>().unwrap() >= 1.0 {
+        "1"
+    } else {
+        "0"
+    };
     format!(
         " --input-depth {depth} --rc 0 --enable-qm 1 \
-        --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 --complex-hvs 1 \
-        --preset {speed} --crf {crf} --tune {tune} \
+        --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 \
+        --preset {speed} --crf {crf} --tune {tune} --complex-hvs {complex_hvs} \
         --qm-min {qm_min} --psy-rd {psy_rd} --hbd-mds {hbd_mds} \
         --tile-columns {tile_cols} --tile-rows {tile_rows} --lp {threads} --pin 0 \
         --color-primaries {prim} --matrix-coefficients {matrix} \
