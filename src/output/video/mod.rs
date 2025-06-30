@@ -140,6 +140,7 @@ pub fn create_lossless(
     dimensions: VideoDimensions,
     verify_frame_count: bool,
     sigterm: Arc<AtomicBool>,
+    slow: bool,
 ) -> Result<PathBuf> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
@@ -199,7 +200,7 @@ pub fn create_lossless(
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
-        .arg("ultrafast")
+        .arg(if slow { "fast" } else { "ultrafast" })
         .arg("-qp")
         .arg("0")
         .arg(&lossless_filename)

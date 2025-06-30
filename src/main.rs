@@ -376,6 +376,7 @@ fn process_file(
                 dimensions,
                 verify_frame_count,
                 Arc::clone(&sigterm),
+                keep_lossless,
             );
             match result {
                 Ok(lf) => {
