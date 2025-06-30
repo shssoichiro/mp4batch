@@ -68,23 +68,35 @@ fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
         .get("Width")
         .expect("Width should be specified in mediainfo output")
         .replace(' ', "")
+        .replace(" pixels", "")
+        .trim()
         .parse()?;
     let height = mediainfo
         .get("Height")
         .expect("Height should be specified in mediainfo output")
         .replace(' ', "")
+        .replace(" pixels", "")
+        .trim()
         .parse()?;
-    let fps = (
-        mediainfo
-            .get("Frame rate")
-            .expect("Frame rate should be specified in mediainfo output")
-            .parse::<f32>()?
-            .round() as u32,
-        1,
-    );
+    let frac_regex = Regex::new(r"\((\d+)\/(\d+)\) FPS").unwrap();
+    let fps_str = mediainfo
+        .get("Frame rate")
+        .expect("Frame rate should be specified in mediainfo output");
+    let fps = if let Some(captures) = frac_regex.captures(fps_str) {
+        (
+            captures.get(1).unwrap().as_str().parse::<u32>()?,
+            captures.get(2).unwrap().as_str().parse::<u32>()?,
+        )
+    } else {
+        (
+            (fps_str.replace(" FPS", "").trim().parse::<f32>()? * 1000.0) as u32,
+            1000,
+        )
+    };
     let bit_depth = mediainfo
         .get("Bit depth")
         .expect("Bit depth should be specified in mediainfo output")
+        .replace(" bits", "")
         .parse()?;
     let pixel_format = match mediainfo
         .get("Chroma subsampling")
