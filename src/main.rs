@@ -345,6 +345,7 @@ fn process_file(
     {
         skip_lossless = true;
     }
+    let mut lossless_filename = None;
     if !skip_lossless {
         eprintln!(
             "{} {} {} {}",
@@ -358,6 +359,7 @@ fn process_file(
             "lossless".blue()
         );
         let mut retry_count = 0;
+
         loop {
             if sigterm.load(Ordering::Relaxed) {
                 bail!("Exited via Ctrl+C");
@@ -376,7 +378,8 @@ fn process_file(
                 Arc::clone(&sigterm),
             );
             match result {
-                Ok(_) => {
+                Ok(lf) => {
+                    lossless_filename = Some(lf);
                     break;
                 }
                 Err(e) => {
@@ -451,10 +454,17 @@ fn process_file(
                 )?;
             }
             encoder => {
+                let should_use_vpy = skip_lossless
+                    || output.video.bit_depth.is_some()
+                    || output.video.resolution.is_some();
                 build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
                 let dimensions = get_video_dimensions(&output_vpy)?;
                 convert_video_av1an(
-                    &output_vpy,
+                    if should_use_vpy {
+                        &output_vpy
+                    } else {
+                        lossless_filename.as_ref().unwrap()
+                    },
                     &video_out,
                     encoder,
                     dimensions,

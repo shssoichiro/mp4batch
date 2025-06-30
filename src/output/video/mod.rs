@@ -1,5 +1,6 @@
 use anyhow::Result;
 use colored::*;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::{
     fmt::Display,
@@ -139,7 +140,7 @@ pub fn create_lossless(
     dimensions: VideoDimensions,
     verify_frame_count: bool,
     sigterm: Arc<AtomicBool>,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
         if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
@@ -153,7 +154,7 @@ pub fn create_lossless(
                     "[Success]".green().bold(),
                     "Lossless already exists".green(),
                 );
-                return Ok(());
+                return Ok(lossless_filename);
             }
         }
     }
@@ -235,11 +236,11 @@ pub fn create_lossless(
         "Finished encoding lossless".green(),
     );
 
-    Ok(())
+    Ok(lossless_filename)
 }
 
 pub fn convert_video_av1an(
-    vpy_input: &Path,
+    input: &Path,
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
@@ -302,7 +303,7 @@ pub fn convert_video_av1an(
     let mut command = Command::new("av1an");
     command
         .arg("-i")
-        .arg(absolute_path(vpy_input).expect("Unable to get absolute path"))
+        .arg(absolute_path(input).expect("Unable to get absolute path"))
         .arg("-e")
         .arg(encoder.get_av1an_name())
         .arg("-v")
