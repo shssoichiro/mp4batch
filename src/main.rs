@@ -810,6 +810,7 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     writeln!(script, "import vapoursynth as vs").unwrap();
     writeln!(script, "core = vs.core").unwrap();
     writeln!(script, "core.max_cache_size=1024").unwrap();
+    writeln!(script, "core.num_threads=1").unwrap();
     writeln!(
         script,
         "clip = core.bs.VideoSource(source=\"{}\", cachepath=\"/\")",
