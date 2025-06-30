@@ -458,8 +458,13 @@ fn process_file(
                 let should_use_vpy = skip_lossless
                     || output.video.bit_depth.is_some()
                     || output.video.resolution.is_some();
-                build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
-                let dimensions = get_video_dimensions(&output_vpy)?;
+
+                let dimensions = if should_use_vpy {
+                    build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
+                    get_video_dimensions(&output_vpy)?
+                } else {
+                    get_video_dimensions(lossless_filename.as_ref().unwrap())?
+                };
                 convert_video_av1an(
                     if should_use_vpy {
                         &output_vpy

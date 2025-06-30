@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use av_data::pixel::{
     ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
     YUVRange,
@@ -57,42 +57,52 @@ pub fn get_video_dimensions(input: &Path) -> Result<VideoDimensions> {
     if filename.ends_with(".vpy") {
         get_video_dimensions_vps(input)
     } else {
-        get_video_dimensions_ffprobe(input)
+        get_video_dimensions_mediainfo(input)
     }
 }
 
-fn get_video_dimensions_ffprobe(input: &Path) -> Result<VideoDimensions> {
+fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
     let mediainfo = get_video_mediainfo(input)?;
 
     let width = mediainfo
         .get("Width")
-        .expect("Width should be specified in ffprobe output")
+        .expect("Width should be specified in mediainfo output")
         .replace(' ', "")
         .parse()?;
     let height = mediainfo
         .get("Height")
-        .expect("Height should be specified in ffprobe output")
+        .expect("Height should be specified in mediainfo output")
         .replace(' ', "")
         .parse()?;
     let fps = (
         mediainfo
             .get("Frame rate")
-            .expect("Frame rate should be specified in ffprobe output")
+            .expect("Frame rate should be specified in mediainfo output")
             .parse::<f32>()?
             .round() as u32,
         1,
     );
     let bit_depth = mediainfo
         .get("Bit depth")
-        .expect("Bit depth should be specified in ffprobe output")
+        .expect("Bit depth should be specified in mediainfo output")
         .parse()?;
+    let pixel_format = match mediainfo
+        .get("Chroma subsampling")
+        .expect("Chroma subsampling should be specified in mediainfo output")
+        .as_str()
+    {
+        "4:2:0" => PixelFormat::Yuv420,
+        "4:2:2" => PixelFormat::Yuv422,
+        "4:4:4" => PixelFormat::Yuv444,
+        _ => bail!("Unimplemented pixel format"),
+    };
 
     Ok(VideoDimensions {
         width,
         height,
         fps,
-        frames: 0,
-        pixel_format: PixelFormat::Yuv420,
+        frames: get_video_frame_count(input)?,
+        pixel_format,
         bit_depth,
     })
 }
