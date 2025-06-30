@@ -10,9 +10,10 @@ use crate::{
     find_source_file, get_audio_delay_ms,
 };
 
-pub use self::{audio::*, video::*};
+pub use self::{audio::*, hdr::*, video::*};
 
 mod audio;
+mod hdr;
 mod video;
 
 #[derive(Debug, Clone, Default)]

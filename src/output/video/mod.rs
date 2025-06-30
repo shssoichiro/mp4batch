@@ -530,16 +530,3 @@ impl VideoEncoder {
         )
     }
 }
-
-pub fn copy_extra_data(input: &Path, target: &Path) -> Result<()> {
-    let status = Command::new("hdrcopier")
-        .arg("copy")
-        .arg("--chapters")
-        .arg(input)
-        .arg(target)
-        .status()?;
-    if !status.success() {
-        anyhow::bail!("Error copying hdr data");
-    }
-    Ok(())
-}
