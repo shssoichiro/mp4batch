@@ -542,8 +542,7 @@ fn process_file(
         }
 
         let timestamps = fs::read_dir(
-            input_vpy
-                .canonicalize()?
+            absolute_path(input_vpy)?
                 .parent()
                 .expect("file has a parent dir"),
         )

@@ -37,7 +37,6 @@ pub fn mux_video(
     let mut track_order = vec!["0:0".to_string()];
     let mut inputs_read = 1;
 
-    // Base command and video input
     let mut command = Command::new("mkvmerge");
     command
         .arg("--output")
@@ -45,18 +44,18 @@ pub fn mux_video(
         .arg("--no-audio")
         .arg("--no-subtitles")
         .arg("--no-attachments")
-        .arg("--no-chapters")
-        .arg("--language")
-        .arg("0:en")
-        .arg("(")
-        .arg(video)
-        .arg(")");
-    // Attach timestamps to video
+        .arg("--no-chapters");
     if let Some(timestamps) = timestamps {
         command
             .arg("--timestamps")
             .arg(format!("0:{}", timestamps.to_string_lossy()));
     }
+    command
+        .arg("--language")
+        .arg("0:en")
+        .arg("(")
+        .arg(video)
+        .arg(")");
 
     if !audios.is_empty() {
         for audio in audios {
