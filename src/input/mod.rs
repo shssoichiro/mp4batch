@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use av_data::pixel::{
     ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
     YUVRange,
@@ -67,29 +67,46 @@ fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
     let width = mediainfo
         .get("Width")
         .expect("Width should be specified in mediainfo output")
-        .replace(' ', "")
         .replace(" pixels", "")
+        .replace(' ', "")
         .trim()
-        .parse()?;
+        .parse()
+        .context("failed to parse width")?;
     let height = mediainfo
         .get("Height")
         .expect("Height should be specified in mediainfo output")
-        .replace(' ', "")
         .replace(" pixels", "")
+        .replace(' ', "")
         .trim()
-        .parse()?;
+        .parse()
+        .context("failed to parse height")?;
     let frac_regex = Regex::new(r"\((\d+)\/(\d+)\) FPS").unwrap();
     let fps_str = mediainfo
         .get("Frame rate")
         .expect("Frame rate should be specified in mediainfo output");
     let fps = if let Some(captures) = frac_regex.captures(fps_str) {
         (
-            captures.get(1).unwrap().as_str().parse::<u32>()?,
-            captures.get(2).unwrap().as_str().parse::<u32>()?,
+            captures
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse::<u32>()
+                .context("failed to parse fps numer")?,
+            captures
+                .get(2)
+                .unwrap()
+                .as_str()
+                .parse::<u32>()
+                .context("failed to parse fps denom")?,
         )
     } else {
         (
-            (fps_str.replace(" FPS", "").trim().parse::<f32>()? * 1000.0) as u32,
+            (fps_str
+                .replace(" FPS", "")
+                .trim()
+                .parse::<f32>()
+                .context("failed to parse fps")?
+                * 1000.0) as u32,
             1000,
         )
     };
@@ -97,7 +114,8 @@ fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
         .get("Bit depth")
         .expect("Bit depth should be specified in mediainfo output")
         .replace(" bits", "")
-        .parse()?;
+        .parse()
+        .context("failed to parse bit depth")?;
     let pixel_format = match mediainfo
         .get("Chroma subsampling")
         .expect("Chroma subsampling should be specified in mediainfo output")
@@ -125,7 +143,7 @@ pub fn get_video_frame_count(input: &Path) -> Result<u32> {
         .arg(input)
         .output()?;
     let output = String::from_utf8_lossy(&command.stdout);
-    Ok(output.trim().parse()?)
+    output.trim().parse().context("failed to parse frame count")
 }
 
 fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
