@@ -2,8 +2,6 @@ use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use colored::*;
 use dotenvy_macro::dotenv;
-use itertools::Itertools;
-use lexical_sort::natural_lexical_cmp;
 use path_clean::PathClean;
 use signal_hook::{
     consts::{SIGINT, SIGTERM},
@@ -22,16 +20,18 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
     thread,
 };
-use walkdir::WalkDir;
 use which::which;
 
-use crate::cli::{ParsedFilter, Track, TrackSource, parse_filters};
+use crate::cli::{Track, TrackSource};
 
 use self::{input::*, output::*};
 
 mod cli;
+mod file_discovery;
 mod input;
 mod output;
+mod output_configuration;
+mod workflow;
 
 #[derive(Parser, Debug)]
 struct InputArgs {
@@ -127,159 +127,20 @@ fn main() {
     eprintln!("DID YOU INSTALL FONTS???");
     eprintln!();
 
-    let inputs = if input.is_file() {
-        vec![input.to_path_buf()]
-    } else if input.is_dir() {
-        WalkDir::new(input)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .map(|ext| ext.to_string_lossy().to_string())
-                    == Some("vpy".to_string())
-            })
-            .filter(|e| {
-                let filestem = e
-                    .path()
-                    .file_stem()
-                    .expect("File should have a name")
-                    .to_string_lossy();
-                !(filestem.contains(".aom-q")
-                    || filestem.contains(".rav1e-q")
-                    || filestem.contains(".svt-q")
-                    || filestem.contains(".x264-q")
-                    || filestem.contains(".x265-q")
-                    || filestem.ends_with(".copy"))
-            })
-            .map(|e| e.path().to_path_buf())
-            .sorted_unstable_by(|a, b| {
-                natural_lexical_cmp(&a.to_string_lossy(), &b.to_string_lossy())
-            })
-            .collect()
-    } else {
-        panic!("Input is neither a file nor a directory");
-    };
-
-    for input in inputs {
-        let outputs = args.formats.as_ref().map_or_else(
-            || vec![Output::default()],
-            |formats| {
-                let formats = formats.trim();
-                if formats.is_empty() {
-                    return vec![Output::default()];
-                }
-                formats
-                    .split(';')
-                    .map(|format| {
-                        let mut output = Output::default();
-                        let filters = parse_filters(format, &input);
-                        if let Some(encoder) = filters.iter().find_map(|filter| {
-                            if let ParsedFilter::VideoEncoder(encoder) = filter {
-                                Some(encoder)
-                            } else {
-                                None
-                            }
-                        }) {
-                            match encoder.to_lowercase().as_str() {
-                                "x264" => {
-                                    which("x264")
-                                        .map_err(|_| anyhow!("x264 not installed or not in PATH!"))
-                                        .unwrap();
-                                    // This is the default, do nothing
-                                }
-                                "x265" => {
-                                    which("x265")
-                                        .map_err(|_| anyhow!("x265 not installed or not in PATH!"))
-                                        .unwrap();
-                                    output.video.encoder = VideoEncoder::X265 {
-                                        crf: 18,
-                                        profile: Profile::Film,
-                                        compat: false,
-                                    }
-                                }
-                                "aom" => {
-                                    which("aomenc")
-                                        .map_err(|_| {
-                                            anyhow!("aomenc not installed or not in PATH!")
-                                        })
-                                        .unwrap();
-                                    output.video.encoder = VideoEncoder::Aom {
-                                        crf: 16,
-                                        speed: 4,
-                                        profile: Profile::Film,
-                                        grain: 0,
-                                        compat: false,
-                                    }
-                                }
-                                "rav1e" => {
-                                    which("rav1e")
-                                        .map_err(|_| anyhow!("rav1e not installed or not in PATH!"))
-                                        .unwrap();
-                                    output.video.encoder = VideoEncoder::Rav1e {
-                                        crf: 40,
-                                        speed: 5,
-                                        profile: Profile::Film,
-                                        grain: 0,
-                                    }
-                                }
-                                "svt" => {
-                                    which("SvtAv1EncApp")
-                                        .map_err(|_| {
-                                            anyhow!("SvtAv1EncApp not installed or not in PATH!")
-                                        })
-                                        .unwrap();
-                                    output.video.encoder = VideoEncoder::SvtAv1 {
-                                        crf: 16,
-                                        speed: 4,
-                                        profile: Profile::Film,
-                                        grain: 0,
-                                    }
-                                }
-                                "copy" => {
-                                    output.video.encoder = VideoEncoder::Copy;
-                                }
-                                enc => panic!("Unrecognized encoder: {}", enc),
-                            }
-                        }
-                        for filter in &filters {
-                            apply_filter(filter, &mut output);
-                        }
-                        output
-                    })
-                    .collect()
-            },
-        );
-
-        let result = process_file(
-            &input,
-            &outputs,
-            args.output.as_deref(),
-            args.keep_lossless,
-            args.lossless_only,
-            args.skip_lossless,
-            &args.force_keyframes,
-            !args.no_verify,
-            args.no_delay,
-            args.no_retry,
-            Arc::clone(&sigterm),
-        );
-        if let Err(err) = result {
-            eprintln!(
-                "{} Failed processing file {}: {}",
-                "[Error]".red().bold(),
-                input
-                    .file_name()
-                    .expect("File should have a name")
-                    .to_string_lossy()
-                    .red(),
-                err.to_string().red()
-            );
-        }
-        eprintln!();
-        if sigterm.load(Ordering::Relaxed) {
-            return;
-        }
+    if let Err(err) = workflow::run_processing_workflow(
+        input,
+        args.formats.as_ref(),
+        args.output.as_deref(),
+        args.keep_lossless,
+        args.lossless_only,
+        args.skip_lossless,
+        &args.force_keyframes,
+        !args.no_verify,
+        args.no_delay,
+        args.no_retry,
+        Arc::clone(&sigterm),
+    ) {
+        eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
     }
 }
 
@@ -629,129 +490,6 @@ fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 
 fn escape_python_string(input: &str) -> String {
     input.replace('\\', r"\\").replace('\'', r"\'")
-}
-
-fn apply_filter(filter: &ParsedFilter, output: &mut Output) {
-    match filter {
-        ParsedFilter::VideoEncoder(_) => (),
-        ParsedFilter::Quantizer(arg) => {
-            let arg = *arg;
-            let range = match output.video.encoder {
-                VideoEncoder::X264 { ref mut crf, .. } => {
-                    *crf = arg;
-                    (-12, 51)
-                }
-                VideoEncoder::X265 { ref mut crf, .. } => {
-                    *crf = arg;
-                    (0, 51)
-                }
-                VideoEncoder::Aom { ref mut crf, .. }
-                | VideoEncoder::SvtAv1 { ref mut crf, .. } => {
-                    *crf = arg;
-                    (0, 63)
-                }
-                VideoEncoder::Rav1e { ref mut crf, .. } => {
-                    *crf = arg;
-                    (0, 255)
-                }
-                VideoEncoder::Copy => {
-                    return;
-                }
-            };
-            if arg < range.0 || arg > range.1 {
-                panic!(
-                    "'q' must be between {} and {}, received {}",
-                    range.0, range.1, arg
-                );
-            }
-        }
-        ParsedFilter::Speed(arg) => match output.video.encoder {
-            VideoEncoder::Aom { ref mut speed, .. }
-            | VideoEncoder::Rav1e { ref mut speed, .. }
-            | VideoEncoder::SvtAv1 { ref mut speed, .. } => {
-                let arg = *arg;
-                if arg > 10 {
-                    panic!("'s' must be between 0 and 10, received {}", arg);
-                }
-                *speed = arg;
-            }
-            _ => (),
-        },
-        ParsedFilter::Profile(arg) => match output.video.encoder {
-            VideoEncoder::X264 {
-                ref mut profile, ..
-            }
-            | VideoEncoder::X265 {
-                ref mut profile, ..
-            }
-            | VideoEncoder::Aom {
-                ref mut profile, ..
-            }
-            | VideoEncoder::Rav1e {
-                ref mut profile, ..
-            }
-            | VideoEncoder::SvtAv1 {
-                ref mut profile, ..
-            } => {
-                *profile = *arg;
-            }
-            VideoEncoder::Copy => (),
-        },
-        ParsedFilter::Grain(arg) => match output.video.encoder {
-            VideoEncoder::Aom { ref mut grain, .. }
-            | VideoEncoder::Rav1e { ref mut grain, .. }
-            | VideoEncoder::SvtAv1 { ref mut grain, .. } => {
-                let arg = *arg;
-                if arg > 64 {
-                    panic!("'grain' must be between 0 and 64, received {}", arg);
-                }
-                *grain = arg;
-            }
-            _ => (),
-        },
-        ParsedFilter::Compat(arg) => match output.video.encoder {
-            VideoEncoder::X264 { ref mut compat, .. }
-            | VideoEncoder::X265 { ref mut compat, .. }
-            | VideoEncoder::Aom { ref mut compat, .. } => {
-                *compat = *arg;
-            }
-            _ => (),
-        },
-        ParsedFilter::Extension(arg) => {
-            output.video.output_ext = (*arg).to_string();
-        }
-        ParsedFilter::BitDepth(arg) => {
-            output.video.bit_depth = Some(*arg);
-        }
-        ParsedFilter::Resolution { width, height } => {
-            output.video.resolution = Some((*width, *height));
-        }
-        ParsedFilter::AudioEncoder(arg) => {
-            output.audio.encoder = match arg.to_lowercase().as_str() {
-                "copy" => AudioEncoder::Copy,
-                "flac" => AudioEncoder::Flac,
-                "aac" => AudioEncoder::Aac,
-                "opus" => AudioEncoder::Opus,
-                arg => panic!("Invalid value provided for 'aenc': {}", arg),
-            }
-        }
-        ParsedFilter::AudioBitrate(arg) => {
-            let arg = *arg;
-            if arg == 0 {
-                panic!("'ab' must be greater than 0, got {}", arg);
-            }
-            output.audio.kbps_per_channel = arg;
-        }
-        ParsedFilter::AudioTracks(args) => {
-            output.audio_tracks.clone_from(args);
-        }
-        ParsedFilter::AudioNormalize => {
-            output.audio.normalize = true;
-        }
-        ParsedFilter::SubtitleTracks(args) => {
-            output.sub_tracks.clone_from(args);
-        }
-    }
 }
 
 fn build_video_suffix(output: &Output) -> Result<String> {
