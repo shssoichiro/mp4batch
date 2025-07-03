@@ -142,6 +142,7 @@ fn main() {
                 true,
                 true,
                 false,
+                true,
                 None,
                 !args.no_verify,
                 args.no_delay,
@@ -162,6 +163,7 @@ fn main() {
                 args.keep_lossless,
                 args.lossless_only,
                 args.skip_lossless,
+                false,
                 args.force_keyframes.as_deref(),
                 !args.no_verify,
                 args.no_delay,
@@ -192,6 +194,7 @@ fn process_file(
     keep_lossless: bool,
     lossless_only: bool,
     mut skip_lossless: bool,
+    copy_audio_to_lossless: bool,
     force_keyframes: Option<&str>,
     verify_frame_count: bool,
     ignore_delay: bool,
@@ -268,6 +271,7 @@ fn process_file(
                 verify_frame_count,
                 Arc::clone(&sigterm),
                 keep_lossless,
+                copy_audio_to_lossless,
             );
             match result {
                 Ok(lf) => {

@@ -141,6 +141,7 @@ pub fn create_lossless(
     verify_frame_count: bool,
     sigterm: Arc<AtomicBool>,
     slow: bool,
+    copy_audio_to_lossless: bool,
 ) -> Result<PathBuf> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
@@ -189,7 +190,7 @@ pub fn create_lossless(
         panic!("Unrecognized input type");
     };
     let mut command = Command::new("ffmpeg");
-    let status = command
+    command
         .arg("-hide_banner")
         .arg("-loglevel")
         .arg("level+error")
@@ -202,10 +203,15 @@ pub fn create_lossless(
         .arg("-preset")
         .arg(if slow { "fast" } else { "ultrafast" })
         .arg("-qp")
-        .arg("0")
+        .arg("0");
+    if copy_audio_to_lossless {
+        command.arg("-acodec").arg("copy");
+    }
+    command
         .arg(&lossless_filename)
         .stdin(pipe.stdout.take().expect("stdout should be writeable"))
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     let is_done = Arc::new(AtomicBool::new(false));
