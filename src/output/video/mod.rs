@@ -201,7 +201,13 @@ pub fn create_lossless(
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
-        .arg(if slow { "fast" } else { "ultrafast" })
+        // ultrafast -> superfast = 50% speed reduction, 15% size reduction
+        // superfast -> veryfast = basically identical
+        // veryfast -> fast = another 50% speed reduction, 2% size reduction
+        // so we are just going to use "superfast" for the "slow" mode
+        // as a note, ffv1 compresses with similar speed and efficiency to x264 fast,
+        // but it decodes 70% slower.
+        .arg(if slow { "superfast" } else { "ultrafast" })
         .arg("-qp")
         .arg("0");
     if copy_audio_to_lossless {
