@@ -11,12 +11,12 @@ use crate::process_file;
 #[allow(clippy::too_many_arguments)]
 pub fn run_processing_workflow(
     input_path: &Path,
-    formats: Option<&String>,
-    output_dir: Option<&str>,
+    formats: Option<&str>,
+    output_dir: Option<&Path>,
     keep_lossless: bool,
     lossless_only: bool,
     skip_lossless: bool,
-    force_keyframes: &Option<String>,
+    force_keyframes: Option<&str>,
     verify_frame_count: bool,
     ignore_delay: bool,
     no_retry: bool,

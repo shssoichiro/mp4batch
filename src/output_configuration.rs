@@ -6,7 +6,7 @@ use crate::cli::{ParsedFilter, parse_filters};
 use crate::output::{AudioEncoder, Output, Profile, VideoEncoder};
 
 /// Parses the formats string and creates output configurations
-pub fn parse_output_configurations(formats: Option<&String>, input_file: &Path) -> Vec<Output> {
+pub fn parse_output_configurations(formats: Option<&str>, input_file: &Path) -> Vec<Output> {
     formats.map_or_else(
         || vec![Output::default()],
         |formats| {

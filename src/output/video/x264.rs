@@ -28,7 +28,7 @@ pub fn convert_video_x264(
     profile: Profile,
     compat: bool,
     dimensions: VideoDimensions,
-    force_keyframes: &Option<String>,
+    force_keyframes: Option<&str>,
     colorimetry: &Colorimetry,
     sigterm: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
@@ -115,7 +115,7 @@ pub fn build_x264_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     compat: bool,
-    force_keyframes: &Option<String>,
+    force_keyframes: Option<&str>,
     colorimetry: &Colorimetry,
 ) -> anyhow::Result<String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;

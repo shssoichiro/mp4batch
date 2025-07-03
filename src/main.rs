@@ -36,11 +36,11 @@ mod workflow;
 #[derive(Parser, Debug)]
 struct InputArgs {
     /// Sets the input directory or file
-    pub input: String,
+    pub input: PathBuf,
 
     /// Override the default output directory
     #[clap(short, long, value_name = "DIR")]
-    pub output: Option<String>,
+    pub output: Option<PathBuf>,
 
     /// Takes a list of desired formats to output.
     /// Each filter is comma separated, each output is semicolon separated.
@@ -110,6 +110,15 @@ struct InputArgs {
     /// Instead of retrying failed encodes, exit immediately
     #[clap(long)]
     pub no_retry: bool,
+
+    #[command(subcommand)]
+    pub subcommand: Option<Subcommand>,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+enum Subcommand {
+    /// Just make a lossless, then exit. Copies the audio to the output.
+    Lossless,
 }
 
 fn main() {
@@ -121,26 +130,47 @@ fn main() {
 
     let args = InputArgs::parse();
 
-    let input = Path::new(&args.input);
+    let input = &args.input;
     assert!(input.exists(), "Input path does not exist");
 
-    eprintln!("DID YOU INSTALL FONTS???");
-    eprintln!();
+    match args.subcommand {
+        Some(Subcommand::Lossless) => {
+            if let Err(err) = workflow::run_processing_workflow(
+                input,
+                None,
+                absolute_path(input).unwrap().parent(),
+                true,
+                true,
+                false,
+                None,
+                !args.no_verify,
+                args.no_delay,
+                args.no_retry,
+                Arc::clone(&sigterm),
+            ) {
+                eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
+            }
+        }
+        None => {
+            eprintln!("DID YOU INSTALL FONTS???");
+            eprintln!();
 
-    if let Err(err) = workflow::run_processing_workflow(
-        input,
-        args.formats.as_ref(),
-        args.output.as_deref(),
-        args.keep_lossless,
-        args.lossless_only,
-        args.skip_lossless,
-        &args.force_keyframes,
-        !args.no_verify,
-        args.no_delay,
-        args.no_retry,
-        Arc::clone(&sigterm),
-    ) {
-        eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
+            if let Err(err) = workflow::run_processing_workflow(
+                input,
+                args.formats.as_deref(),
+                args.output.as_deref(),
+                args.keep_lossless,
+                args.lossless_only,
+                args.skip_lossless,
+                args.force_keyframes.as_deref(),
+                !args.no_verify,
+                args.no_delay,
+                args.no_retry,
+                Arc::clone(&sigterm),
+            ) {
+                eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
+            }
+        }
     }
 }
 
@@ -158,11 +188,11 @@ fn check_for_required_apps() -> Result<()> {
 fn process_file(
     input_vpy: &Path,
     outputs: &[Output],
-    output_dir: Option<&str>,
+    output_dir: Option<&Path>,
     keep_lossless: bool,
     lossless_only: bool,
     mut skip_lossless: bool,
-    force_keyframes: &Option<String>,
+    force_keyframes: Option<&str>,
     verify_frame_count: bool,
     ignore_delay: bool,
     no_retry: bool,
@@ -380,7 +410,9 @@ fn process_file(
             audio_suffixes.push(audio_suffix);
         }
         let audio_suffix = audio_suffixes.join("-");
-        let mut output_path = PathBuf::from(output_dir.unwrap_or(dotenv!("OUTPUT_PATH")));
+        let mut output_path = output_dir
+            .map(|d| d.to_owned())
+            .unwrap_or_else(|| PathBuf::from(dotenv!("OUTPUT_PATH")));
         output_path.push(
             input_vpy
                 .with_extension(format!(

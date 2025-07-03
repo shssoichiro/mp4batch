@@ -245,7 +245,7 @@ pub fn convert_video_av1an(
     output: &Path,
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
-    force_keyframes: &Option<String>,
+    force_keyframes: Option<&str>,
     colorimetry: &Colorimetry,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
@@ -464,7 +464,7 @@ impl VideoEncoder {
         computed_threads: NonZeroUsize,
         cores: NonZeroUsize,
         workers: NonZeroUsize,
-        force_keyframes: &Option<String>,
+        force_keyframes: Option<&str>,
     ) -> anyhow::Result<String> {
         Ok(match self {
             VideoEncoder::Aom {
