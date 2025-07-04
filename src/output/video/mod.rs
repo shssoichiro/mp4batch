@@ -141,7 +141,7 @@ pub fn create_lossless(
     verify_frame_count: bool,
     sigterm: Arc<AtomicBool>,
     slow: bool,
-    copy_audio_to_lossless: bool,
+    copy_audio_from: Option<&Path>,
 ) -> Result<PathBuf> {
     let lossless_filename = input.with_extension("lossless.mkv");
     if lossless_filename.exists() {
@@ -210,8 +210,14 @@ pub fn create_lossless(
         .arg(if slow { "superfast" } else { "ultrafast" })
         .arg("-qp")
         .arg("0");
-    if copy_audio_to_lossless {
-        command.arg("-acodec").arg("copy");
+    if let Some(source2) = copy_audio_from {
+        command
+            .arg("-i")
+            .arg(source2)
+            .arg("-map")
+            .arg("0:a:0")
+            .arg("-acodec")
+            .arg("copy");
     }
     command
         .arg(&lossless_filename)

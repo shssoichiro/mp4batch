@@ -271,7 +271,11 @@ fn process_file(
                 verify_frame_count,
                 Arc::clone(&sigterm),
                 keep_lossless,
-                copy_audio_to_lossless,
+                if copy_audio_to_lossless {
+                    Some(&source_video)
+                } else {
+                    None
+                },
             );
             match result {
                 Ok(lf) => {
