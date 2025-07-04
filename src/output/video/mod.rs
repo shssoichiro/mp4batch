@@ -197,7 +197,19 @@ pub fn create_lossless(
         .arg("-stats")
         .arg("-y")
         .arg("-i")
-        .arg("-")
+        .arg("-");
+    if let Some(source2) = copy_audio_from {
+        command
+            .arg("-i")
+            .arg(source2)
+            .arg("-map")
+            .arg("0:v:0")
+            .arg("-map")
+            .arg("1:a:0")
+            .arg("-acodec")
+            .arg("copy");
+    }
+    command
         .arg("-vcodec")
         .arg("libx264")
         .arg("-preset")
@@ -210,15 +222,7 @@ pub fn create_lossless(
         .arg(if slow { "superfast" } else { "ultrafast" })
         .arg("-qp")
         .arg("0");
-    if let Some(source2) = copy_audio_from {
-        command
-            .arg("-i")
-            .arg(source2)
-            .arg("-map")
-            .arg("0:a:0")
-            .arg("-acodec")
-            .arg("copy");
-    }
+
     command
         .arg(&lossless_filename)
         .stdin(pipe.stdout.take().expect("stdout should be writeable"))
