@@ -203,7 +203,7 @@ fn process_file(
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
-    let colorimetry = get_video_colorimetry(input_vpy)?;
+    let colorimetry = Colorimetry::from_path(input_vpy)?;
     eprintln!(
         "{} {} {}{}{}{}",
         "[Info]".blue().bold(),

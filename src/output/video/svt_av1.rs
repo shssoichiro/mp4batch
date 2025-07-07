@@ -1,6 +1,7 @@
-use av_data::pixel::{ChromaLocation, ToPrimitive, YUVRange};
-
-use crate::input::{Colorimetry, VideoDimensions};
+use crate::{
+    input::{Colorimetry, VideoDimensions},
+    output::VideoEncoderIdent,
+};
 
 use super::Profile;
 
@@ -11,24 +12,17 @@ pub fn build_svtav1_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     colorimetry: &Colorimetry,
-) -> String {
+) -> anyhow::Result<String> {
     let depth = dimensions.bit_depth;
     let tile_cols = i32::from(dimensions.width >= 2000);
     let tile_rows = i32::from(
         dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600),
     );
-    let prim = colorimetry.primaries.to_u8().unwrap();
-    let matrix = colorimetry.matrix.to_u8().unwrap();
-    let transfer = colorimetry.transfer.to_u8().unwrap();
-    let range = match colorimetry.range {
-        YUVRange::Limited => 0,
-        YUVRange::Full => 1,
-    };
-    let csp = match colorimetry.chroma_location {
-        ChromaLocation::TopLeft => "topleft",
-        ChromaLocation::Left => "left",
-        _ => "unknown",
-    };
+    let prim = colorimetry.get_primaries_encoder_string(VideoEncoderIdent::SvtAv1)?;
+    let matrix = colorimetry.get_matrix_encoder_string(VideoEncoderIdent::SvtAv1)?;
+    let transfer = colorimetry.get_transfer_encoder_string(VideoEncoderIdent::SvtAv1)?;
+    let range = colorimetry.get_range_encoder_string(VideoEncoderIdent::SvtAv1)?;
+    let csp = colorimetry.get_chromaloc_encoder_string(VideoEncoderIdent::SvtAv1)?;
     let qm_min = match profile {
         Profile::Grain => 8,
         Profile::AnimeGrain => 5,
@@ -60,7 +54,7 @@ pub fn build_svtav1_args_string(
     } else {
         "0"
     };
-    format!(
+    Ok(format!(
         " --input-depth {depth} --rc 0 --enable-qm 1 \
         --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 \
         --preset {speed} --crf {crf} --tune {tune} --complex-hvs {complex_hvs} \
@@ -69,5 +63,5 @@ pub fn build_svtav1_args_string(
         --color-primaries {prim} --matrix-coefficients {matrix} \
         --transfer-characteristics {transfer} --color-range {range} \
         --chroma-sample-position {csp} "
-    )
+    ))
 }

@@ -1,6 +1,3 @@
-use av_data::pixel::{
-    ChromaLocation, ColorPrimaries, MatrixCoefficients, TransferCharacteristic, YUVRange,
-};
 use colored::*;
 use std::sync::atomic::Ordering;
 use std::{
@@ -13,6 +10,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::output::VideoEncoderIdent;
 use crate::{
     absolute_path,
     input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
@@ -162,70 +160,11 @@ pub fn build_x264_args_string(
         Profile::AnimeGrain => 0.7,
         Profile::Anime | Profile::AnimeDetailed => 0.65,
     };
-    let prim = match colorimetry.primaries {
-        ColorPrimaries::BT709 => "bt709",
-        ColorPrimaries::BT470M => "bt470m",
-        ColorPrimaries::BT470BG => "bt470bg",
-        ColorPrimaries::ST170M => "smpte170m",
-        ColorPrimaries::ST240M => "smpte240m",
-        ColorPrimaries::Film => "film",
-        ColorPrimaries::BT2020 => "bt2020",
-        ColorPrimaries::ST428 => "smpte428",
-        ColorPrimaries::P3DCI => "smpte431",
-        ColorPrimaries::P3Display => "smpte432",
-        ColorPrimaries::Unspecified => panic!("Color primaries unspecified"),
-        _ => unimplemented!("Color primaries not implemented for x264"),
-    };
-    let matrix = match colorimetry.matrix {
-        MatrixCoefficients::Identity => "GBR",
-        MatrixCoefficients::BT709 => "bt709",
-        MatrixCoefficients::BT470M => "fcc",
-        MatrixCoefficients::BT470BG => "bt470bg",
-        MatrixCoefficients::ST170M => "smpte170m",
-        MatrixCoefficients::ST240M => "smpte240m",
-        MatrixCoefficients::YCgCo => "YCgCo",
-        MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
-        MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
-        MatrixCoefficients::ST2085 => "smpte2085",
-        MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
-        MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
-        MatrixCoefficients::ICtCp => "ICtCp",
-        MatrixCoefficients::Unspecified => panic!("Matrix coefficients unspecified"),
-        _ => unimplemented!("Matrix coefficients not implemented for x264"),
-    };
-    let transfer = match colorimetry.transfer {
-        TransferCharacteristic::BT1886 => "bt709",
-        TransferCharacteristic::BT470M => "bt470m",
-        TransferCharacteristic::BT470BG => "bt470bg",
-        TransferCharacteristic::ST170M => "smpte170m",
-        TransferCharacteristic::ST240M => "smpte240m",
-        TransferCharacteristic::Linear => "linear",
-        TransferCharacteristic::Logarithmic100 => "log100",
-        TransferCharacteristic::Logarithmic316 => "log316",
-        TransferCharacteristic::XVYCC => "iec61966-2-4",
-        TransferCharacteristic::BT1361E => "bt1361e",
-        TransferCharacteristic::SRGB => "iec61966-2-1",
-        TransferCharacteristic::BT2020Ten => "bt2020-10",
-        TransferCharacteristic::BT2020Twelve => "bt2020-12",
-        TransferCharacteristic::PerceptualQuantizer => "smpte2084",
-        TransferCharacteristic::ST428 => "smpte428",
-        TransferCharacteristic::HybridLogGamma => "arib-std-b67",
-        TransferCharacteristic::Unspecified => panic!("Transfer characteristics unspecified"),
-        _ => unimplemented!("Transfer characteristics not implemented for x264"),
-    };
-    let range = match colorimetry.range {
-        YUVRange::Limited => "tv",
-        YUVRange::Full => "pc",
-    };
-    let csp = match colorimetry.chroma_location {
-        ChromaLocation::Left => " --chromaloc 0",
-        ChromaLocation::Center => " --chromaloc 1",
-        ChromaLocation::TopLeft => " --chromaloc 2",
-        ChromaLocation::Top => " --chromaloc 3",
-        ChromaLocation::BottomLeft => " --chromaloc 4",
-        ChromaLocation::Bottom => " --chromaloc 5",
-        _ => "",
-    };
+    let prim = colorimetry.get_primaries_encoder_string(VideoEncoderIdent::X264)?;
+    let matrix = colorimetry.get_matrix_encoder_string(VideoEncoderIdent::X264)?;
+    let transfer = colorimetry.get_transfer_encoder_string(VideoEncoderIdent::X264)?;
+    let range = colorimetry.get_range_encoder_string(VideoEncoderIdent::X264)?;
+    let csp = colorimetry.get_chromaloc_encoder_string(VideoEncoderIdent::X264)?;
     let depth = dimensions.bit_depth;
     let vbv = if compat {
         "--level 4.1 --vbv-maxrate 50000 --vbv-bufsize 78125"

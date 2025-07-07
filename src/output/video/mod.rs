@@ -501,9 +501,9 @@ impl VideoEncoder {
                 profile,
                 colorimetry,
                 computed_threads,
-            ),
+            )?,
             VideoEncoder::Rav1e { crf, speed, .. } => {
-                build_rav1e_args_string(crf, speed, dimensions, colorimetry)
+                build_rav1e_args_string(crf, speed, dimensions, colorimetry)?
             }
             VideoEncoder::SvtAv1 {
                 crf,
@@ -517,7 +517,7 @@ impl VideoEncoder {
                 dimensions,
                 profile,
                 colorimetry,
-            ),
+            )?,
             VideoEncoder::X264 {
                 crf,
                 profile,
@@ -542,7 +542,7 @@ impl VideoEncoder {
                 compat,
                 colorimetry,
                 computed_threads,
-            ),
+            )?,
             VideoEncoder::Copy => unreachable!(),
         })
     }
@@ -552,5 +552,28 @@ impl VideoEncoder {
             self,
             VideoEncoder::Aom { .. } | VideoEncoder::SvtAv1 { .. } | VideoEncoder::Rav1e { .. }
         )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoEncoderIdent {
+    Copy,
+    Aom,
+    Rav1e,
+    SvtAv1,
+    X264,
+    X265,
+}
+
+impl From<VideoEncoder> for VideoEncoderIdent {
+    fn from(value: VideoEncoder) -> Self {
+        match value {
+            VideoEncoder::Copy => Self::Copy,
+            VideoEncoder::Aom { .. } => Self::Aom,
+            VideoEncoder::Rav1e { .. } => Self::Rav1e,
+            VideoEncoder::SvtAv1 { .. } => Self::SvtAv1,
+            VideoEncoder::X264 { .. } => Self::X264,
+            VideoEncoder::X265 { .. } => Self::X265,
+        }
     }
 }

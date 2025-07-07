@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
@@ -7,13 +8,15 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use av_data::pixel::{
-    ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, TransferCharacteristic,
-    YUVRange,
+    ChromaLocation, ColorPrimaries, FromPrimitive, MatrixCoefficients, ToPrimitive,
+    TransferCharacteristic, YUVRange,
 };
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use regex::Regex;
 use vapoursynth::vsscript::{Environment, EvalFlags};
+
+use crate::output::VideoEncoderIdent;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VideoDimensions {
@@ -306,52 +309,361 @@ pub struct Colorimetry {
 }
 
 impl Colorimetry {
+    pub fn from_path<P: AsRef<Path>>(input: P) -> Result<Self> {
+        let env = Environment::from_file(input, EvalFlags::SetWorkingDir).map_err(|e| match e {
+            vapoursynth::vsscript::Error::VSScript(e) => {
+                anyhow!("An error occurred in VSScript: {}", e)
+            }
+            _ => anyhow!("{}", e),
+        })?;
+        let (node, _) = env.get_output(0)?;
+        let frame = node.get_frame(0)?;
+        let props = frame.props();
+        Ok(Colorimetry {
+            range: match props.get_int("_ColorRange") {
+                Ok(0) => YUVRange::Full,
+                _ => YUVRange::Limited,
+            },
+            primaries: props
+                .get_int("_Primaries")
+                .map_or(ColorPrimaries::Unspecified, |val| {
+                    ColorPrimaries::from_i64(val).unwrap_or(ColorPrimaries::Unspecified)
+                }),
+            matrix: props
+                .get_int("_Matrix")
+                .map_or(MatrixCoefficients::Unspecified, |val| {
+                    MatrixCoefficients::from_i64(val).unwrap_or(MatrixCoefficients::Unspecified)
+                }),
+            transfer: props.get_int("_Transfer").map_or(
+                TransferCharacteristic::Unspecified,
+                |val| {
+                    TransferCharacteristic::from_i64(val)
+                        .unwrap_or(TransferCharacteristic::Unspecified)
+                },
+            ),
+            chroma_location: match props.get_int("_ChromaLocation") {
+                Ok(0) => ChromaLocation::Left,
+                Ok(1) => ChromaLocation::Center,
+                Ok(2) => ChromaLocation::TopLeft,
+                Ok(3) => ChromaLocation::Top,
+                Ok(4) => ChromaLocation::BottomLeft,
+                Ok(5) => ChromaLocation::Bottom,
+                _ => ChromaLocation::Unspecified,
+            },
+        })
+    }
+
     pub fn is_hdr(&self) -> bool {
         self.transfer == TransferCharacteristic::HybridLogGamma
             || self.transfer == TransferCharacteristic::PerceptualQuantizer
     }
-}
 
-pub fn get_video_colorimetry(input: &Path) -> Result<Colorimetry> {
-    let env = Environment::from_file(input, EvalFlags::SetWorkingDir).map_err(|e| match e {
-        vapoursynth::vsscript::Error::VSScript(e) => {
-            anyhow!("An error occurred in VSScript: {}", e)
+    pub fn get_primaries_encoder_string(
+        &self,
+        encoder: VideoEncoderIdent,
+    ) -> Result<Cow<'static, str>> {
+        match encoder {
+            VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
+            VideoEncoderIdent::Aom => Ok(Cow::Borrowed(match self.primaries {
+                ColorPrimaries::BT709 => "bt709",
+                ColorPrimaries::BT470M => "bt470m",
+                ColorPrimaries::BT470BG => "bt470bg",
+                ColorPrimaries::ST170M | ColorPrimaries::ST240M => "smpte240",
+                ColorPrimaries::Film => "film",
+                ColorPrimaries::BT2020 => "bt2020",
+                ColorPrimaries::ST428 => "xyz",
+                ColorPrimaries::P3DCI => "smpte431",
+                ColorPrimaries::P3Display => "smpte432",
+                ColorPrimaries::Tech3213 => "ebu3213",
+                ColorPrimaries::Unspecified => bail!("Color primaries unspecified"),
+                x => bail!("Color primaries {x} not implemented for aom"),
+            })),
+            VideoEncoderIdent::Rav1e => Ok(Cow::Borrowed(match self.primaries {
+                ColorPrimaries::BT709 => "BT709",
+                ColorPrimaries::BT470M => "BT470M",
+                ColorPrimaries::BT470BG => "BT470BG",
+                ColorPrimaries::ST170M => "BT601",
+                ColorPrimaries::ST240M => "SMPTE240",
+                ColorPrimaries::Film => "GenericFilm",
+                ColorPrimaries::BT2020 => "BT2020",
+                ColorPrimaries::ST428 => "XYZ",
+                ColorPrimaries::P3DCI => "SMPTE431",
+                ColorPrimaries::P3Display => "SMPTE432",
+                ColorPrimaries::Tech3213 => "EBU3213",
+                ColorPrimaries::Unspecified => bail!("Color primaries unspecified"),
+                x => bail!("Color primaries {x} not implemented for rav1e"),
+            })),
+            VideoEncoderIdent::SvtAv1 => Ok(self.primaries.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.primaries {
+                ColorPrimaries::BT709 => "bt709",
+                ColorPrimaries::BT470M => "bt470m",
+                ColorPrimaries::BT470BG => "bt470bg",
+                ColorPrimaries::ST170M => "smpte170m",
+                ColorPrimaries::ST240M => "smpte240m",
+                ColorPrimaries::Film => "film",
+                ColorPrimaries::BT2020 => "bt2020",
+                ColorPrimaries::ST428 => "smpte428",
+                ColorPrimaries::P3DCI => "smpte431",
+                ColorPrimaries::P3Display => "smpte432",
+                ColorPrimaries::Unspecified => bail!("Color primaries unspecified"),
+                x => bail!("Color primaries {x} not implemented for x264"),
+            })),
+            VideoEncoderIdent::X265 => Ok(Cow::Borrowed(match self.primaries {
+                ColorPrimaries::BT709 => "bt709",
+                ColorPrimaries::BT470M => "bt470m",
+                ColorPrimaries::BT470BG => "bt470bg",
+                ColorPrimaries::ST170M => "smpte170m",
+                ColorPrimaries::ST240M => "smpte240m",
+                ColorPrimaries::Film => "film",
+                ColorPrimaries::BT2020 => "bt2020",
+                ColorPrimaries::ST428 => "smpte428",
+                ColorPrimaries::P3DCI => "smpte431",
+                ColorPrimaries::P3Display => "smpte432",
+                ColorPrimaries::Unspecified => bail!("Color primaries unspecified"),
+                x => bail!("Color primaries {x} not implemented for x265"),
+            })),
         }
-        _ => anyhow!("{}", e),
-    })?;
-    let (node, _) = env.get_output(0)?;
-    let frame = node.get_frame(0)?;
-    let props = frame.props();
-    Ok(Colorimetry {
-        range: match props.get_int("_ColorRange") {
-            Ok(0) => YUVRange::Full,
-            _ => YUVRange::Limited,
-        },
-        primaries: props
-            .get_int("_Primaries")
-            .map_or(ColorPrimaries::Unspecified, |val| {
-                ColorPrimaries::from_i64(val).unwrap_or(ColorPrimaries::Unspecified)
-            }),
-        matrix: props
-            .get_int("_Matrix")
-            .map_or(MatrixCoefficients::Unspecified, |val| {
-                MatrixCoefficients::from_i64(val).unwrap_or(MatrixCoefficients::Unspecified)
-            }),
-        transfer: props
-            .get_int("_Transfer")
-            .map_or(TransferCharacteristic::Unspecified, |val| {
-                TransferCharacteristic::from_i64(val).unwrap_or(TransferCharacteristic::Unspecified)
-            }),
-        chroma_location: match props.get_int("_ChromaLocation") {
-            Ok(0) => ChromaLocation::Left,
-            Ok(1) => ChromaLocation::Center,
-            Ok(2) => ChromaLocation::TopLeft,
-            Ok(3) => ChromaLocation::Top,
-            Ok(4) => ChromaLocation::BottomLeft,
-            Ok(5) => ChromaLocation::Bottom,
-            _ => ChromaLocation::Unspecified,
-        },
-    })
+    }
+
+    pub fn get_matrix_encoder_string(
+        &self,
+        encoder: VideoEncoderIdent,
+    ) -> Result<Cow<'static, str>> {
+        match encoder {
+            VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
+            VideoEncoderIdent::Aom => Ok(Cow::Borrowed(match self.matrix {
+                MatrixCoefficients::Identity => "identity",
+                MatrixCoefficients::BT709 => "bt709",
+                MatrixCoefficients::BT470M => "fcc73",
+                MatrixCoefficients::BT470BG => "bt470bg",
+                MatrixCoefficients::ST170M => "bt601",
+                MatrixCoefficients::ST240M => "smpte240",
+                MatrixCoefficients::YCgCo => "ycgco",
+                MatrixCoefficients::BT2020NonConstantLuminance => "bt2020ncl",
+                MatrixCoefficients::BT2020ConstantLuminance => "bt2020cl",
+                MatrixCoefficients::ST2085 => "smpte2085",
+                MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chromncl",
+                MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chromcl",
+                MatrixCoefficients::ICtCp => "ictcp",
+                MatrixCoefficients::Unspecified => bail!("Matrix coefficients unspecified"),
+                x => bail!("Matrix coefficients {x} not implemented for aom"),
+            })),
+            VideoEncoderIdent::Rav1e => Ok(Cow::Borrowed(match self.matrix {
+                MatrixCoefficients::Identity => "Identity",
+                MatrixCoefficients::BT709 => "BT709",
+                MatrixCoefficients::BT470M => "FCC",
+                MatrixCoefficients::BT470BG => "BT470BG",
+                MatrixCoefficients::ST170M => "BT601",
+                MatrixCoefficients::ST240M => "SMPTE240",
+                MatrixCoefficients::YCgCo => "YCgCo",
+                MatrixCoefficients::BT2020NonConstantLuminance => "BT2020NCL",
+                MatrixCoefficients::BT2020ConstantLuminance => "BT2020CL",
+                MatrixCoefficients::ST2085 => "SMPTE2085",
+                MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "ChromatNCL",
+                MatrixCoefficients::ChromaticityDerivedConstantLuminance => "ChromatCL",
+                MatrixCoefficients::ICtCp => "ICtCp",
+                MatrixCoefficients::Unspecified => bail!("Matrix coefficients unspecified"),
+                x => bail!("Matrix coefficients {x} not implemented for rav1e"),
+            })),
+            VideoEncoderIdent::SvtAv1 => Ok(self.matrix.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.matrix {
+                MatrixCoefficients::Identity => "GBR",
+                MatrixCoefficients::BT709 => "bt709",
+                MatrixCoefficients::BT470M => "fcc",
+                MatrixCoefficients::BT470BG => "bt470bg",
+                MatrixCoefficients::ST170M => "smpte170m",
+                MatrixCoefficients::ST240M => "smpte240m",
+                MatrixCoefficients::YCgCo => "YCgCo",
+                MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
+                MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
+                MatrixCoefficients::ST2085 => "smpte2085",
+                MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
+                MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
+                MatrixCoefficients::ICtCp => "ICtCp",
+                MatrixCoefficients::Unspecified => bail!("Matrix coefficients unspecified"),
+                x => bail!("Matrix coefficients {x} not implemented for x264"),
+            })),
+            VideoEncoderIdent::X265 => Ok(Cow::Borrowed(match self.matrix {
+                MatrixCoefficients::Identity => "gbr",
+                MatrixCoefficients::BT709 => "bt709",
+                MatrixCoefficients::BT470M => "fcc",
+                MatrixCoefficients::BT470BG => "bt470bg",
+                MatrixCoefficients::ST170M => "smpte170m",
+                MatrixCoefficients::ST240M => "smpte240m",
+                MatrixCoefficients::YCgCo => "ycgco",
+                MatrixCoefficients::BT2020NonConstantLuminance => "bt2020nc",
+                MatrixCoefficients::BT2020ConstantLuminance => "bt2020c",
+                MatrixCoefficients::ST2085 => "smpte2085",
+                MatrixCoefficients::ChromaticityDerivedNonConstantLuminance => "chroma-derived-nc",
+                MatrixCoefficients::ChromaticityDerivedConstantLuminance => "chroma-derived-c",
+                MatrixCoefficients::ICtCp => "ictcp",
+                MatrixCoefficients::Unspecified => bail!("Matrix coefficients unspecified"),
+                x => bail!("Matrix coefficients {x} not implemented for x265"),
+            })),
+        }
+    }
+
+    pub fn get_transfer_encoder_string(
+        &self,
+        encoder: VideoEncoderIdent,
+    ) -> Result<Cow<'static, str>> {
+        match encoder {
+            VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
+            VideoEncoderIdent::Aom => Ok(Cow::Borrowed(match self.transfer {
+                TransferCharacteristic::BT1886 => "bt709",
+                TransferCharacteristic::BT470M => "bt470m",
+                TransferCharacteristic::BT470BG => "bt470bg",
+                TransferCharacteristic::ST170M => "bt601",
+                TransferCharacteristic::ST240M => "smpte240",
+                TransferCharacteristic::Linear => "lin",
+                TransferCharacteristic::Logarithmic100 => "log100",
+                TransferCharacteristic::Logarithmic316 => "log100sq10",
+                TransferCharacteristic::XVYCC => "iec61966",
+                TransferCharacteristic::BT1361E => "bt1361",
+                TransferCharacteristic::SRGB => "srgb",
+                TransferCharacteristic::BT2020Ten => "bt2020-10bit",
+                TransferCharacteristic::BT2020Twelve => "bt2020-12bit",
+                TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+                TransferCharacteristic::ST428 => "smpte428",
+                TransferCharacteristic::HybridLogGamma => "hlg",
+                TransferCharacteristic::Unspecified => {
+                    bail!("Transfer characteristics unspecified")
+                }
+                x => bail!("Transfer characteristics {x} not implemented for aom"),
+            })),
+            VideoEncoderIdent::Rav1e => Ok(Cow::Borrowed(match self.transfer {
+                TransferCharacteristic::BT1886 => "BT709",
+                TransferCharacteristic::BT470M => "BT470M",
+                TransferCharacteristic::BT470BG => "BT470BG",
+                TransferCharacteristic::ST170M => "BT601",
+                TransferCharacteristic::ST240M => "SMPTE240",
+                TransferCharacteristic::Linear => "Linear",
+                TransferCharacteristic::Logarithmic100 => "Log100",
+                TransferCharacteristic::Logarithmic316 => "Log100Sqrt10",
+                TransferCharacteristic::XVYCC => "IEC61966",
+                TransferCharacteristic::BT1361E => "BT1361",
+                TransferCharacteristic::SRGB => "SRGB",
+                TransferCharacteristic::BT2020Ten => "BT2020_10Bit",
+                TransferCharacteristic::BT2020Twelve => "BT2020_12Bit",
+                TransferCharacteristic::PerceptualQuantizer => "SMPTE2084",
+                TransferCharacteristic::ST428 => "SMPTE428",
+                TransferCharacteristic::HybridLogGamma => "HLG",
+                TransferCharacteristic::Unspecified => {
+                    bail!("Transfer characteristics unspecified")
+                }
+                x => bail!("Transfer characteristics {x} not implemented for rav1e"),
+            })),
+            VideoEncoderIdent::SvtAv1 => Ok(self.transfer.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.transfer {
+                TransferCharacteristic::BT1886 => "bt709",
+                TransferCharacteristic::BT470M => "bt470m",
+                TransferCharacteristic::BT470BG => "bt470bg",
+                TransferCharacteristic::ST170M => "smpte170m",
+                TransferCharacteristic::ST240M => "smpte240m",
+                TransferCharacteristic::Linear => "linear",
+                TransferCharacteristic::Logarithmic100 => "log100",
+                TransferCharacteristic::Logarithmic316 => "log316",
+                TransferCharacteristic::XVYCC => "iec61966-2-4",
+                TransferCharacteristic::BT1361E => "bt1361e",
+                TransferCharacteristic::SRGB => "iec61966-2-1",
+                TransferCharacteristic::BT2020Ten => "bt2020-10",
+                TransferCharacteristic::BT2020Twelve => "bt2020-12",
+                TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+                TransferCharacteristic::ST428 => "smpte428",
+                TransferCharacteristic::HybridLogGamma => "arib-std-b67",
+                TransferCharacteristic::Unspecified => {
+                    bail!("Transfer characteristics unspecified")
+                }
+                x => unimplemented!("Transfer characteristics {x} not implemented for x264"),
+            })),
+            VideoEncoderIdent::X265 => Ok(Cow::Borrowed(match self.transfer {
+                TransferCharacteristic::BT1886 => "bt709",
+                TransferCharacteristic::BT470M => "bt470m",
+                TransferCharacteristic::BT470BG => "bt470bg",
+                TransferCharacteristic::ST170M => "smpte170m",
+                TransferCharacteristic::ST240M => "smpte240m",
+                TransferCharacteristic::Linear => "linear",
+                TransferCharacteristic::Logarithmic100 => "log100",
+                TransferCharacteristic::Logarithmic316 => "log316",
+                TransferCharacteristic::XVYCC => "iec61966-2-4",
+                TransferCharacteristic::BT1361E => "bt1361e",
+                TransferCharacteristic::SRGB => "iec61966-2-1",
+                TransferCharacteristic::BT2020Ten => "bt2020-10",
+                TransferCharacteristic::BT2020Twelve => "bt2020-12",
+                TransferCharacteristic::PerceptualQuantizer => "smpte2084",
+                TransferCharacteristic::ST428 => "smpte428",
+                TransferCharacteristic::HybridLogGamma => "arib-std-b67",
+                TransferCharacteristic::Unspecified => {
+                    bail!("Transfer characteristics unspecified")
+                }
+                x => bail!("Transfer characteristics {x} not implemented for x265"),
+            })),
+        }
+    }
+
+    pub fn get_range_encoder_string(
+        &self,
+        encoder: VideoEncoderIdent,
+    ) -> Result<Cow<'static, str>> {
+        match encoder {
+            VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
+            VideoEncoderIdent::Aom => bail!("aom does not support a range argument"),
+            VideoEncoderIdent::Rav1e => Ok(Cow::Borrowed(match self.range {
+                YUVRange::Limited => "Limited",
+                YUVRange::Full => "Full",
+            })),
+            VideoEncoderIdent::SvtAv1 => Ok(Cow::Borrowed(match self.range {
+                YUVRange::Limited => "0",
+                YUVRange::Full => "1",
+            })),
+            VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.range {
+                YUVRange::Limited => "tv",
+                YUVRange::Full => "pc",
+            })),
+            VideoEncoderIdent::X265 => Ok(Cow::Borrowed(match self.range {
+                YUVRange::Limited => "limited",
+                YUVRange::Full => "full",
+            })),
+        }
+    }
+
+    pub fn get_chromaloc_encoder_string(
+        &self,
+        encoder: VideoEncoderIdent,
+    ) -> Result<Cow<'static, str>> {
+        match encoder {
+            VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
+            VideoEncoderIdent::Aom => Ok(Cow::Borrowed(match self.chroma_location {
+                ChromaLocation::Left => "left",
+                ChromaLocation::TopLeft => "colocated",
+                _ => "unknown",
+            })),
+            VideoEncoderIdent::Rav1e => bail!("rav1e does not support a chroma loc argument"),
+            VideoEncoderIdent::SvtAv1 => Ok(Cow::Borrowed(match self.chroma_location {
+                ChromaLocation::TopLeft => "topleft",
+                ChromaLocation::Left => "left",
+                _ => "unknown",
+            })),
+            VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.chroma_location {
+                ChromaLocation::Left => " --chromaloc 0",
+                ChromaLocation::Center => " --chromaloc 1",
+                ChromaLocation::TopLeft => " --chromaloc 2",
+                ChromaLocation::Top => " --chromaloc 3",
+                ChromaLocation::BottomLeft => " --chromaloc 4",
+                ChromaLocation::Bottom => " --chromaloc 5",
+                _ => "",
+            })),
+            VideoEncoderIdent::X265 => Ok(Cow::Borrowed(match self.chroma_location {
+                ChromaLocation::Left => " --chromaloc 0",
+                ChromaLocation::Center => " --chromaloc 1",
+                ChromaLocation::TopLeft => " --chromaloc 2",
+                ChromaLocation::Top => " --chromaloc 3",
+                ChromaLocation::BottomLeft => " --chromaloc 4",
+                ChromaLocation::Bottom => " --chromaloc 5",
+                _ => "",
+            })),
+        }
+    }
 }
 
 pub fn get_audio_delay_ms(input: &Path, track: usize) -> Result<i32> {
