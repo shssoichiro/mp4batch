@@ -138,6 +138,7 @@ pub fn extract_video(input: &Path, output: &Path) -> Result<()> {
 pub fn create_lossless(
     input: &Path,
     dimensions: VideoDimensions,
+    colorimetry: &Colorimetry,
     verify_frame_count: bool,
     sigterm: Arc<AtomicBool>,
     slow: bool,
@@ -170,6 +171,11 @@ pub fn create_lossless(
         .arg("-")
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
+
+    let prim = colorimetry.get_primaries_encoder_string(VideoEncoderIdent::X264)?;
+    let matrix = colorimetry.get_matrix_encoder_string(VideoEncoderIdent::X264)?;
+    let transfer = colorimetry.get_transfer_encoder_string(VideoEncoderIdent::X264)?;
+    let range = colorimetry.get_range_encoder_string(VideoEncoderIdent::X264)?;
 
     let filename = input
         .file_name()
@@ -221,7 +227,11 @@ pub fn create_lossless(
         // but it decodes 70% slower.
         .arg(if slow { "superfast" } else { "ultrafast" })
         .arg("-qp")
-        .arg("0");
+        .arg("0")
+        .arg("-x264-params")
+        .arg(format!(
+            "colorprim={prim}:colormatrix={matrix}:transfer={transfer}:input-range={range}:range={range}"
+        ));
 
     command
         .arg(&lossless_filename)

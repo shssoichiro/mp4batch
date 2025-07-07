@@ -268,6 +268,7 @@ fn process_file(
             let result = create_lossless(
                 input_vpy,
                 dimensions,
+                &colorimetry,
                 verify_frame_count,
                 Arc::clone(&sigterm),
                 keep_lossless,
