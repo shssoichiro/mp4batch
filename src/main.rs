@@ -470,7 +470,12 @@ fn process_file(
             let path = item.path();
             let file_name = path.file_name().unwrap().to_string_lossy();
             if file_name.starts_with(input_vpy.file_stem().unwrap().to_str().unwrap())
-                && file_name.contains(".vfr.")
+                && (
+                    // Wobbly naming
+                    file_name.contains(".vfr.") ||
+                    // gmkvextractgui naming
+                    file_name.ends_with(".tc.txt")
+                )
             {
                 Some(path)
             } else {
