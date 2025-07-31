@@ -44,10 +44,12 @@ pub fn build_svtav1_args_string(
     } else {
         "0"
     };
+    // In theory 2 might be slightly better than 1 for live action,
+    // but the difference is small, and 2 seems to currently be bugged at
+    // very high bitrates to give worse quality than 1
     let tune = match profile {
-        Profile::Film | Profile::Grain | Profile::AnimeGrain => '2',
-        Profile::Anime | Profile::AnimeDetailed => '1',
         Profile::Fast => '0',
+        _ => '1',
     };
     let complex_hvs = if psy_rd.parse::<f32>().unwrap() >= 1.0 {
         "1"
