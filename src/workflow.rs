@@ -22,6 +22,7 @@ pub fn run_processing_workflow(
     ignore_delay: bool,
     no_retry: bool,
     sigterm: Arc<AtomicBool>,
+    ai_upscale: bool,
 ) -> Result<()> {
     let inputs = discover_input_files(input_path)?;
 
@@ -60,6 +61,7 @@ pub fn run_processing_workflow(
             ignore_delay,
             no_retry,
             Arc::clone(&sigterm),
+            ai_upscale,
         );
 
         if let Err(err) = result {

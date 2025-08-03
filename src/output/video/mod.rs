@@ -1,5 +1,7 @@
 use anyhow::Result;
 use colored::*;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::{
@@ -195,6 +197,10 @@ pub fn create_lossless(
     } else {
         panic!("Unrecognized input type");
     };
+
+    let is_done = Arc::new(AtomicBool::new(false));
+    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
+
     let mut command = Command::new("ffmpeg");
     command
         .arg("-hide_banner")
@@ -240,10 +246,10 @@ pub fn create_lossless(
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
-    let is_done = Arc::new(AtomicBool::new(false));
-    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
+
     pipe.wait()?;
     is_done.store(true, Ordering::Relaxed);
+
     if !status.success() {
         anyhow::bail!(
             "Failed to execute ffmpeg: Exited with code {:x}",
@@ -270,6 +276,240 @@ pub fn create_lossless(
     );
 
     Ok(lossless_filename)
+}
+
+pub fn create_lossless_with_topaz_enhance(
+    input: &Path,
+    dimensions: VideoDimensions,
+    colorimetry: &Colorimetry,
+    verify_frame_count: bool,
+    sigterm: Arc<AtomicBool>,
+    slow: bool,
+    copy_audio_from: Option<&Path>,
+) -> Result<PathBuf> {
+    let lossless_filename = input.with_extension("lossless.mkv");
+    if lossless_filename.exists() {
+        if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+            // We use a fuzzy frame count check because *some cursed sources*
+            // report a different frame count from the number of actual decodeable frames.
+            let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
+            let allowance = dimensions.frames / 200;
+            if !verify_frame_count || diff <= allowance {
+                eprintln!(
+                    "{} {}",
+                    "[Success]".green().bold(),
+                    "Lossless already exists".green(),
+                );
+                return Ok(lossless_filename);
+            }
+        }
+    }
+
+    // Print the info once
+    Command::new("vspipe")
+        .arg("-i")
+        .arg(input)
+        .arg("-o")
+        .arg("0")
+        .arg("-")
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
+
+    let prim = colorimetry.get_primaries_encoder_string(VideoEncoderIdent::X264)?;
+    let matrix = colorimetry.get_matrix_encoder_string(VideoEncoderIdent::X264)?;
+    let transfer = colorimetry.get_transfer_encoder_string(VideoEncoderIdent::X264)?;
+    let range = colorimetry.get_range_encoder_string(VideoEncoderIdent::X264)?;
+
+    let filename = input
+        .file_name()
+        .expect("File should have a name")
+        .to_string_lossy();
+    let mut pipe1 = if filename.ends_with(".vpy") {
+        Command::new("vspipe")
+            .arg("-c")
+            .arg("y4m")
+            .arg(input)
+            .arg("-")
+            .arg("-o")
+            .arg("0")
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for lossless encoding: {}", e))?
+    } else {
+        panic!("Unrecognized input type");
+    };
+
+    let (w, h) = compute_upscaled_dimensions(dimensions.width, dimensions.height);
+    let mut pipe2 = Command::new("ffmpeg")
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-y")
+        .arg("-i")
+        .arg("-")
+        .arg("-sws_flags")
+        .arg("spline+accurate_rnd+full_chroma_int")
+        .arg("-filter_complex")
+        .arg(format!("tvai_up=model=prob-4:scale=0:w={w}:h={h}:preblur=0:noise=0:details=0:halo=0:blur=0:compression=0:estimate=8:blend=0.4:device=-2:vram=1:instances=1"))
+        .arg("-level")
+        .arg("3")
+        .arg("-vcodec")
+        .arg("libx264")
+        .arg("-preset")
+        .arg("ultrafast")
+        .arg("-qp")
+        .arg("0")
+        .arg("-x264-params")
+        .arg(format!(
+            "colorprim={prim}:colormatrix={matrix}:transfer={transfer}:input-range={range}:range={range}"
+        ))
+        .arg("-fps_mode:v")
+        .arg("passthrough")
+        .arg("-movflags")
+        .arg("frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr")
+        .arg("-bf" )
+        .arg("0")
+        .arg("-")
+        .stdin(pipe1.stdout.take().expect("stdout should be writeable"))
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for lossless encoding: {}", e))?;
+
+    let second_input_script = r#"
+import vapoursynth as vs
+core = vs.code
+
+clip = core.ffms2.Source(source="-")
+
+import soifunc
+
+clip = soifunc.mc_dfttest(clip)
+clip = soifunc.retinex_deband(clip, 24)
+clip = vstools.finalize_clip(clip, clamp_tv_range=True)
+
+clip.set_output(0)
+"#;
+    let second_input = input.with_file_name(format!(
+        "{}-filter2",
+        input.file_name().unwrap().to_string_lossy()
+    ));
+    {
+        let mut file = File::create(&second_input).unwrap();
+        file.write_all(second_input_script.as_bytes()).unwrap();
+        file.flush().unwrap();
+    }
+
+    let mut pipe3 = Command::new("vspipe")
+        .arg("-c")
+        .arg("y4m")
+        .arg(second_input)
+        .arg("-")
+        .arg("-o")
+        .arg("0")
+        .stdin(pipe2.stdout.take().expect("stdout should be writeable"))
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe for lossless encoding: {}", e))?;
+
+    let is_done = Arc::new(AtomicBool::new(false));
+    monitor_for_sigterm(&pipe1, Arc::clone(&sigterm), Arc::clone(&is_done));
+    monitor_for_sigterm(&pipe2, Arc::clone(&sigterm), Arc::clone(&is_done));
+    monitor_for_sigterm(&pipe3, Arc::clone(&sigterm), Arc::clone(&is_done));
+
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("level+error")
+        .arg("-stats")
+        .arg("-y")
+        .arg("-i")
+        .arg("-");
+    if let Some(audio_source) = copy_audio_from {
+        command
+            .arg("-i")
+            .arg(audio_source)
+            .arg("-map")
+            .arg("0:v:0")
+            .arg("-map")
+            .arg("1:a:0")
+            .arg("-acodec")
+            .arg("copy");
+    }
+    let status = command.arg("-vcodec")
+        .arg("libx264")
+        .arg("-preset")
+        .arg(if slow { "superfast" } else { "ultrafast" })
+        .arg("-qp")
+        .arg("0")
+        .arg("-x264-params")
+        .arg(format!(
+            "colorprim={prim}:colormatrix={matrix}:transfer={transfer}:input-range={range}:range={range}"
+        ))
+        .arg(&lossless_filename)
+        .stdin(pipe3.stdout.take().expect("stdout should be writeable"))
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
+
+    pipe1.wait()?;
+    pipe2.wait()?;
+    pipe3.wait()?;
+    is_done.store(true, Ordering::Relaxed);
+
+    if !status.success() {
+        anyhow::bail!(
+            "Failed to execute ffmpeg: Exited with code {:x}",
+            status.code().unwrap_or(-1)
+        );
+    }
+
+    if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
+        if verify_frame_count {
+            // We use a fuzzy frame count check because *some cursed sources*
+            // report a different frame count from the number of actual decodeable frames.
+            let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
+            let allowance = dimensions.frames / 200;
+            if diff > allowance {
+                anyhow::bail!("Incomplete lossless encode");
+            }
+        }
+    }
+
+    eprintln!(
+        "{} {}",
+        "[Success]".green().bold(),
+        "Finished encoding lossless".green(),
+    );
+
+    Ok(lossless_filename)
+}
+
+fn compute_upscaled_dimensions(input_w: u32, input_h: u32) -> (u32, u32) {
+    let (target_max_w, target_max_h) = if input_w >= input_h {
+        // Landscape: target 1920x1080 max
+        (1920u32, 1080u32)
+    } else {
+        // Portrait: target 1080x1920 max
+        (1080u32, 1920u32)
+    };
+
+    // Calculate scale factor to fit within target bounds (only scale up, never down)
+    let scale_w = target_max_w as f64 / input_w as f64;
+    let scale_h = target_max_h as f64 / input_h as f64;
+    let scale_factor = scale_w.min(scale_h).max(1.0); // Never scale down
+
+    // Apply scale factor
+    let scaled_w = (input_w as f64 * scale_factor) as u32;
+    let scaled_h = (input_h as f64 * scale_factor) as u32;
+
+    // Round to nearest multiple of 4
+    let round_to_multiple_of_4 = |n: u32| -> u32 { ((n + 2) / 4) * 4 };
+
+    (
+        round_to_multiple_of_4(scaled_w),
+        round_to_multiple_of_4(scaled_h),
+    )
 }
 
 pub fn convert_video_av1an(
@@ -585,5 +825,80 @@ impl From<VideoEncoder> for VideoEncoderIdent {
             VideoEncoder::X264 { .. } => Self::X264,
             VideoEncoder::X265 { .. } => Self::X265,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_upscaled_dimensions_landscape_unchanged() {
+        // Input of 1920x1080 -> output of 1920x1080 (unchanged)
+        assert_eq!(compute_upscaled_dimensions(1920, 1080), (1920, 1080));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_landscape_already_at_max() {
+        // Input of 1920x800 -> output of 1920x800 (unchanged because max dimension is already 1920)
+        assert_eq!(compute_upscaled_dimensions(1920, 800), (1920, 800));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_landscape_upscale() {
+        // Input of 640x480 -> output of 1440x1080
+        assert_eq!(compute_upscaled_dimensions(640, 480), (1440, 1080));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_portrait_upscale() {
+        // Input of 720x1280 -> output of 1080x1920
+        assert_eq!(compute_upscaled_dimensions(720, 1280), (1080, 1920));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_portrait_unchanged() {
+        // Portrait already at max dimensions
+        assert_eq!(compute_upscaled_dimensions(1080, 1920), (1080, 1920));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_portrait_partial_upscale() {
+        // Portrait where one dimension is already at max
+        assert_eq!(compute_upscaled_dimensions(1080, 1600), (1080, 1600));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_square() {
+        // Square input should be treated as landscape (w >= h)
+        assert_eq!(compute_upscaled_dimensions(800, 800), (1080, 1080));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_rounding_to_4() {
+        // Test that dimensions are rounded to nearest multiple of 4
+        // 640x360 scaled by 1920/640 = 3.0 gives 1920x1080 (already multiples of 4)
+        assert_eq!(compute_upscaled_dimensions(640, 360), (1920, 1080));
+
+        // Test case that would need rounding
+        // 641x361 scaled by 1920/641 ≈ 2.996 gives ~1918x~1081, rounded to 1920x1080
+        assert_eq!(compute_upscaled_dimensions(641, 361), (1916, 1080));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_very_small_input() {
+        // Very small input should scale up significantly
+        assert_eq!(compute_upscaled_dimensions(160, 120), (1440, 1080));
+    }
+
+    #[test]
+    fn test_compute_upscaled_dimensions_extreme_aspect_ratios() {
+        // Very wide landscape
+        assert_eq!(compute_upscaled_dimensions(1920, 400), (1920, 400));
+        assert_eq!(compute_upscaled_dimensions(960, 200), (1920, 400));
+
+        // Very tall portrait
+        assert_eq!(compute_upscaled_dimensions(540, 1920), (540, 1920));
+        assert_eq!(compute_upscaled_dimensions(270, 960), (540, 1920));
     }
 }

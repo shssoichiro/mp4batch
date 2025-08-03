@@ -111,6 +111,10 @@ struct InputArgs {
     #[clap(long)]
     pub no_retry: bool,
 
+    /// Do Topaz AI enhancement and upscaling
+    #[clap(long = "ai")]
+    pub ai_upscale: bool,
+
     #[command(subcommand)]
     pub subcommand: Option<Subcommand>,
 }
@@ -148,6 +152,7 @@ fn main() {
                 args.no_delay,
                 args.no_retry,
                 Arc::clone(&sigterm),
+                args.ai_upscale,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
@@ -169,6 +174,7 @@ fn main() {
                 args.no_delay,
                 args.no_retry,
                 Arc::clone(&sigterm),
+                args.ai_upscale,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
@@ -200,6 +206,7 @@ fn process_file(
     ignore_delay: bool,
     no_retry: bool,
     sigterm: Arc<AtomicBool>,
+    ai_upscale: bool,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -265,19 +272,35 @@ fn process_file(
             //
             // Essentially, we retry the encode until it works.
             let dimensions = get_video_dimensions(input_vpy)?;
-            let result = create_lossless(
-                input_vpy,
-                dimensions,
-                &colorimetry,
-                verify_frame_count,
-                Arc::clone(&sigterm),
-                keep_lossless,
-                if copy_audio_to_lossless {
-                    Some(&source_video)
-                } else {
-                    None
-                },
-            );
+            let result = if ai_upscale {
+                create_lossless_with_topaz_enhance(
+                    input_vpy,
+                    dimensions,
+                    &colorimetry,
+                    verify_frame_count,
+                    Arc::clone(&sigterm),
+                    keep_lossless,
+                    if copy_audio_to_lossless {
+                        Some(&source_video)
+                    } else {
+                        None
+                    },
+                )
+            } else {
+                create_lossless(
+                    input_vpy,
+                    dimensions,
+                    &colorimetry,
+                    verify_frame_count,
+                    Arc::clone(&sigterm),
+                    keep_lossless,
+                    if copy_audio_to_lossless {
+                        Some(&source_video)
+                    } else {
+                        None
+                    },
+                )
+            };
             match result {
                 Ok(lf) => {
                     lossless_filename = Some(lf);
