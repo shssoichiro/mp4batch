@@ -58,7 +58,7 @@ pub fn build_svtav1_args_string(
     };
     Ok(format!(
         " --input-depth {depth} --rc 0 --enable-qm 1 \
-        --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 \
+        --scd 0 --keyint -1 --scm 0 --film-grain-denoise 0 --enable-dlf 2 \
         --preset {speed} --crf {crf} --tune {tune} --complex-hvs {complex_hvs} \
         --qm-min {qm_min} --ac-bias {psy_rd} --hbd-mds {hbd_mds} \
         --tile-columns {tile_cols} --tile-rows {tile_rows} --lp {threads} --pin 0 \
