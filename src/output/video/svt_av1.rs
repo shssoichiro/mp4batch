@@ -11,7 +11,7 @@ pub fn build_svtav1_args_string(
     threads: usize,
     dimensions: VideoDimensions,
     profile: Profile,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
 ) -> anyhow::Result<String> {
     let depth = dimensions.bit_depth;
     let tile_cols = i32::from(dimensions.width >= 2000);
@@ -39,7 +39,7 @@ pub fn build_svtav1_args_string(
         Profile::AnimeGrain => "0.5",
         Profile::Fast => "0.0",
     };
-    let hbd_mds = if psy_rd.parse::<f32>().unwrap() > 0.0 {
+    let hbd_mds = if psy_rd.parse::<f32>()? > 0.0 {
         "1"
     } else {
         "0"
@@ -51,7 +51,7 @@ pub fn build_svtav1_args_string(
         Profile::Fast => '0',
         _ => '1',
     };
-    let complex_hvs = if psy_rd.parse::<f32>().unwrap() >= 1.0 {
+    let complex_hvs = if psy_rd.parse::<f32>()? >= 1.0 {
         "1"
     } else {
         "0"

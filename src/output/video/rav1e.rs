@@ -7,7 +7,7 @@ pub fn build_rav1e_args_string(
     crf: i16,
     speed: u8,
     dimensions: VideoDimensions,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
 ) -> anyhow::Result<String> {
     // TODO: Add proper HDR metadata
     // TODO: Remove rdo-lookahead-frames limitation if we can reduce rav1e memory

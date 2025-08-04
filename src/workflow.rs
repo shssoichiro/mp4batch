@@ -21,7 +21,7 @@ pub fn run_processing_workflow(
     verify_frame_count: bool,
     ignore_delay: bool,
     no_retry: bool,
-    sigterm: Arc<AtomicBool>,
+    sigterm: &Arc<AtomicBool>,
 ) -> Result<()> {
     let inputs = discover_input_files(input_path)?;
 
@@ -59,7 +59,7 @@ pub fn run_processing_workflow(
             verify_frame_count,
             ignore_delay,
             no_retry,
-            Arc::clone(&sigterm),
+            sigterm,
         );
 
         if let Err(err) = result {

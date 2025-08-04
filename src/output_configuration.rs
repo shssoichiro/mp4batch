@@ -161,12 +161,13 @@ fn apply_quantizer_filter(arg: i16, output: &mut Output) {
         VideoEncoder::Copy => return,
     };
 
-    if arg < range.0 || arg > range.1 {
-        panic!(
-            "'q' must be between {} and {}, received {}",
-            range.0, range.1, arg
-        );
-    }
+    assert!(
+        ((range.0)..=(range.1)).contains(&arg),
+        "'q' must be between {} and {}, received {}",
+        range.0,
+        range.1,
+        arg
+    );
 }
 
 fn apply_speed_filter(arg: u8, output: &mut Output) {
@@ -174,9 +175,11 @@ fn apply_speed_filter(arg: u8, output: &mut Output) {
         VideoEncoder::Aom { ref mut speed, .. }
         | VideoEncoder::Rav1e { ref mut speed, .. }
         | VideoEncoder::SvtAv1 { ref mut speed, .. } => {
-            if arg > 10 {
-                panic!("'s' must be between 0 and 10, received {}", arg);
-            }
+            assert!(
+                (arg <= 10),
+                "'s' must be between 0 and 10, received {}",
+                arg
+            );
             *speed = arg;
         }
         _ => (),
@@ -211,9 +214,11 @@ fn apply_grain_filter(arg: u8, output: &mut Output) {
         VideoEncoder::Aom { ref mut grain, .. }
         | VideoEncoder::Rav1e { ref mut grain, .. }
         | VideoEncoder::SvtAv1 { ref mut grain, .. } => {
-            if arg > 64 {
-                panic!("'grain' must be between 0 and 64, received {}", arg);
-            }
+            assert!(
+                (arg <= 64),
+                "'grain' must be between 0 and 64, received {}",
+                arg
+            );
             *grain = arg;
         }
         _ => (),
@@ -242,8 +247,6 @@ fn apply_audio_encoder_filter(arg: &str, output: &mut Output) {
 }
 
 fn apply_audio_bitrate_filter(arg: u32, output: &mut Output) {
-    if arg == 0 {
-        panic!("'ab' must be greater than 0, got {}", arg);
-    }
+    assert!(arg > 0, "'ab' must be greater than 0, got {}", arg);
     output.audio.kbps_per_channel = arg;
 }

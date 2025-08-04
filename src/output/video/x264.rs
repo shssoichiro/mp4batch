@@ -27,8 +27,8 @@ pub fn convert_video_x264(
     compat: bool,
     dimensions: VideoDimensions,
     force_keyframes: Option<&str>,
-    colorimetry: &Colorimetry,
-    sigterm: Arc<AtomicBool>,
+    colorimetry: Colorimetry,
+    sigterm: &Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -94,7 +94,7 @@ pub fn convert_video_x264(
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
     let is_done = Arc::new(AtomicBool::new(false));
-    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
+    monitor_for_sigterm(&pipe, Arc::clone(sigterm), Arc::clone(&is_done));
     pipe.wait()?;
     is_done.store(true, Ordering::Relaxed);
 
@@ -114,7 +114,7 @@ pub fn build_x264_args_string(
     profile: Profile,
     compat: bool,
     force_keyframes: Option<&str>,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
 ) -> anyhow::Result<String> {
     let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     let min_keyint = if profile.is_anime() { fps / 2 } else { fps };

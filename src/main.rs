@@ -121,12 +121,12 @@ enum Subcommand {
     Lossless,
 }
 
-fn main() {
-    check_for_required_apps().unwrap();
+fn main() -> Result<()> {
+    check_for_required_apps()?;
 
     let sigterm = Arc::new(AtomicBool::new(false));
-    register(SIGTERM, Arc::clone(&sigterm)).unwrap();
-    register(SIGINT, Arc::clone(&sigterm)).unwrap();
+    register(SIGTERM, Arc::clone(&sigterm))?;
+    register(SIGINT, Arc::clone(&sigterm))?;
 
     let args = InputArgs::parse();
 
@@ -138,7 +138,7 @@ fn main() {
             if let Err(err) = workflow::run_processing_workflow(
                 input,
                 None,
-                absolute_path(input).unwrap().parent(),
+                absolute_path(input)?.parent(),
                 true,
                 true,
                 false,
@@ -147,7 +147,7 @@ fn main() {
                 !args.no_verify,
                 args.no_delay,
                 args.no_retry,
-                Arc::clone(&sigterm),
+                &sigterm,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
@@ -168,12 +168,14 @@ fn main() {
                 !args.no_verify,
                 args.no_delay,
                 args.no_retry,
-                Arc::clone(&sigterm),
+                &sigterm,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
         }
     }
+
+    Ok(())
 }
 
 fn check_for_required_apps() -> Result<()> {
@@ -199,7 +201,7 @@ fn process_file(
     verify_frame_count: bool,
     ignore_delay: bool,
     no_retry: bool,
-    sigterm: Arc<AtomicBool>,
+    sigterm: &Arc<AtomicBool>,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -268,15 +270,11 @@ fn process_file(
             let result = create_lossless(
                 input_vpy,
                 dimensions,
-                &colorimetry,
+                colorimetry,
                 verify_frame_count,
-                Arc::clone(&sigterm),
+                sigterm,
                 keep_lossless,
-                if copy_audio_to_lossless {
-                    Some(&source_video)
-                } else {
-                    None
-                },
+                copy_audio_to_lossless.then_some(source_video.as_path()),
             );
             match result {
                 Ok(lf) => {
@@ -350,8 +348,8 @@ fn process_file(
                     compat,
                     dimensions,
                     force_keyframes,
-                    &colorimetry,
-                    Arc::clone(&sigterm),
+                    colorimetry,
+                    sigterm,
                 )?;
             }
             encoder => {
@@ -363,19 +361,25 @@ fn process_file(
                     build_vpy_script(&output_vpy, input_vpy, output, skip_lossless);
                     get_video_dimensions(&output_vpy)?
                 } else {
-                    get_video_dimensions(lossless_filename.as_ref().unwrap())?
+                    get_video_dimensions(
+                        lossless_filename
+                            .as_ref()
+                            .expect("lossless filename is set"),
+                    )?
                 };
                 convert_video_av1an(
                     if should_use_vpy {
                         &output_vpy
                     } else {
-                        lossless_filename.as_ref().unwrap()
+                        lossless_filename
+                            .as_ref()
+                            .expect("lossless filename is set")
                     },
                     &video_out,
                     encoder,
                     dimensions,
                     force_keyframes,
-                    &colorimetry,
+                    colorimetry,
                 )?;
             }
         };
@@ -392,7 +396,7 @@ fn process_file(
         let has_vpy_audio = vspipe_has_audio(input_vpy)?;
         if let Some(track) = has_vpy_audio {
             let audio_path = input_vpy.with_extension("vpy.flac");
-            save_vpy_audio(input_vpy, track, &audio_path, Arc::clone(&sigterm))?;
+            save_vpy_audio(input_vpy, track, &audio_path, sigterm)?;
             audio_tracks = vec![Track {
                 source: TrackSource::External(audio_path),
                 enabled: true,
@@ -419,18 +423,17 @@ fn process_file(
             audio_suffixes.push(audio_suffix);
         }
         let audio_suffix = audio_suffixes.join("-");
-        let mut output_path = output_dir
-            .map(|d| d.to_owned())
-            .unwrap_or_else(|| PathBuf::from(dotenv!("OUTPUT_PATH")));
-        output_path.push(
-            input_vpy
-                .with_extension(format!(
-                    "{}-{}.{}",
-                    video_suffix, audio_suffix, output.video.output_ext
-                ))
-                .file_name()
-                .expect("File should have a name"),
-        );
+        let output_path = output_dir
+            .map_or_else(|| PathBuf::from(dotenv!("OUTPUT_PATH")), |d| d.to_owned())
+            .join(
+                input_vpy
+                    .with_extension(format!(
+                        "{}-{}.{}",
+                        video_suffix, audio_suffix, output.video.output_ext
+                    ))
+                    .file_name()
+                    .expect("File should have a name"),
+            );
 
         let mut subtitle_outputs = Vec::new();
         if !output.sub_tracks.is_empty() {
@@ -468,19 +471,20 @@ fn process_file(
         .filter_map(Result::ok)
         .find_map(|item| {
             let path = item.path();
-            let file_name = path.file_name().unwrap().to_string_lossy();
-            if file_name.starts_with(input_vpy.file_stem().unwrap().to_str().unwrap())
-                && (
-                    // Wobbly naming
-                    file_name.contains(".vfr.") ||
+            let file_name = path.file_name().expect("has file name").to_string_lossy();
+            (file_name.starts_with(
+                input_vpy
+                    .file_stem()
+                    .expect("has file stem")
+                    .to_string_lossy()
+                    .as_ref(),
+            ) && (
+                // Wobbly naming
+                file_name.contains(".vfr.") ||
                     // gmkvextractgui naming
                     file_name.ends_with(".tc.txt")
-                )
-            {
-                Some(path)
-            } else {
-                None
-            }
+            ))
+            .then_some(path)
         });
 
         mux_video(
@@ -628,6 +632,10 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
     script.flush().expect("Unable to flush script data");
 }
 
+#[expect(
+    clippy::string_slice,
+    reason = "`find` returns a byte index that we know is on a character boundary"
+)]
 fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
     let contents = read_to_string(input).expect("Unable to read input script");
     let mut output_pos = None;
@@ -643,7 +651,8 @@ fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWri
                     .find(line)
                     .expect("Input script does not have an output clip"),
             );
-            output_var = Some(&line[0..pos]);
+
+            output_var = Some(&line[..pos]);
             break;
         }
     }
@@ -698,6 +707,7 @@ fn monitor_for_sigterm(child: &Child, sigterm: Arc<AtomicBool>, child_is_done: A
             use nix::libc::SIGKILL;
             use nix::libc::pid_t;
 
+            // SAFETY: Only works on unix, validated by cfg
             unsafe {
                 let _ = nix::libc::kill(child_pid as pid_t, SIGKILL);
             }

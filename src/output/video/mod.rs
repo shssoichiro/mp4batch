@@ -138,9 +138,9 @@ pub fn extract_video(input: &Path, output: &Path) -> Result<()> {
 pub fn create_lossless(
     input: &Path,
     dimensions: VideoDimensions,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
     verify_frame_count: bool,
-    sigterm: Arc<AtomicBool>,
+    sigterm: &Arc<AtomicBool>,
     slow: bool,
     copy_audio_from: Option<&Path>,
 ) -> Result<PathBuf> {
@@ -241,7 +241,7 @@ pub fn create_lossless(
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     let is_done = Arc::new(AtomicBool::new(false));
-    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
+    monitor_for_sigterm(&pipe, Arc::clone(sigterm), Arc::clone(&is_done));
     pipe.wait()?;
     is_done.store(true, Ordering::Relaxed);
     if !status.success() {
@@ -278,7 +278,7 @@ pub fn convert_video_av1an(
     encoder: VideoEncoder,
     dimensions: VideoDimensions,
     force_keyframes: Option<&str>,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
 ) -> Result<()> {
     if dimensions.width % 8 != 0 {
         eprintln!(
@@ -322,7 +322,7 @@ pub fn convert_video_av1an(
         }
         _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
     })
-    .unwrap();
+    .expect("value is at least 1");
     assert!(
         workers <= cores,
         "Worker count exceeded core count, this is a bug"
@@ -332,7 +332,7 @@ pub fn convert_video_av1an(
         64,
         (cores.get() as f32 / workers.get() as f32 * 1.5).ceil() as usize + 2,
     ))
-    .unwrap();
+    .expect("value is at least 1");
     let mut command = Command::new("av1an");
     command
         .arg("-i")
@@ -492,7 +492,7 @@ impl VideoEncoder {
     pub fn get_args_string(
         self,
         dimensions: VideoDimensions,
-        colorimetry: &Colorimetry,
+        colorimetry: Colorimetry,
         computed_threads: NonZeroUsize,
         cores: NonZeroUsize,
         workers: NonZeroUsize,

@@ -9,7 +9,7 @@ pub fn build_x265_args_string(
     dimensions: VideoDimensions,
     profile: Profile,
     compat: bool,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
     threads: NonZeroUsize,
 ) -> anyhow::Result<String> {
     // TODO: Add full HDR metadata

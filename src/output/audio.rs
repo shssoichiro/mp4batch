@@ -119,48 +119,48 @@ pub fn convert_audio(
             integrated: norm_data
                 .iter()
                 .find(|line| line.starts_with("Input Integrated:"))
-                .unwrap()
+                .expect("Input Integrated line in loudnorm output")
                 .split_whitespace()
                 .nth(2)
-                .unwrap()
+                .expect("Integrated value in line")
                 .parse()
-                .unwrap(),
+                .expect("Valid integrated value"),
             true_peak: norm_data
                 .iter()
                 .find(|line| line.starts_with("Input True Peak:"))
-                .unwrap()
+                .expect("Input True Peak line in loudnorm output")
                 .split_whitespace()
                 .nth(3)
-                .unwrap()
+                .expect("True peak value in line")
                 .parse()
-                .unwrap(),
+                .expect("Valid true peak value"),
             lra: norm_data
                 .iter()
                 .find(|line| line.starts_with("Input LRA:"))
-                .unwrap()
+                .expect("Input LRA line in loudnorm output")
                 .split_whitespace()
                 .nth(2)
-                .unwrap()
+                .expect("LRA value in line")
                 .parse()
-                .unwrap(),
+                .expect("Valid LRA value"),
             threshold: norm_data
                 .iter()
                 .find(|line| line.starts_with("Input Threshold:"))
-                .unwrap()
+                .expect("Input Threshold line in loudnorm output")
                 .split_whitespace()
                 .nth(2)
-                .unwrap()
+                .expect("Threshold value in line")
                 .parse()
-                .unwrap(),
+                .expect("Valid threshold value"),
             offset: norm_data
                 .iter()
                 .find(|line| line.starts_with("Target Offset:"))
-                .unwrap()
+                .expect("Target Offset line in loudnorm output")
                 .split_whitespace()
                 .nth(2)
-                .unwrap()
+                .expect("Offset value in line")
                 .parse()
-                .unwrap(),
+                .expect("Valid offset value"),
         });
     }
 
@@ -187,7 +187,7 @@ pub fn convert_audio(
         .arg("-map_chapters")
         .arg("-1");
     if normalize {
-        let params = fp_data.unwrap();
+        let params = fp_data.expect("First pass data should be available when normalize is true");
         command.arg("-af").arg(format!(
             "loudnorm=I=-16:dual_mono=true:TP=-1.5:LRA=11:measured_I={:.1}:measured_TP={:.1}:\
              measured_LRA={:.1}:measured_thresh={:.1}:offset={:.1}:linear=true:\
@@ -258,7 +258,7 @@ pub fn save_vpy_audio(
     input: &Path,
     track: usize,
     output: &Path,
-    sigterm: Arc<AtomicBool>,
+    sigterm: &Arc<AtomicBool>,
 ) -> Result<()> {
     let filename = input
         .file_name()
@@ -298,7 +298,7 @@ pub fn save_vpy_audio(
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute ffmpeg: {}", e))?;
     let is_done = Arc::new(AtomicBool::new(false));
-    monitor_for_sigterm(&pipe, Arc::clone(&sigterm), Arc::clone(&is_done));
+    monitor_for_sigterm(&pipe, Arc::clone(sigterm), Arc::clone(&is_done));
     pipe.wait()?;
     is_done.store(true, Ordering::Relaxed);
     if !status.success() {

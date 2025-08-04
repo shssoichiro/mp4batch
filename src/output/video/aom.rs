@@ -9,7 +9,7 @@ pub fn build_aom_args_string(
     speed: u8,
     dimensions: VideoDimensions,
     profile: Profile,
-    colorimetry: &Colorimetry,
+    colorimetry: Colorimetry,
     threads: NonZeroUsize,
 ) -> anyhow::Result<String> {
     // Note: aom doesn't have a parameter to control full vs limited range

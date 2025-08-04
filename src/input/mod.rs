@@ -83,7 +83,7 @@ fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
         .trim()
         .parse()
         .context("failed to parse height")?;
-    let frac_regex = Regex::new(r"\((\d+)\/(\d+)\) FPS").unwrap();
+    let frac_regex = Regex::new(r"\((\d+)\/(\d+)\) FPS").expect("Valid FPS regex");
     let fps_str = mediainfo
         .get("Frame rate")
         .expect("Frame rate should be specified in mediainfo output");
@@ -91,13 +91,13 @@ fn get_video_dimensions_mediainfo(input: &Path) -> Result<VideoDimensions> {
         (
             captures
                 .get(1)
-                .unwrap()
+                .expect("FPS numerator capture group")
                 .as_str()
                 .parse::<u32>()
                 .context("failed to parse fps numer")?,
             captures
                 .get(2)
-                .unwrap()
+                .expect("FPS denominator capture group")
                 .as_str()
                 .parse::<u32>()
                 .context("failed to parse fps denom")?,
@@ -175,21 +175,21 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     let width = lines
         .iter()
         .find(|l| l.starts_with("Width: "))
-        .unwrap()
+        .expect("Width line in vspipe output")
         .replace("Width: ", "")
         .trim()
         .parse()?;
     let height = lines
         .iter()
         .find(|l| l.starts_with("Height: "))
-        .unwrap()
+        .expect("Height line in vspipe output")
         .replace("Height: ", "")
         .trim()
         .parse()?;
     let fps: Vec<_> = lines
         .iter()
         .find(|l| l.starts_with("FPS: "))
-        .unwrap()
+        .expect("FPS line in vspipe output")
         .replace("FPS: ", "")
         .split_whitespace()
         .next()
@@ -200,7 +200,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
     let bit_depth = lines
         .iter()
         .find(|l| l.starts_with("Bits: "))
-        .unwrap()
+        .expect("Bits line in vspipe output")
         .replace("Bits: ", "")
         .trim()
         .parse()
@@ -211,7 +211,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
         frames: lines
             .iter()
             .find(|l| l.starts_with("Frames: "))
-            .unwrap()
+            .expect("Frames line in vspipe output")
             .replace("Frames: ", "")
             .trim()
             .parse()?,
@@ -220,7 +220,7 @@ fn get_video_dimensions_vps(input: &Path) -> Result<VideoDimensions> {
             &lines
                 .iter()
                 .find(|l| l.starts_with("Format Name: "))
-                .unwrap()
+                .expect("Format Name line in vspipe output")
                 .replace("Format Name: ", ""),
         ),
         bit_depth,
@@ -279,12 +279,11 @@ pub fn find_source_file(input: &Path) -> PathBuf {
         .find(|source| source.file_stem() == input.file_stem())
         .unwrap_or_else(|| &sources[0]);
     // Handle relative or absolute paths
-    let mut output = input
+    input
         .parent()
         .expect("File should have a parent dir")
-        .to_path_buf();
-    output.push(source);
-    output
+        .to_path_buf()
+        .join(source)
 }
 
 fn parse_sources(script: &str) -> Vec<PathBuf> {
@@ -353,13 +352,13 @@ impl Colorimetry {
         })
     }
 
-    pub fn is_hdr(&self) -> bool {
+    pub fn is_hdr(self) -> bool {
         self.transfer == TransferCharacteristic::HybridLogGamma
             || self.transfer == TransferCharacteristic::PerceptualQuantizer
     }
 
     pub fn get_primaries_encoder_string(
-        &self,
+        self,
         encoder: VideoEncoderIdent,
     ) -> Result<Cow<'static, str>> {
         match encoder {
@@ -393,7 +392,12 @@ impl Colorimetry {
                 ColorPrimaries::Unspecified => bail!("Color primaries unspecified"),
                 x => bail!("Color primaries {x} not implemented for rav1e"),
             })),
-            VideoEncoderIdent::SvtAv1 => Ok(self.primaries.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::SvtAv1 => Ok(self
+                .primaries
+                .to_u8()
+                .expect("Valid primaries enum")
+                .to_string()
+                .into()),
             VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.primaries {
                 ColorPrimaries::BT709 => "bt709",
                 ColorPrimaries::BT470M => "bt470m",
@@ -426,7 +430,7 @@ impl Colorimetry {
     }
 
     pub fn get_matrix_encoder_string(
-        &self,
+        self,
         encoder: VideoEncoderIdent,
     ) -> Result<Cow<'static, str>> {
         match encoder {
@@ -465,7 +469,12 @@ impl Colorimetry {
                 MatrixCoefficients::Unspecified => bail!("Matrix coefficients unspecified"),
                 x => bail!("Matrix coefficients {x} not implemented for rav1e"),
             })),
-            VideoEncoderIdent::SvtAv1 => Ok(self.matrix.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::SvtAv1 => Ok(self
+                .matrix
+                .to_u8()
+                .expect("Valid matrix enum")
+                .to_string()
+                .into()),
             VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.matrix {
                 MatrixCoefficients::Identity => "GBR",
                 MatrixCoefficients::BT709 => "bt709",
@@ -504,7 +513,7 @@ impl Colorimetry {
     }
 
     pub fn get_transfer_encoder_string(
-        &self,
+        self,
         encoder: VideoEncoderIdent,
     ) -> Result<Cow<'static, str>> {
         match encoder {
@@ -553,7 +562,12 @@ impl Colorimetry {
                 }
                 x => bail!("Transfer characteristics {x} not implemented for rav1e"),
             })),
-            VideoEncoderIdent::SvtAv1 => Ok(self.transfer.to_u8().unwrap().to_string().into()),
+            VideoEncoderIdent::SvtAv1 => Ok(self
+                .transfer
+                .to_u8()
+                .expect("Valid transfer enum")
+                .to_string()
+                .into()),
             VideoEncoderIdent::X264 => Ok(Cow::Borrowed(match self.transfer {
                 TransferCharacteristic::BT1886 => "bt709",
                 TransferCharacteristic::BT470M => "bt470m",
@@ -601,10 +615,7 @@ impl Colorimetry {
         }
     }
 
-    pub fn get_range_encoder_string(
-        &self,
-        encoder: VideoEncoderIdent,
-    ) -> Result<Cow<'static, str>> {
+    pub fn get_range_encoder_string(self, encoder: VideoEncoderIdent) -> Result<Cow<'static, str>> {
         match encoder {
             VideoEncoderIdent::Copy => bail!("copy does not support colorimetry args"),
             VideoEncoderIdent::Aom => bail!("aom does not support a range argument"),
@@ -628,7 +639,7 @@ impl Colorimetry {
     }
 
     pub fn get_chromaloc_encoder_string(
-        &self,
+        self,
         encoder: VideoEncoderIdent,
     ) -> Result<Cow<'static, str>> {
         match encoder {
@@ -695,7 +706,7 @@ pub fn vspipe_has_audio(input: &Path) -> Result<Option<usize>> {
         if line.starts_with("Output Index:") {
             if let Some(next_line) = iter.peek() {
                 if next_line.trim() == "Type: Audio" {
-                    let (_, index) = line.split_once(": ").unwrap();
+                    let (_, index) = line.split_once(": ").expect("Valid index line format");
                     return Ok(Some(index.parse()?));
                 }
             }

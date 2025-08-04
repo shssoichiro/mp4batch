@@ -89,13 +89,23 @@ fn parse_quantizer(input: &str) -> IResult<&str, ParsedFilter> {
         recognize((opt(char('-')), digit1)),
     )
     .parse_complete(input)
-    .map(|(input, token)| (input, ParsedFilter::Quantizer(token.parse().unwrap())))
+    .map(|(input, token)| {
+        (
+            input,
+            ParsedFilter::Quantizer(token.parse().expect("Invalid quantizer value")),
+        )
+    })
 }
 
 fn parse_speed(input: &str) -> IResult<&str, ParsedFilter> {
     preceded(alt((tag("s="), tag("speed="))), digit1)
         .parse_complete(input)
-        .map(|(input, token)| (input, ParsedFilter::Speed(token.parse().unwrap())))
+        .map(|(input, token)| {
+            (
+                input,
+                ParsedFilter::Speed(token.parse().expect("Invalid speed value")),
+            )
+        })
 }
 
 fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
@@ -104,7 +114,7 @@ fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
         .map(|(input, token)| {
             (
                 input,
-                ParsedFilter::Profile(Profile::from_str(token).unwrap()),
+                ParsedFilter::Profile(Profile::from_str(token).expect("Invalid profile")),
             )
         })
 }
@@ -112,7 +122,12 @@ fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
 fn parse_grain(input: &str) -> IResult<&str, ParsedFilter> {
     preceded(alt((tag("g="), tag("grain="))), digit1)
         .parse_complete(input)
-        .map(|(input, token)| (input, ParsedFilter::Grain(token.parse().unwrap())))
+        .map(|(input, token)| {
+            (
+                input,
+                ParsedFilter::Grain(token.parse().expect("Invalid grain value")),
+            )
+        })
 }
 
 fn parse_compat(input: &str) -> IResult<&str, ParsedFilter> {
@@ -121,7 +136,7 @@ fn parse_compat(input: &str) -> IResult<&str, ParsedFilter> {
         .map(|(input, token)| {
             (
                 input,
-                ParsedFilter::Compat(token.parse::<u8>().unwrap() > 0),
+                ParsedFilter::Compat(token.parse::<u8>().expect("Invalid compat value") > 0),
             )
         })
 }
@@ -143,7 +158,10 @@ fn parse_bit_depth(input: &str) -> IResult<&str, ParsedFilter> {
         .parse_complete(input)
         .map(|(input, token)| {
             if token == "8" || token == "10" {
-                (input, ParsedFilter::BitDepth(token.parse().unwrap()))
+                (
+                    input,
+                    ParsedFilter::BitDepth(token.parse().expect("Invalid bit depth value")),
+                )
             } else {
                 panic!("Unsupported bit depth: {}", token);
             }
@@ -154,14 +172,20 @@ fn parse_resolution(input: &str) -> IResult<&str, ParsedFilter> {
     preceded(tag("res="), (digit1, char('x'), digit1))
         .parse_complete(input)
         .map(|(input, (w, _, h))| {
-            let width = w.parse::<u32>().unwrap();
-            let height = h.parse::<u32>().unwrap();
-            if width % 2 != 0 || height % 2 != 0 {
-                panic!("Resolution must be mod 2, got {}x{}", w, h);
-            }
-            if width < 64 || height < 64 {
-                panic!("Resolution must be at least 64x64, got {}x{}", w, h);
-            }
+            let width = w.parse::<u32>().expect("Invalid width value");
+            let height = h.parse::<u32>().expect("Invalid height value");
+            assert!(
+                !(width % 2 != 0 || height % 2 != 0),
+                "Resolution must be mod 2, got {}x{}",
+                w,
+                h
+            );
+            assert!(
+                !(width < 64 || height < 64),
+                "Resolution must be at least 64x64, got {}x{}",
+                w,
+                h
+            );
 
             (input, ParsedFilter::Resolution { width, height })
         })
@@ -182,7 +206,12 @@ fn parse_audio_encoder(input: &str) -> IResult<&str, ParsedFilter> {
 fn parse_audio_bitrate(input: &str) -> IResult<&str, ParsedFilter> {
     preceded(tag("ab="), digit1)
         .parse_complete(input)
-        .map(|(input, token)| (input, ParsedFilter::AudioBitrate(token.parse().unwrap())))
+        .map(|(input, token)| {
+            (
+                input,
+                ParsedFilter::AudioBitrate(token.parse().expect("Invalid audio bitrate value")),
+            )
+        })
 }
 
 fn parse_audio_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, ParsedFilter<'a>> {

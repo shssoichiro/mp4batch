@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use nom::{
     IResult, Parser,
     bytes::complete::tag,
@@ -46,8 +46,10 @@ impl HdrMetadata {
                 eprintln!("Warning: {}", e);
             }
         }
-        if data.is_some() && data.as_ref().unwrap().color_coords.is_some() {
-            return Ok(data);
+        if let Some(data) = data
+            && data.color_coords.is_some()
+        {
+            return Ok(Some(data));
         }
 
         match parse_mediainfo(input) {
@@ -61,8 +63,10 @@ impl HdrMetadata {
                 anyhow::bail!("Unable to parse metadata");
             }
         }
-        if data.is_some() && data.as_ref().unwrap().color_coords.is_some() {
-            return Ok(data);
+        if let Some(data) = data
+            && data.color_coords.is_some()
+        {
+            return Ok(Some(data));
         }
 
         match parse_ffprobe(input) {
@@ -94,11 +98,8 @@ fn extract_chapters(input: &Path) -> Option<PathBuf> {
         .arg("chapters")
         .arg(&output)
         .status();
-    if result.is_ok() && output.exists() && output.metadata().expect("File exists").len() > 0 {
-        Some(output)
-    } else {
-        None
-    }
+    (result.is_ok() && output.exists() && output.metadata().expect("File exists").len() > 0)
+        .then_some(output)
 }
 
 pub fn apply_data(target: &Path, hdr: Option<&HdrMetadata>, chapters: Option<&Path>) -> Result<()> {
@@ -219,11 +220,19 @@ fn parse_mkvinfo(input: &Path) -> anyhow::Result<Option<HdrMetadata>> {
             continue;
         }
         if line.contains("Maximum content light:") {
-            hdr.max_content_light = line.split_once(": ").unwrap().1.parse()?;
+            hdr.max_content_light = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Maximum frame light:") {
-            hdr.max_frame_light = line.split_once(": ").unwrap().1.parse()?;
+            hdr.max_frame_light = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
 
@@ -231,53 +240,120 @@ fn parse_mkvinfo(input: &Path) -> anyhow::Result<Option<HdrMetadata>> {
             // This should always be the first piece of color data, so we initialize here
             hdr.color_coords = Some(ColorCoordinates::default());
 
-            hdr.color_coords.as_mut().unwrap().red.0 = line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .red
+                .0 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Red colour coordinate y:") {
-            hdr.color_coords.as_mut().unwrap().red.1 = line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .red
+                .1 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Green colour coordinate x:") {
-            hdr.color_coords.as_mut().unwrap().green.0 =
-                line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .green
+                .0 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Green colour coordinate y:") {
-            hdr.color_coords.as_mut().unwrap().green.1 =
-                line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .green
+                .1 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Blue colour coordinate x:") {
-            hdr.color_coords.as_mut().unwrap().blue.0 = line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .blue
+                .0 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Blue colour coordinate y:") {
-            hdr.color_coords.as_mut().unwrap().blue.1 = line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .blue
+                .1 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("White colour coordinate x:") {
-            hdr.color_coords.as_mut().unwrap().white.0 =
-                line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .white
+                .0 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("White colour coordinate y:") {
-            hdr.color_coords.as_mut().unwrap().white.1 =
-                line.split_once(": ").unwrap().1.parse()?;
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .white
+                .1 = line
+                .split_once(": ")
+                .expect("line contains delimiter")
+                .1
+                .parse()?;
             continue;
         }
 
         if line.contains("Maximum luminance:") {
-            hdr.max_luma = line.split_once(": ").unwrap().1.parse()?;
+            hdr.max_luma = line
+                .split_once(": ")
+                .expect("Line should contain colon separator")
+                .1
+                .parse()?;
             continue;
         }
         if line.contains("Minimum luminance:") {
-            hdr.min_luma = line.split_once(": ").unwrap().1.parse()?;
-            continue;
+            hdr.min_luma = line
+                .split_once(": ")
+                .expect("Line should contain colon separator")
+                .1
+                .parse()?;
         }
     }
 
-    Ok(if has_hdr { Some(hdr) } else { None })
+    Ok(has_hdr.then_some(hdr))
 }
 
 // MediaInfo may include the following pieces of data:
@@ -313,7 +389,7 @@ fn parse_mediainfo(input: &Path) -> Result<Option<HdrMetadata>> {
         if line.contains("Maximum Content Light Level") {
             hdr.max_content_light = line
                 .split_once(": ")
-                .unwrap()
+                .expect("line contains delimiter")
                 .1
                 .trim_end_matches(" cd/m2")
                 .parse()?;
@@ -322,15 +398,15 @@ fn parse_mediainfo(input: &Path) -> Result<Option<HdrMetadata>> {
         if line.contains("Maximum Frame-Average Light Level") {
             hdr.max_frame_light = line
                 .split_once(": ")
-                .unwrap()
+                .expect("line contains delimiter")
                 .1
                 .trim_end_matches(" cd/m2")
                 .parse()?;
             continue;
         }
         if line.contains("Mastering display luminance") {
-            let output = line.split_once(": ").unwrap().1;
-            let (min, max) = output.split_once(", ").unwrap();
+            let output = line.split_once(": ").expect("line contains delimiter").1;
+            let (min, max) = output.split_once(", ").expect("line contains delimiter");
             hdr.min_luma = min
                 .trim_start_matches("min: ")
                 .trim_end_matches(" cd/m2")
@@ -343,18 +419,22 @@ fn parse_mediainfo(input: &Path) -> Result<Option<HdrMetadata>> {
         }
 
         if line.contains("Encoding settings") && line.contains("master-display") {
-            let settings = line.split_once(": ").unwrap().1;
+            let settings = line.split_once(": ").expect("line contains delimiter").1;
             hdr.color_coords = Some(parse_x265_settings(settings)?);
         }
     }
 
-    Ok(if has_hdr { Some(hdr) } else { None })
+    Ok(has_hdr.then_some(hdr))
 }
 
 // Takes in a string that contains a substring in the format:
 // master-display=G(13250,34499)B(7499,2999)R(34000,15999)WP(15634,16450)L(10000000,50)cll=944,143
 //
 // Also using unwrap here because I don't want to fight the borrow checker anymore.
+#[expect(
+    clippy::string_slice,
+    reason = "we know the split index is on a char boundary"
+)]
 fn parse_x265_settings(input: &str) -> Result<ColorCoordinates> {
     const MASTER_DISPLAY_HEADER: &str = "master-display=";
     let header_pos = input
@@ -363,16 +443,16 @@ fn parse_x265_settings(input: &str) -> Result<ColorCoordinates> {
     let input = &input[(header_pos + MASTER_DISPLAY_HEADER.len())..];
     let (input, (gx, gy)) = preceded(char('G'), get_coordinate_pair)
         .parse_complete(input)
-        .unwrap();
+        .map_err(|e| anyhow!("{}", e))?;
     let (input, (bx, by)) = preceded(char('B'), get_coordinate_pair)
         .parse_complete(input)
-        .unwrap();
+        .map_err(|e| anyhow!("{}", e))?;
     let (input, (rx, ry)) = preceded(char('R'), get_coordinate_pair)
         .parse_complete(input)
-        .unwrap();
+        .map_err(|e| anyhow!("{}", e))?;
     let (_, (wx, wy)) = preceded(tag("WP"), get_coordinate_pair)
         .parse_complete(input)
-        .unwrap();
+        .map_err(|e| anyhow!("{}", e))?;
 
     // Why 50000? Why indeed.
     Ok(ColorCoordinates {
@@ -393,7 +473,10 @@ fn get_coordinate_pair(input: &str) -> IResult<&str, (u32, u32)> {
     .map(|(input, (x, y))| {
         (
             input,
-            (x.parse::<u32>().unwrap(), y.parse::<u32>().unwrap()),
+            (
+                x.parse::<u32>().expect("value is numeric"),
+                y.parse::<u32>().expect("value is numeric"),
+            ),
         )
     })
 }
@@ -449,71 +532,152 @@ fn parse_ffprobe(input: &Path) -> anyhow::Result<Option<HdrMetadata>> {
             // This should always be the first piece of color data, so we initialize here
             hdr.color_coords = Some(ColorCoordinates::default());
 
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().red.0 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .red
+                .0 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("red_y=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().red.1 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .red
+                .1 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("green_x=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().green.0 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .green
+                .0 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("green_y=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().green.1 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .green
+                .1 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("blue_x=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().blue.0 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .blue
+                .0 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("blue_y=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().blue.1 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .blue
+                .1 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("white_point_x=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().white.0 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .white
+                .0 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("white_point_y=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
-            hdr.color_coords.as_mut().unwrap().white.1 =
-                num.parse::<f64>()? / denom.parse::<f64>()?;
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
+            hdr.color_coords
+                .as_mut()
+                .expect("color coords is set")
+                .white
+                .1 = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("min_luminance=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
             hdr.min_luma = num.parse::<f64>()? / denom.parse::<f64>()?;
             continue;
         }
         if line.starts_with("max_luminance=") {
-            let (num, denom) = line.split_once('=').unwrap().1.split_once('/').unwrap();
+            let (num, denom) = line
+                .split_once('=')
+                .expect("delimiter is present")
+                .1
+                .split_once('/')
+                .expect("delimiter is present");
             hdr.max_luma = num.parse::<u32>()? / denom.parse::<u32>()?;
             continue;
         }
 
         if line.starts_with("max_content=") {
-            hdr.max_content_light = line.split_once('=').unwrap().1.parse()?;
+            hdr.max_content_light = line
+                .split_once('=')
+                .expect("Line should contain equals separator")
+                .1
+                .parse()?;
             continue;
         }
         if line.starts_with("max_average=") {
-            hdr.max_frame_light = line.split_once('=').unwrap().1.parse()?;
-            continue;
+            hdr.max_frame_light = line
+                .split_once('=')
+                .expect("Line should contain equals separator")
+                .1
+                .parse()?;
         }
     }
     Ok(Some(hdr))
