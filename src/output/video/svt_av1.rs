@@ -46,9 +46,12 @@ pub fn build_svtav1_args_string(
     };
     // In theory 2 might be slightly better than 1 for live action,
     // but the difference is small, and 2 seems to currently be bugged at
-    // very high bitrates to give worse quality than 1
+    // very high bitrates to give worse quality than 1.
+    //
+    // Tune 0 seems better for grainy content, even though it increases filesize in general.
+    // For other content, the size increase seems to outweigh the grain retention benefits.
     let tune = match profile {
-        Profile::Fast => '0',
+        Profile::Grain | Profile::AnimeGrain => '0',
         _ => '1',
     };
     let complex_hvs = if psy_rd.parse::<f32>()? >= 1.0 {
