@@ -611,10 +611,10 @@ fn build_vpy_script(filename: &Path, input: &Path, output: &Output, skip_lossles
 }
 
 fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<File>) {
-    writeln!(script, "import vapoursynth as vs").unwrap();
-    writeln!(script, "core = vs.core").unwrap();
-    writeln!(script, "core.max_cache_size=1024").unwrap();
-    writeln!(script, "core.num_threads=1").unwrap();
+    writeln!(script, "import vapoursynth as vs").expect("write should succeed");
+    writeln!(script, "core = vs.core").expect("write should succeed");
+    writeln!(script, "core.max_cache_size=1024").expect("write should succeed");
+    writeln!(script, "core.num_threads=1").expect("write should succeed");
     writeln!(
         script,
         "clip = core.lsmas.LWLibavSource(source=\"{}\")",
@@ -624,11 +624,11 @@ fn build_new_vpy_script(input: &Path, output: &Output, script: &mut BufWriter<Fi
                 .to_string_lossy()
         )
     )
-    .unwrap();
+    .expect("write should succeed");
 
     write_filters(output, script, None);
 
-    writeln!(script, "clip.set_output()").unwrap();
+    writeln!(script, "clip.set_output()").expect("write should succeed");
     script.flush().expect("Unable to flush script data");
 }
 
@@ -658,10 +658,10 @@ fn copy_and_modify_vpy_script(input: &Path, output: &Output, script: &mut BufWri
     }
     match (output_pos, output_var) {
         (Some(pos), Some(var)) => {
-            write!(script, "{}", &contents[..pos]).unwrap();
+            write!(script, "{}", &contents[..pos]).expect("write should succeed");
             write_filters(output, script, Some(var));
-            writeln!(script).unwrap();
-            write!(script, "{}", &contents[pos..]).unwrap();
+            writeln!(script).expect("write should succeed");
+            write!(script, "{}", &contents[pos..]).expect("write should succeed");
             script.flush().expect("Unable to flush contents of script");
         }
         _ => {
@@ -681,11 +681,11 @@ fn write_filters(output: &Output, script: &mut BufWriter<File>, clip: Option<&st
             script,
             "{clip} = {clip}.resize.Spline36({w}, {h}, dither_type='error_diffusion')"
         )
-        .unwrap();
+        .expect("write should succeed");
     }
     if let Some(bd) = output.video.bit_depth {
-        writeln!(script, "import vsutil").unwrap();
-        writeln!(script, "{clip} = vsutil.depth({clip}, {bd})").unwrap();
+        writeln!(script, "import vsutil").expect("write should succeed");
+        writeln!(script, "{clip} = vsutil.depth({clip}, {bd})").expect("write should succeed");
     }
 }
 

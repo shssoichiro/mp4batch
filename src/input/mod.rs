@@ -703,13 +703,12 @@ pub fn vspipe_has_audio(input: &Path) -> Result<Option<usize>> {
     let mut iter = output.lines().peekable();
     while let Some(line) = iter.next() {
         let line = line.trim();
-        if line.starts_with("Output Index:") {
-            if let Some(next_line) = iter.peek() {
-                if next_line.trim() == "Type: Audio" {
-                    let (_, index) = line.split_once(": ").expect("Valid index line format");
-                    return Ok(Some(index.parse()?));
-                }
-            }
+        if line.starts_with("Output Index:")
+            && let Some(next_line) = iter.peek()
+            && next_line.trim() == "Type: Audio"
+        {
+            let (_, index) = line.split_once(": ").expect("Valid index line format");
+            return Ok(Some(index.parse()?));
         }
     }
     Ok(None)

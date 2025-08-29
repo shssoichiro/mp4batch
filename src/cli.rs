@@ -71,7 +71,7 @@ pub fn parse_filters<'a>(input: &'a str, in_file: &Path) -> Vec<ParsedFilter<'a>
     filters
 }
 
-fn parse_video_encoder(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_video_encoder(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("enc="), alphanumeric1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -83,7 +83,7 @@ fn parse_video_encoder(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_quantizer(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_quantizer(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(
         alt((tag("q="), tag("qp="), tag("crf="))),
         recognize((opt(char('-')), digit1)),
@@ -97,7 +97,7 @@ fn parse_quantizer(input: &str) -> IResult<&str, ParsedFilter> {
     })
 }
 
-fn parse_speed(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_speed(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(alt((tag("s="), tag("speed="))), digit1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -108,7 +108,7 @@ fn parse_speed(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_profile(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(alt((tag("p="), tag("profile="))), alpha1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -119,7 +119,7 @@ fn parse_profile(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_grain(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_grain(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(alt((tag("g="), tag("grain="))), digit1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -130,7 +130,7 @@ fn parse_grain(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_compat(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_compat(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("compat="), digit1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -141,7 +141,7 @@ fn parse_compat(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_extension(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_extension(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("ext="), alphanumeric1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -153,7 +153,7 @@ fn parse_extension(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_bit_depth(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_bit_depth(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("bd="), digit1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -168,7 +168,7 @@ fn parse_bit_depth(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_resolution(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_resolution(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("res="), (digit1, char('x'), digit1))
         .parse_complete(input)
         .map(|(input, (w, _, h))| {
@@ -191,7 +191,7 @@ fn parse_resolution(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_audio_encoder(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_audio_encoder(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("aenc="), alphanumeric1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -203,7 +203,7 @@ fn parse_audio_encoder(input: &str) -> IResult<&str, ParsedFilter> {
         })
 }
 
-fn parse_audio_bitrate(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_audio_bitrate(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     preceded(tag("ab="), digit1)
         .parse_complete(input)
         .map(|(input, token)| {
@@ -247,7 +247,7 @@ fn parse_audio_tracks<'a>(input: &'a str, in_file: &Path) -> IResult<&'a str, Pa
     })
 }
 
-fn parse_audio_norm(input: &str) -> IResult<&str, ParsedFilter> {
+fn parse_audio_norm(input: &str) -> IResult<&str, ParsedFilter<'_>> {
     tag("an=1")(input).map(|(input, _)| (input, ParsedFilter::AudioNormalize))
 }
 

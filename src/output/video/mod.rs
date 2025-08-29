@@ -145,20 +145,20 @@ pub fn create_lossless(
     copy_audio_from: Option<&Path>,
 ) -> Result<PathBuf> {
     let lossless_filename = input.with_extension("lossless.mkv");
-    if lossless_filename.exists() {
-        if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
-            // We use a fuzzy frame count check because *some cursed sources*
-            // report a different frame count from the number of actual decodeable frames.
-            let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
-            let allowance = dimensions.frames / 200;
-            if !verify_frame_count || diff <= allowance {
-                eprintln!(
-                    "{} {}",
-                    "[Success]".green().bold(),
-                    "Lossless already exists".green(),
-                );
-                return Ok(lossless_filename);
-            }
+    if lossless_filename.exists()
+        && let Ok(lossless_frames) = get_video_frame_count(&lossless_filename)
+    {
+        // We use a fuzzy frame count check because *some cursed sources*
+        // report a different frame count from the number of actual decodeable frames.
+        let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
+        let allowance = dimensions.frames / 200;
+        if !verify_frame_count || diff <= allowance {
+            eprintln!(
+                "{} {}",
+                "[Success]".green().bold(),
+                "Lossless already exists".green(),
+            );
+            return Ok(lossless_filename);
         }
     }
 
@@ -251,15 +251,15 @@ pub fn create_lossless(
         );
     }
 
-    if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename) {
-        if verify_frame_count {
-            // We use a fuzzy frame count check because *some cursed sources*
-            // report a different frame count from the number of actual decodeable frames.
-            let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
-            let allowance = dimensions.frames / 200;
-            if diff > allowance {
-                anyhow::bail!("Incomplete lossless encode");
-            }
+    if let Ok(lossless_frames) = get_video_frame_count(&lossless_filename)
+        && verify_frame_count
+    {
+        // We use a fuzzy frame count check because *some cursed sources*
+        // report a different frame count from the number of actual decodeable frames.
+        let diff = (lossless_frames as i64 - dimensions.frames as i64).unsigned_abs() as u32;
+        let allowance = dimensions.frames / 200;
+        if diff > allowance {
+            anyhow::bail!("Incomplete lossless encode");
         }
     }
 
@@ -414,13 +414,12 @@ pub fn convert_video_av1an(
     if let VideoEncoder::Aom { grain, .. }
     | VideoEncoder::Rav1e { grain, .. }
     | VideoEncoder::SvtAv1 { grain, .. } = encoder
+        && grain > 0
     {
-        if grain > 0 {
-            command
-                .arg("--photon-noise")
-                .arg(grain.to_string())
-                .arg("--chroma-noise");
-        }
+        command
+            .arg("--photon-noise")
+            .arg(grain.to_string())
+            .arg("--chroma-noise");
     }
     if let VideoEncoder::X265 { .. } = encoder {
         command.arg("--concat").arg("mkvmerge");
