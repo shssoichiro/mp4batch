@@ -280,7 +280,7 @@ pub fn convert_video_av1an(
     force_keyframes: Option<&str>,
     colorimetry: Colorimetry,
 ) -> Result<()> {
-    if dimensions.width % 8 != 0 {
+    if !dimensions.width.is_multiple_of(8) {
         eprintln!(
             "{} {} {} {}",
             "[Warning]".yellow().bold(),
@@ -289,7 +289,7 @@ pub fn convert_video_av1an(
             "is not divisble by 8".yellow()
         );
     }
-    if dimensions.height % 8 != 0 {
+    if !dimensions.height.is_multiple_of(8) {
         eprintln!(
             "{} {} {} {}",
             "[Warning]".yellow().bold(),

@@ -30,7 +30,7 @@ pub fn convert_video_x264(
     colorimetry: Colorimetry,
     sigterm: &Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
-    if dimensions.width % 8 != 0 {
+    if !dimensions.width.is_multiple_of(8) {
         eprintln!(
             "{} {} {} {}",
             "[Warning]".yellow().bold(),
@@ -39,7 +39,7 @@ pub fn convert_video_x264(
             "is not divisble by 8".yellow()
         );
     }
-    if dimensions.height % 8 != 0 {
+    if !dimensions.height.is_multiple_of(8) {
         eprintln!(
             "{} {} {} {}",
             "[Warning]".yellow().bold(),
