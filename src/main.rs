@@ -385,11 +385,15 @@ fn process_file(
         };
 
         let mut audio_tracks = if output.audio_tracks.is_empty() {
-            vec![Track {
-                source: TrackSource::FromVideo(0),
-                enabled: true,
-                forced: false,
-            }]
+            if has_audio(&source_video)? {
+                vec![Track {
+                    source: TrackSource::FromVideo(0),
+                    enabled: true,
+                    forced: false,
+                }]
+            } else {
+                vec![]
+            }
         } else {
             output.audio_tracks.clone()
         };

@@ -2,7 +2,7 @@ use crate::{
     cli::{Track, TrackSource},
     find_source_file, monitor_for_sigterm,
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use colored::*;
 use std::sync::atomic::Ordering;
 use std::{
@@ -344,4 +344,32 @@ fn get_channel_count(path: &Path, audio_track: &Track) -> Result<u32> {
         .ok_or_else(|| anyhow::anyhow!("No output from ffprobe"))?
         .to_string();
     Ok(output.parse()?)
+}
+
+pub fn has_audio(input: &Path) -> Result<bool> {
+    let output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("quiet")
+        .arg("-select_streams")
+        .arg("a")
+        .arg("-show_entries")
+        .arg("stream=index")
+        .arg("-of")
+        .arg("csv=p=0")
+        .arg(input.as_os_str())
+        .output()
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to run ffprobe on {}: {}",
+                input.to_string_lossy(),
+                e
+            )
+        })?;
+
+    if !output.status.success() {
+        bail!("failed to check for audio in source file");
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(!stdout.trim().is_empty())
 }
