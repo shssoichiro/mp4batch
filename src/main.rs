@@ -8,7 +8,6 @@ use signal_hook::{
     flag::register,
 };
 use size::Size;
-use std::process::{Child, Command};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{
@@ -19,6 +18,10 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, atomic::AtomicBool},
     thread,
+};
+use std::{
+    io::stderr,
+    process::{Child, Command, Stdio},
 };
 use which::which;
 
@@ -203,19 +206,8 @@ fn process_file(
     no_retry: bool,
     sigterm: &Arc<AtomicBool>,
 ) -> Result<()> {
-    // Print the info once
-    Command::new("vspipe")
-        .arg("-i")
-        .arg(input_vpy)
-        .arg("-o")
-        .arg("0")
-        .arg("-")
-        .status()
-        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
-
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
-    let colorimetry = Colorimetry::from_path(input_vpy)?;
     eprintln!(
         "{} {} {}{}{}{}",
         "[Info]".blue().bold(),
@@ -245,6 +237,28 @@ fn process_file(
             )),
         ")".blue(),
     );
+
+    // Print the info once.
+    // vspipe's `-o` option doesn't work with `-i`, so we will manually just print index 0.
+    let info_stdout = Command::new("vspipe")
+        .arg("-i")
+        .arg(input_vpy)
+        .arg("-")
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?
+        .stdout;
+    let mut stderr = stderr().lock();
+    for line in String::from_utf8_lossy(&info_stdout)
+        .lines()
+        .skip(1)
+        .take_while(|line| !line.starts_with("Output Index: 1"))
+    {
+        writeln!(&mut stderr, "{}", line)?;
+    }
+    drop(stderr);
+
+    let colorimetry = Colorimetry::from_path(input_vpy)?;
     if outputs
         .iter()
         .all(|output| matches!(output.video.encoder, VideoEncoder::Copy))
