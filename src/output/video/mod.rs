@@ -162,16 +162,6 @@ pub fn create_lossless(
         }
     }
 
-    // Print the info once
-    Command::new("vspipe")
-        .arg("-i")
-        .arg(input)
-        .arg("-o")
-        .arg("0")
-        .arg("-")
-        .status()
-        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
-
     let prim = colorimetry.get_primaries_encoder_string(VideoEncoderIdent::X264)?;
     let matrix = colorimetry.get_matrix_encoder_string(VideoEncoderIdent::X264)?;
     let transfer = colorimetry.get_transfer_encoder_string(VideoEncoderIdent::X264)?;

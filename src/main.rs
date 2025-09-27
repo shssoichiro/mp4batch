@@ -8,7 +8,7 @@ use signal_hook::{
     flag::register,
 };
 use size::Size;
-use std::process::Child;
+use std::process::{Child, Command};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{
@@ -203,6 +203,16 @@ fn process_file(
     no_retry: bool,
     sigterm: &Arc<AtomicBool>,
 ) -> Result<()> {
+    // Print the info once
+    Command::new("vspipe")
+        .arg("-i")
+        .arg(input_vpy)
+        .arg("-o")
+        .arg("0")
+        .arg("-")
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
+
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
     let colorimetry = Colorimetry::from_path(input_vpy)?;
