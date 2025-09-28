@@ -340,6 +340,9 @@ pub fn convert_video_av1an(
         )?)
         .arg("--sc-method")
         .arg("standard")
+        // Should be safe since our inputs are always lossless x264 with no open-gop
+        .arg("--chunk-method")
+        .arg("lsmash")
         .arg("-x")
         .arg(
             match encoder {
