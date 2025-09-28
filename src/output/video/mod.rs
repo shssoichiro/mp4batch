@@ -342,7 +342,7 @@ pub fn convert_video_av1an(
         .arg("standard")
         // Should be safe since our inputs are always lossless x264 with no open-gop
         .arg("--chunk-method")
-        .arg("lsmash")
+        .arg("ffms2")
         .arg("-x")
         .arg(
             match encoder {
