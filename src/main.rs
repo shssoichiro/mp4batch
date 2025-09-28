@@ -14,7 +14,7 @@ use std::{
     env,
     fmt::Write as FmtWrite,
     fs::{self, File, read_to_string},
-    io::{self, BufWriter, Write},
+    io::{self, BufRead, BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, atomic::AtomicBool},
     thread,
@@ -240,23 +240,47 @@ fn process_file(
 
     // Print the info once.
     // vspipe's `-o` option doesn't work with `-i`, so we will manually just print index 0.
-    let info_stdout = Command::new("vspipe")
+    let mut child = Command::new("vspipe")
         .arg("-i")
         .arg(input_vpy)
         .arg("-")
-        .stderr(Stdio::inherit())
-        .output()
-        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?
-        .stdout;
-    let mut stderr = stderr().lock();
-    for line in String::from_utf8_lossy(&info_stdout)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to execute vspipe -i prior to lossless: {}", e))?;
+
+    let child_stderr = child.stderr.take().expect("stderr should be captured");
+    let reader = io::BufReader::new(child_stderr);
+    let mut stderr_writer = stderr().lock();
+
+    // Print stderr line by line, overwriting the previous line
+    for line in reader.lines() {
+        let line = line.map_err(|e| anyhow::anyhow!("Failed to read vspipe stderr: {}", e))?;
+        write!(&mut stderr_writer, "\r{}", line)?;
+        stderr_writer.flush()?;
+    }
+    // Move to next line after progress is done
+    eprintln!();
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| anyhow::anyhow!("Failed to wait for vspipe process: {}", e))?;
+
+    if !output.status.success() {
+        bail!(
+            "vspipe -i failed with exit code: {:?}",
+            output.status.code()
+        );
+    }
+
+    for line in String::from_utf8_lossy(&output.stdout)
         .lines()
         .skip(1)
         .take_while(|line| !line.starts_with("Output Index: 1"))
     {
-        writeln!(&mut stderr, "{}", line)?;
+        writeln!(&mut stderr_writer, "{}", line)?;
     }
-    drop(stderr);
+    drop(stderr_writer);
 
     let colorimetry = Colorimetry::from_path(input_vpy)?;
     if outputs
