@@ -120,8 +120,14 @@ struct InputArgs {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Subcommand {
-    /// Just make a lossless, then exit. Copies the audio to the output.
-    Lossless,
+    /// Just make a lossless, then exit.
+    ///
+    /// By default, copies the audio into the lossless video.
+    Lossless {
+        /// Extract audio to a separate `.mka` instead of muxing into the lossless video
+        #[clap(short = 'X', long = "extract-audio")]
+        extract_audio: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -137,7 +143,7 @@ fn main() -> Result<()> {
     assert!(input.exists(), "Input path does not exist");
 
     match args.subcommand {
-        Some(Subcommand::Lossless) => {
+        Some(Subcommand::Lossless { extract_audio }) => {
             if let Err(err) = workflow::run_processing_workflow(
                 input,
                 None,
@@ -145,7 +151,8 @@ fn main() -> Result<()> {
                 true,
                 true,
                 false,
-                true,
+                !extract_audio,
+                extract_audio,
                 None,
                 !args.no_verify,
                 args.no_delay,
@@ -166,6 +173,7 @@ fn main() -> Result<()> {
                 args.keep_lossless,
                 args.lossless_only,
                 args.skip_lossless,
+                false,
                 false,
                 args.force_keyframes.as_deref(),
                 !args.no_verify,
@@ -200,6 +208,7 @@ fn process_file(
     lossless_only: bool,
     mut skip_lossless: bool,
     copy_audio_to_lossless: bool,
+    extract_audio_separately: bool,
     force_keyframes: Option<&str>,
     verify_frame_count: bool,
     ignore_delay: bool,
@@ -358,6 +367,23 @@ fn process_file(
                 "Received both --lossless-only and --skip-lossless. Doing nothing. This is \
                  probably a mistake."
             );
+        } else if extract_audio_separately {
+            // Extract audio to separate .mka matching the lossless filename stem
+            if let Some(lf) = &lossless_filename {
+                let audio_out = lf.with_extension("mka");
+                convert_audio(
+                    input_vpy,
+                    &audio_out,
+                    AudioEncoder::Copy,
+                    &Track {
+                        source: TrackSource::FromVideo(0),
+                        enabled: true,
+                        forced: false,
+                    },
+                    0,
+                    false,
+                )?;
+            }
         }
         return Ok(());
     }
