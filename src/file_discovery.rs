@@ -9,7 +9,14 @@ use walkdir::WalkDir;
 /// If the path is a directory, recursively finds all .vpy files, excluding already processed ones.
 pub fn discover_input_files(input_path: &Path) -> Result<Vec<PathBuf>> {
     if input_path.is_file() {
-        Ok(vec![input_path.to_path_buf()])
+        if is_vpy_file(input_path) {
+            Ok(vec![input_path.to_path_buf()])
+        } else {
+            anyhow::bail!(
+                "Input file must be a .vpy script: {}",
+                input_path.to_string_lossy()
+            )
+        }
     } else if input_path.is_dir() {
         let files = WalkDir::new(input_path)
             .into_iter()
