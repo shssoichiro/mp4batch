@@ -16,10 +16,13 @@ use crate::{
     absolute_path,
     input::{Colorimetry, PixelFormat, VideoDimensions, get_video_frame_count},
     monitor_for_sigterm,
-    output::video::{
-        aom::build_aom_args_string, rav1e::build_rav1e_args_string,
-        svt_av1::build_svtav1_args_string, x264::build_x264_args_string,
-        x265::build_x265_args_string,
+    output::{
+        audio::has_audio,
+        video::{
+            aom::build_aom_args_string, rav1e::build_rav1e_args_string,
+            svt_av1::build_svtav1_args_string, x264::build_x264_args_string,
+            x265::build_x265_args_string,
+        },
     },
 };
 
@@ -195,15 +198,18 @@ pub fn create_lossless(
         .arg("-i")
         .arg("-");
     if let Some(source2) = copy_audio_from {
-        command
-            .arg("-i")
-            .arg(source2)
-            .arg("-map")
-            .arg("0:v:0")
-            .arg("-map")
-            .arg("1:a:0")
-            .arg("-acodec")
-            .arg("copy");
+        // Only map audio if the source actually has audio tracks
+        if has_audio(source2)? {
+            command
+                .arg("-i")
+                .arg(source2)
+                .arg("-map")
+                .arg("0:v:0")
+                .arg("-map")
+                .arg("1:a:0")
+                .arg("-acodec")
+                .arg("copy");
+        }
     }
     command
         .arg("-vcodec")
