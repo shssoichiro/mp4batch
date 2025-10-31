@@ -23,6 +23,7 @@ pub fn run_processing_workflow(
     ignore_delay: bool,
     no_retry: bool,
     sigterm: &Arc<AtomicBool>,
+    use_xav: bool,
 ) -> Result<()> {
     let inputs = discover_input_files(input_path)?;
 
@@ -62,6 +63,7 @@ pub fn run_processing_workflow(
             ignore_delay,
             no_retry,
             sigterm,
+            use_xav,
         );
 
         if let Err(err) = result {

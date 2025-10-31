@@ -114,6 +114,10 @@ struct InputArgs {
     #[clap(long)]
     pub no_retry: bool,
 
+    /// Use xav instead of av1an
+    #[clap(long)]
+    pub xav: bool,
+
     #[command(subcommand)]
     pub subcommand: Option<Subcommand>,
 }
@@ -158,6 +162,7 @@ fn main() -> Result<()> {
                 args.no_delay,
                 args.no_retry,
                 &sigterm,
+                false,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
@@ -180,6 +185,7 @@ fn main() -> Result<()> {
                 args.no_delay,
                 args.no_retry,
                 &sigterm,
+                args.xav,
             ) {
                 eprintln!("{} Workflow failed: {}", "[Error]".red().bold(), err);
             }
@@ -214,6 +220,7 @@ fn process_file(
     ignore_delay: bool,
     no_retry: bool,
     sigterm: &Arc<AtomicBool>,
+    use_xav: bool,
 ) -> Result<()> {
     let source_video = find_source_file(input_vpy);
     let mediainfo = get_video_mediainfo(&source_video)?;
@@ -441,20 +448,37 @@ fn process_file(
                             .expect("lossless filename is set"),
                     )?
                 };
-                convert_video_av1an(
-                    if should_use_vpy {
-                        &output_vpy
-                    } else {
-                        lossless_filename
-                            .as_ref()
-                            .expect("lossless filename is set")
-                    },
-                    &video_out,
-                    encoder,
-                    dimensions,
-                    force_keyframes,
-                    colorimetry,
-                )?;
+                if use_xav {
+                    convert_video_xav(
+                        if should_use_vpy {
+                            &output_vpy
+                        } else {
+                            lossless_filename
+                                .as_ref()
+                                .expect("lossless filename is set")
+                        },
+                        &video_out,
+                        encoder,
+                        dimensions,
+                        force_keyframes,
+                        colorimetry,
+                    )?;
+                } else {
+                    convert_video_av1an(
+                        if should_use_vpy {
+                            &output_vpy
+                        } else {
+                            lossless_filename
+                                .as_ref()
+                                .expect("lossless filename is set")
+                        },
+                        &video_out,
+                        encoder,
+                        dimensions,
+                        force_keyframes,
+                        colorimetry,
+                    )?;
+                }
             }
         };
 

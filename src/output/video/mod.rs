@@ -268,7 +268,7 @@ pub fn create_lossless(
     Ok(lossless_filename)
 }
 
-pub fn convert_video_av1an(
+pub fn convert_video_xav(
     input: &Path,
     output: &Path,
     encoder: VideoEncoder,
@@ -311,25 +311,9 @@ pub fn convert_video_av1an(
         } * if dimensions.width >= 2000 { 2 } else { 1 },
     )
     .expect("not 0");
-    let cores = available_parallelism().expect("Unable to get machine parallelism count");
-    let workers = NonZeroUsize::new(match encoder {
-        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } | VideoEncoder::SvtAv1 { .. } => {
-            std::cmp::max(cores.get() / tiles.get(), 1)
-        }
-        _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
-    })
-    .expect("value is at least 1");
-    assert!(
-        workers <= cores,
-        "Worker count exceeded core count, this is a bug"
-    );
+    let thread_info = calculate_workers_and_threads(encoder, tiles);
 
-    let threads_per_worker = NonZeroUsize::new(std::cmp::min(
-        64,
-        (cores.get() as f32 / workers.get() as f32 * 1.5).ceil() as usize + 2,
-    ))
-    .expect("value is at least 1");
-    let mut command = Command::new("av1an");
+    let mut command = Command::new("xav");
     command
         .arg("-i")
         .arg(absolute_path(input).expect("Unable to get absolute path"))
@@ -339,9 +323,9 @@ pub fn convert_video_av1an(
         .arg(&encoder.get_args_string(
             dimensions,
             colorimetry,
-            threads_per_worker,
-            cores,
-            workers,
+            thread_info.threads_per_worker,
+            thread_info.cores,
+            thread_info.workers,
             force_keyframes,
         )?)
         .arg("--sc-method")
@@ -386,7 +370,7 @@ pub fn convert_video_av1an(
             .to_string(),
         )
         .arg("-w")
-        .arg(workers.to_string())
+        .arg(thread_info.workers.to_string())
         .arg("--pix-format")
         .arg(match (dimensions.bit_depth, dimensions.pixel_format) {
             (8, PixelFormat::Yuv420) => "yuv420p".to_string(),
@@ -408,7 +392,153 @@ pub fn convert_video_av1an(
     if encoder.uses_av1an_thread_pinning() {
         command
             .arg("--set-thread-affinity")
-            .arg((cores.get() / workers).to_string());
+            .arg((thread_info.cores.get() / thread_info.workers).to_string());
+    }
+    if let VideoEncoder::Aom { grain, .. }
+    | VideoEncoder::Rav1e { grain, .. }
+    | VideoEncoder::SvtAv1 { grain, .. } = encoder
+        && grain > 0
+    {
+        command.arg("-n").arg(grain.to_string());
+    }
+    let status = command
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Failed to execute av1an: Exited with code {:x}",
+            status.code().unwrap_or(-1)
+        ))
+    }
+}
+
+pub fn convert_video_av1an(
+    input: &Path,
+    output: &Path,
+    encoder: VideoEncoder,
+    dimensions: VideoDimensions,
+    force_keyframes: Option<&str>,
+    colorimetry: Colorimetry,
+) -> Result<()> {
+    if !dimensions.width.is_multiple_of(8) {
+        eprintln!(
+            "{} {} {} {}",
+            "[Warning]".yellow().bold(),
+            "Width".yellow(),
+            dimensions.width.to_string().yellow(),
+            "is not divisble by 8".yellow()
+        );
+    }
+    if !dimensions.height.is_multiple_of(8) {
+        eprintln!(
+            "{} {} {} {}",
+            "[Warning]".yellow().bold(),
+            "Height".yellow(),
+            dimensions.height.to_string().yellow(),
+            "is not divisble by 8".yellow()
+        );
+    }
+
+    if output.exists() && get_video_frame_count(output).unwrap_or(0) == dimensions.frames {
+        eprintln!("Video output already exists, reusing");
+        return Ok(());
+    }
+
+    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
+    // We may not actually split tiles at this point,
+    // but we want to make sure we don't run out of memory
+    let tiles = NonZeroUsize::new(
+        if dimensions.height >= 2000 || (dimensions.height >= 1550 && dimensions.width >= 3600) {
+            2
+        } else {
+            1
+        } * if dimensions.width >= 2000 { 2 } else { 1 },
+    )
+    .expect("not 0");
+    let thread_info = calculate_workers_and_threads(encoder, tiles);
+    let mut command = Command::new("av1an");
+    command
+        .arg("-i")
+        .arg(absolute_path(input).expect("Unable to get absolute path"))
+        .arg("-e")
+        .arg(encoder.get_av1an_name())
+        .arg("-v")
+        .arg(&encoder.get_args_string(
+            dimensions,
+            colorimetry,
+            thread_info.threads_per_worker,
+            thread_info.cores,
+            thread_info.workers,
+            force_keyframes,
+        )?)
+        .arg("--sc-method")
+        .arg("standard")
+        // Should be safe since our inputs are always lossless x264 with no open-gop
+        .arg("--chunk-method")
+        .arg("ffms2")
+        .arg("-x")
+        .arg(
+            match encoder {
+                VideoEncoder::Aom { profile, .. }
+                | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::SvtAv1 { profile, .. }
+                | VideoEncoder::X264 { profile, .. }
+                | VideoEncoder::X265 { profile, .. } => {
+                    if profile.is_anime() {
+                        fps * 15
+                    } else {
+                        fps * 10
+                    }
+                }
+                VideoEncoder::Copy => unreachable!(),
+            }
+            .to_string(),
+        )
+        .arg("--min-scene-len")
+        .arg(
+            match encoder {
+                VideoEncoder::Aom { profile, .. }
+                | VideoEncoder::Rav1e { profile, .. }
+                | VideoEncoder::SvtAv1 { profile, .. }
+                | VideoEncoder::X264 { profile, .. }
+                | VideoEncoder::X265 { profile, .. } => {
+                    if profile.is_anime() {
+                        fps / 2
+                    } else {
+                        fps
+                    }
+                }
+                VideoEncoder::Copy => unreachable!(),
+            }
+            .to_string(),
+        )
+        .arg("-w")
+        .arg(thread_info.workers.to_string())
+        .arg("--pix-format")
+        .arg(match (dimensions.bit_depth, dimensions.pixel_format) {
+            (8, PixelFormat::Yuv420) => "yuv420p".to_string(),
+            (8, PixelFormat::Yuv422) => "yuv422p".to_string(),
+            (8, PixelFormat::Yuv444) => "yuv444p".to_string(),
+            (bd, PixelFormat::Yuv420) => format!("yuv420p{}le", bd),
+            (bd, PixelFormat::Yuv422) => format!("yuv422p{}le", bd),
+            (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
+        })
+        .arg("-r")
+        .arg("-o")
+        .arg(absolute_path(output).expect("Unable to get absolute path"));
+    if let Some(force_keyframes) = force_keyframes {
+        command.arg("--force-keyframes").arg(force_keyframes);
+    }
+    if dimensions.height > 1080 {
+        command.arg("--sc-downscale-height").arg("1080");
+    }
+    if encoder.uses_av1an_thread_pinning() {
+        command
+            .arg("--set-thread-affinity")
+            .arg((thread_info.cores.get() / thread_info.workers).to_string());
     }
     if let VideoEncoder::Aom { grain, .. }
     | VideoEncoder::Rav1e { grain, .. }
@@ -583,5 +713,39 @@ impl From<VideoEncoder> for VideoEncoderIdent {
             VideoEncoder::X264 { .. } => Self::X264,
             VideoEncoder::X265 { .. } => Self::X265,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ThreadingCalcs {
+    cores: NonZeroUsize,
+    workers: NonZeroUsize,
+    threads_per_worker: NonZeroUsize,
+}
+
+fn calculate_workers_and_threads(encoder: VideoEncoder, tiles: NonZeroUsize) -> ThreadingCalcs {
+    let cores = available_parallelism().expect("Unable to get machine parallelism count");
+    let workers = NonZeroUsize::new(match encoder {
+        VideoEncoder::Aom { .. } | VideoEncoder::Rav1e { .. } | VideoEncoder::SvtAv1 { .. } => {
+            std::cmp::max(cores.get() / tiles.get(), 1)
+        }
+        _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
+    })
+    .expect("value is at least 1");
+    assert!(
+        workers <= cores,
+        "Worker count exceeded core count, this is a bug"
+    );
+
+    let threads_per_worker = NonZeroUsize::new(std::cmp::min(
+        64,
+        (cores.get() as f32 / workers.get() as f32 * 1.5).ceil() as usize + 2,
+    ))
+    .expect("value is at least 1");
+
+    ThreadingCalcs {
+        cores,
+        workers,
+        threads_per_worker,
     }
 }
