@@ -300,7 +300,6 @@ pub fn convert_video_xav(
         return Ok(());
     }
 
-    let fps = (dimensions.fps.0 as f32 / dimensions.fps.1 as f32).round() as u32;
     // We may not actually split tiles at this point,
     // but we want to make sure we don't run out of memory
     let tiles = NonZeroUsize::new(
