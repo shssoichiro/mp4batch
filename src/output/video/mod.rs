@@ -315,11 +315,7 @@ pub fn convert_video_xav(
 
     let mut command = Command::new("xav");
     command
-        .arg("-i")
-        .arg(absolute_path(input).expect("Unable to get absolute path"))
-        .arg("-e")
-        .arg(encoder.get_av1an_name())
-        .arg("-v")
+        .arg("-p")
         .arg(&encoder.get_args_string(
             dimensions,
             colorimetry,
@@ -328,72 +324,9 @@ pub fn convert_video_xav(
             thread_info.workers,
             force_keyframes,
         )?)
-        .arg("--sc-method")
-        .arg("standard")
-        // Should be safe since our inputs are always lossless x264 with no open-gop
-        .arg("--chunk-method")
-        .arg("ffms2")
-        .arg("-x")
-        .arg(
-            match encoder {
-                VideoEncoder::Aom { profile, .. }
-                | VideoEncoder::Rav1e { profile, .. }
-                | VideoEncoder::SvtAv1 { profile, .. }
-                | VideoEncoder::X264 { profile, .. }
-                | VideoEncoder::X265 { profile, .. } => {
-                    if profile.is_anime() {
-                        fps * 15
-                    } else {
-                        fps * 10
-                    }
-                }
-                VideoEncoder::Copy => unreachable!(),
-            }
-            .to_string(),
-        )
-        .arg("--min-scene-len")
-        .arg(
-            match encoder {
-                VideoEncoder::Aom { profile, .. }
-                | VideoEncoder::Rav1e { profile, .. }
-                | VideoEncoder::SvtAv1 { profile, .. }
-                | VideoEncoder::X264 { profile, .. }
-                | VideoEncoder::X265 { profile, .. } => {
-                    if profile.is_anime() {
-                        fps / 2
-                    } else {
-                        fps
-                    }
-                }
-                VideoEncoder::Copy => unreachable!(),
-            }
-            .to_string(),
-        )
         .arg("-w")
         .arg(thread_info.workers.to_string())
-        .arg("--pix-format")
-        .arg(match (dimensions.bit_depth, dimensions.pixel_format) {
-            (8, PixelFormat::Yuv420) => "yuv420p".to_string(),
-            (8, PixelFormat::Yuv422) => "yuv422p".to_string(),
-            (8, PixelFormat::Yuv444) => "yuv444p".to_string(),
-            (bd, PixelFormat::Yuv420) => format!("yuv420p{}le", bd),
-            (bd, PixelFormat::Yuv422) => format!("yuv422p{}le", bd),
-            (bd, PixelFormat::Yuv444) => format!("yuv444p{}le", bd),
-        })
-        .arg("-r")
-        .arg("-o")
-        .arg(absolute_path(output).expect("Unable to get absolute path"));
-    if let Some(force_keyframes) = force_keyframes {
-        command.arg("--force-keyframes").arg(force_keyframes);
-    }
-    if dimensions.height > 1080 {
-        command.arg("--sc-downscale-height").arg("1080");
-    }
-    if encoder.uses_av1an_thread_pinning() {
-        command
-            .arg("--set-thread-affinity")
-            .arg((thread_info.cores.get() / thread_info.workers).to_string());
-    }
+        .arg("-r");
     if let VideoEncoder::Aom { grain, .. }
     | VideoEncoder::Rav1e { grain, .. }
     | VideoEncoder::SvtAv1 { grain, .. } = encoder
@@ -401,6 +334,9 @@ pub fn convert_video_xav(
     {
         command.arg("-n").arg(grain.to_string());
     }
+    command
+        .arg(absolute_path(input).expect("Unable to get absolute path"))
+        .arg(absolute_path(output).expect("Unable to get absolute path"));
     let status = command
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to execute av1an: {}", e))?;
