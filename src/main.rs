@@ -291,8 +291,14 @@ fn process_file(
 
     for line in String::from_utf8_lossy(&output.stdout)
         .lines()
-        .skip(1)
         .take_while(|line| !line.starts_with("Output Index: 1"))
+        .filter(|line| {
+            line.starts_with("Width:")
+                || line.starts_with("Height:")
+                || line.starts_with("Frames:")
+                || line.starts_with("FPS:")
+                || line.starts_with("Format Name:")
+        })
     {
         writeln!(&mut stderr_writer, "{}", line)?;
     }
@@ -617,7 +623,6 @@ fn process_file(
                 .to_string_lossy()
                 .green()
         );
-        eprintln!();
     }
 
     if !keep_lossless {

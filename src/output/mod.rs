@@ -129,7 +129,10 @@ pub fn mux_video(
     if copy_fonts {
         eprintln!("WARNING: copy fonts not currently implemented for mkv");
     }
-    command.arg("--track-order").arg(track_order.join(","));
+    command
+        .arg("--track-order")
+        .arg(track_order.join(","))
+        .stderr(Stdio::null());
 
     let status = command.status()?;
     if status.success() {
