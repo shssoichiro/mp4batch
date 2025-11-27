@@ -19,6 +19,11 @@ path-clean = "1.0.1"
 regex = "1.6.0"
 signal-hook = "0.3.17"
 size = "0.5"
+vapoursynth = { version = "0.4.0", features = [
+    "vsscript-functions",
+    "vapoursynth-api-36",
+    "vsscript-api-32",
+] }
 walkdir = "2"
 which = "8.0.0"
 
