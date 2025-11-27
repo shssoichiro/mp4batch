@@ -1,9 +1,11 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    ffi::CString,
     fs,
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -14,7 +16,13 @@ use av_data::pixel::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use regex::Regex;
-use vapoursynth::vsscript::{Environment, EvalFlags};
+use vapoursynth4_rs::{
+    api::{Api, VssApi},
+    frame::Frame,
+    map::KeyStr,
+    node::Node,
+    sciprt::{OutputNode, Script},
+};
 
 use crate::output::VideoEncoderIdent;
 
@@ -309,38 +317,50 @@ pub struct Colorimetry {
 
 impl Colorimetry {
     pub fn from_path<P: AsRef<Path>>(input: P) -> Result<Self> {
-        let env = Environment::from_file(input, EvalFlags::SetWorkingDir).map_err(|e| match e {
-            vapoursynth::vsscript::Error::VSScript(e) => {
-                anyhow!("An error occurred in VSScript: {}", e)
-            }
-            _ => anyhow!("{}", e),
-        })?;
-        let (node, _) = env.get_output(0)?;
-        let frame = node.get_frame(0)?;
-        let props = frame.props();
+        let script = Script::new(None, VssApi::new(4, 1)?, Api::new(4, 1)?);
+        script
+            .evaluate_file(&CString::from_str(&input.as_ref().to_string_lossy())?)
+            .map_err(|e| anyhow!("{}", e))?;
+        let node = match script.get_output(0)? {
+            OutputNode::Audio(_) => bail!("Audio node not supported"),
+            OutputNode::Video(video_node) => video_node,
+        };
+        let frame = node
+            .get_frame(0)
+            .map_err(|e| anyhow!("{}", String::from_utf8_lossy(e.as_bytes())))?;
+        let props = frame
+            .properties()
+            .ok_or_else(|| anyhow!("Failed to get frame properties"))?;
+        // The vapoursynth4 bindings are SO PAINFUL to use. But we are FORCED to migrate to them
+        // because Vapoursynth R73 removed the v3 API support, because "nobody has used it in years".
+        let cstr_range = CString::from_str("_ColorRange")?;
+        let cstr_prim = CString::from_str("_Primaries")?;
+        let cstr_matrix = CString::from_str("_Matrix")?;
+        let cstr_trans = CString::from_str("_Transfer")?;
+        let cstr_chroma = CString::from_str("_ChromaLocation")?;
         Ok(Colorimetry {
-            range: match props.get_int("_ColorRange") {
+            range: match props.get_int(KeyStr::from_cstr(&cstr_range), 0) {
                 Ok(0) => YUVRange::Full,
                 _ => YUVRange::Limited,
             },
             primaries: props
-                .get_int("_Primaries")
+                .get_int(KeyStr::from_cstr(&cstr_prim), 0)
                 .map_or(ColorPrimaries::Unspecified, |val| {
                     ColorPrimaries::from_i64(val).unwrap_or(ColorPrimaries::Unspecified)
                 }),
             matrix: props
-                .get_int("_Matrix")
+                .get_int(KeyStr::from_cstr(&cstr_matrix), 0)
                 .map_or(MatrixCoefficients::Unspecified, |val| {
                     MatrixCoefficients::from_i64(val).unwrap_or(MatrixCoefficients::Unspecified)
                 }),
-            transfer: props.get_int("_Transfer").map_or(
+            transfer: props.get_int(KeyStr::from_cstr(&cstr_trans), 0).map_or(
                 TransferCharacteristic::Unspecified,
                 |val| {
                     TransferCharacteristic::from_i64(val)
                         .unwrap_or(TransferCharacteristic::Unspecified)
                 },
             ),
-            chroma_location: match props.get_int("_ChromaLocation") {
+            chroma_location: match props.get_int(KeyStr::from_cstr(&cstr_chroma), 0) {
                 Ok(0) => ChromaLocation::Left,
                 Ok(1) => ChromaLocation::Center,
                 Ok(2) => ChromaLocation::TopLeft,
