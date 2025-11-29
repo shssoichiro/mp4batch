@@ -132,7 +132,8 @@ pub fn mux_video(
     command
         .arg("--track-order")
         .arg(track_order.join(","))
-        .stderr(Stdio::null());
+        .stderr(Stdio::null())
+        .stdout(Stdio::null());
 
     let status = command.status()?;
     if status.success() {
