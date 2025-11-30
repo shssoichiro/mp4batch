@@ -666,10 +666,7 @@ fn calculate_workers_and_threads(encoder: VideoEncoder, tiles: NonZeroUsize) -> 
         }
         _ => (std::cmp::max(cores.get() / tiles.get(), 1) / 4).max(1),
     })
-    .expect("value is at least 1")
-    // Limit the number of workers, as memory bandwidth eventually becomes a limiter
-    // SAFETY: non-zero constant
-    .min(unsafe { NonZeroUsize::new_unchecked(16) });
+    .expect("value is at least 1");
     assert!(
         workers <= cores,
         "Worker count exceeded core count, this is a bug"
