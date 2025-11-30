@@ -1,0 +1,295 @@
+---
+alwaysApply: true
+---
+
+# Ruleset: Effective Code Comments for an LLM in Software Development
+
+Purpose: help the LLM write comments that **explain intent, constraints, trade-offs, and risks**—not narrate the code. Comment _why_, not _what_. Keep it short, true, and useful.
+
+---
+
+## 1) Core Principles
+
+- **Explain “why,” not “what.”** The code already says what. Comments justify design choices, constraints, and non-obvious behavior.
+- **Document decisions and trade-offs.** When multiple approaches exist, state why this one won.
+- **Call out hazards.** Concurrency, performance landmines, security assumptions, undefined behavior, external side effects.
+- **Record invariants and contracts.** Preconditions, postconditions, data shapes, error semantics.
+- **Prefer refactoring over commenting.** If a comment explains confusing code, first try to simplify the code. If not possible, then comment.
+- **Stay current or delete.** Out-of-date comments are bugs with better handwriting.
+
+---
+
+## 2) When to Comment (Heuristics)
+
+Comment when any of these apply:
+
+- Behavior is non-obvious (tricky algorithm, external constraints, legacy quirks).
+- There are **invariants/assumptions** the code relies on.
+- There’s **risk**: security, concurrency, data races, precision, compliance.
+- A **trade-off** was made (simplicity vs performance; memory vs CPU; portability vs features).
+- **Public APIs** and any module boundary. State contract, stability, and known limitations.
+- **Workarounds** for defects (with link and summary), feature flags, migrations.
+
+---
+
+## 3) What _Not_ to Do
+
+- Don’t restate the code: `// increment i` or `# map over items`.
+- Don’t write fiction: no speculation, no guesses, no placeholders masquerading as facts.
+- Don’t duplicate sources verbatim (schema, config) that will drift.
+- Don’t dump changelogs in comments; put history in VCS, but summarize _why_ for critical decisions.
+- Don’t leak secrets, credentials, internal-only URLs, or PII.
+- Don’t joke or editorialize. Clarity beats clever.
+
+---
+
+## 4) Style & Tone
+
+- **Concise, precise, plain language.** Default to imperative present: “Ensure…”, “Guard…”.
+- **One idea per comment.** Prefer short lines; wrap ~80–100 chars.
+- **Use consistent tags** (see below) to make comments scannable.
+- **Include short summaries when linking out.** Links rot; the summary survives.
+
+---
+
+## 5) Standard Comment Tags
+
+Use these uppercase labels at the start of a comment block when relevant:
+
+- `RATIONALE:` why this approach was chosen.
+- `ASSUMPTION:` conditions expected to hold (inputs, environment, versions).
+- `INVARIANT:` must remain true across the code path.
+- `CONTRACT:` input/output guarantees; error behavior.
+- `HAZARD:` risks (race, UB, precision, reentrancy).
+- `SECURITY:` threat model notes; validation requirements.
+- `PERF:` complexity, caching, memory trade-offs.
+- `COMPAT:` legacy behavior we must match.
+- `WORKAROUND:` temporary fix with removal criteria.
+- `TODO:` concrete next step + owner or ticket; include _why_ and expiry/trigger.
+- `LINK:` URL + 1-line summary (issue/ADR/PR/standard).
+
+---
+
+## 6) Examples (Good vs Bad)
+
+### A) Non-obvious indexing
+
+**Bad**
+
+```ts
+// use 1-based indexing
+const page = i + 1;
+```
+
+**Good**
+
+```ts
+// RATIONALE: External API uses 1-based pages; keep internal zero-based and convert at boundary.
+const page = i + 1;
+```
+
+### B) Concurrency ordering
+
+**Bad**
+
+```go
+// lock both to avoid race
+muA.Lock(); muB.Lock()
+```
+
+**Good**
+
+```go
+// HAZARD: Acquire in A→B order across the service to avoid deadlock (see ADR-42).
+muA.Lock(); muB.Lock()
+```
+
+### C) Performance trade-off
+
+**Bad**
+
+```py
+# using dict for speed
+seen = {}
+```
+
+**Good**
+
+```py
+# PERF: O(n) membership checks via dict; list is simpler but becomes O(n^2) on large inputs (~1e5).
+seen = {}
+```
+
+### D) Workaround with exit criteria
+
+**Bad**
+
+```java
+// temporary fix; remove later
+```
+
+**Good**
+
+```java
+// WORKAROUND: Avoid JIT crash on Azul 21.30 by disabling vectorization (ISSUE-9132).
+// Remove when Azul ≥ 21.34 or when HotLoop is rewritten.
+```
+
+### E) API contract
+
+**Good**
+
+```rust
+/// CONTRACT: Returns a stable, lexicographically sorted list.
+/// ASSUMPTION: `names` contains UTF-8; invalid bytes rejected with Error::InvalidInput.
+/// SECURITY: Caller must sanitize user-supplied `names` before logging.
+pub fn sorted_names(names: Vec<String>) -> Result<Vec<String>, Error> { ... }
+```
+
+### F) Link with summary
+
+**Good**
+
+```sql
+-- LINK: PR#1782 — switched to partial index; cuts write amp ~30% on hot shard.
+-- RATIONALE: Full index caused vacuum backlog under weekend load.
+```
+
+---
+
+## 7) Language-Specific Notes
+
+- **Python**: Prefer docstrings for public APIs (purpose, args, returns, errors). Use `#` line comments for local rationale. Don’t restate type hints.
+- **JS/TS**: Prefer `/** ... */` JSDoc for exported functions/types; inline `//` for rationale near tricky code. Use TSDoc tags only if they add value.
+- **Go**: Package and exported symbol docs start with the symbol name. Keep inline comments short; use full sentences for exported docs.
+- **Java/Kotlin/C#**: Javadoc/XML doc for public APIs. Put invariants and thread-safety in class-level docs.
+- **Rust**: Use `///` doc comments, `//!` for crate/module docs. Mark safety: `// SAFETY:` when using `unsafe`.
+
+---
+
+## 8) TODOs That Don’t Rot
+
+- Include **why**, **owner or ticket**, and **trigger/expiry**.
+
+**Good**
+
+```ts
+// TODO(core-1234): Replace polling with SSE once gateway supports HTTP/2 push (target Q1).
+```
+
+**Bad**
+
+```ts
+// TODO: improve later
+```
+
+---
+
+## 9) Security & Compliance
+
+- Mark security-relevant logic explicitly with `SECURITY:` and list assumptions:
+
+  - trust boundaries, input validation, authN/authZ, crypto parameters, secrets handling.
+
+- Never include secrets or keys. Redact examples.
+- If referencing policies/standards (OWASP, PCI), add a one-line summary + link.
+
+---
+
+## 10) LLM Operating Rules (Guardrails)
+
+- **Never fabricate** links, issue IDs, benchmarks, or standards. If unknown, omit or mark as unknown.
+- **Validate consistency**: comments must match the code. If code changes, update or remove the comment in the same edit.
+- **Prefer refactors** over comments when names/structure can remove the need for explanation.
+- **No boilerplate dumps.** Generate only comments that add decision-making value.
+- **Check drift**: before output, do a quick pass—does any comment restate code or contradict it?
+- **Respect project style**: line length, doc format, tag conventions.
+
+---
+
+## 11) Minimal Comment Shapes (Templates)
+
+Use these skeletons to keep comments tight and high-signal.
+
+**Rationale**
+
+```txt
+// RATIONALE: <why this approach> vs <alternatives>, because <constraint/trade-off>.
+```
+
+**Invariant / Contract**
+
+```txt
+// INVARIANT: <condition that must hold> (violations lead to <effect>).
+```
+
+**Hazard**
+
+```txt
+// HAZARD: <risk>. Mitigation: <strategy>. Test: <how verified>.
+```
+
+**Workaround**
+
+```txt
+// WORKAROUND: <issue/bug> — <summary>. Remove when <condition> (see <link/id>).
+```
+
+**Link with summary**
+
+```txt
+// LINK: <URL or ID> — <1-line why this matters>.
+```
+
+---
+
+## 12) Commenting Checklist (for the LLM)
+
+Before finalizing:
+
+1. Did I explain **why** this code exists or is shaped this way?
+2. Did I capture **assumptions/invariants** that must hold?
+3. Did I mark any **hazards** (perf, security, concurrency) and mitigations?
+4. Is there a **trade-off** statement where alternatives existed?
+5. Are **links summarized** so the comment stands alone if the link dies?
+6. Is everything **concise, factual, and current**? Remove fluff.
+
+---
+
+## 13) Compact Examples (Multi-lang)
+
+**Python**
+
+```py
+# RATIONALE: Avoid datetime.now() to keep runs deterministic in tests.
+now = datetime_from_env_or_utc()
+```
+
+**TypeScript**
+
+```ts
+// COMPAT: Preserve legacy falsy handling (null|undefined) to avoid breaking older clients.
+export function coalesce<T>(a: T | null | undefined, b: T): T { ... }
+```
+
+**Go**
+
+```go
+// INVARIANT: ids are monotonic per shard; required by snapshot merge logic.
+```
+
+**Rust**
+
+```rust
+// SAFETY: Raw pointer from FFI remains valid for the duration of lock_guard.
+```
+
+**SQL**
+
+```sql
+-- PERF: Hash join preferred; forces planner away from nested loops on wide tables.
+```
+
+---
+
+Keep it lean, justify the weird parts, and mark the landmines. Comments are for future readers under deadline pressure—give them reasons, not narration.

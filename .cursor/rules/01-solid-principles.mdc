@@ -1,0 +1,354 @@
+---
+alwaysApply: true
+---
+
+# SOLID Ruleset for an LLM in Software Development
+
+This document defines **guidelines, guardrails, and best practices** for generating or refactoring code using the **SOLID** principles. Keep outputs concise, justify trade-offs, and avoid ceremony that bloats token budgets.
+
+---
+
+## General Operating Rules (LLM)
+
+- **State intent first.** In ≤3 bullets: goal, constraints, and why SOLID changes help.
+- **Small diffs.** Prefer minimal, reviewable changes over sweeping rewrites.
+- **Name the principle(s) you’re applying.** Show how the change addresses a concrete smell.
+- **Provide one short example** (10–30 lines) using a mainstream language (TypeScript/Java/Python). Keep language-agnostic where possible.
+- **Ship tests.** Include 1–3 focused unit tests proving contracts and extension points.
+- **No premature abstraction.** If there’s only one implementation and low likelihood of variation, keep it simple and explain why.
+
+---
+
+## S — Single Responsibility Principle (SRP)
+
+> A module should have **one reason to change**.
+
+### Signals You’re Violating SRP
+
+- Class handles **multiple concerns** (e.g., business logic, I/O, formatting).
+- Changes in unrelated requirements force edits to the same class.
+- Too many private methods with topic switching; long God objects.
+
+### Guidelines
+
+- Split by **axis of change**: policy vs. mechanism, calculation vs. presentation, orchestration vs. execution.
+- Extract **cohesive collaborators**; keep public API small.
+- Keep files/classes/functions **focused and testable**.
+
+### Minimal Example (TypeScript)
+
+**Before (mixed concerns):**
+
+```ts
+class InvoiceService {
+  generate(invoice: Invoice): string {
+    /* calc totals */
+  }
+  save(invoice: Invoice) {
+    /* writes to DB */
+  }
+  print(invoice: Invoice): string {
+    /* formats for printer */
+  }
+}
+```
+
+**After (one responsibility each):**
+
+```ts
+class InvoiceCalculator {
+  total(i: Invoice): Money {
+    /* ... */
+  }
+}
+class InvoiceRepo {
+  save(i: Invoice): void {
+    /* ... */
+  }
+}
+class InvoiceFormatter {
+  toPrint(i: Invoice): string {
+    /* ... */
+  }
+}
+```
+
+**Tests:** Unit-test each role; integration test their composition.
+
+**Guardrail:** Do not create an explosion of micro-classes with trivial pass-throughs. Extract only **meaningful** responsibilities.
+
+---
+
+## O — Open/Closed Principle (OCP)
+
+> Software entities should be **open for extension**, **closed for modification**.
+
+### Signals You’re Violating OCP
+
+- Recurrent edits to a central `switch/if` on type/enum to add features.
+- Feature additions require touching well-tested core code.
+
+### Guidelines
+
+- Prefer **polymorphism/strategy/registration** over conditionals that grow.
+- Define stable **extension points** (interfaces, callbacks, plugins).
+- Keep **data + behavior** together for variants.
+
+### Minimal Example (Java)
+
+**Before (growing switch):**
+
+```java
+BigDecimal price(Order o) {
+  switch (o.type()) {
+    case STANDARD: return o.base();
+    case PROMO: return o.base().multiply(new BigDecimal("0.9"));
+    case VIP: return o.base().multiply(new BigDecimal("0.8"));
+  }
+  throw new IllegalArgumentException();
+}
+```
+
+**After (strategy):**
+
+```java
+interface Pricing { BigDecimal price(Order o); }
+
+class Standard implements Pricing { public BigDecimal price(Order o){ return o.base(); } }
+class Promo implements Pricing { public BigDecimal price(Order o){ return o.base().multiply(new BigDecimal("0.9")); } }
+
+class PriceEngine {
+  private final Map<OrderType, Pricing> strategies;
+  public BigDecimal price(Order o){ return strategies.get(o.type()).price(o); }
+}
+```
+
+**Guardrail:** Don’t abstract for hypothetical futures. Create extensions when there’s **at least one credible variant**.
+
+---
+
+## L — Liskov Substitution Principle (LSP)
+
+> Subtypes must be **substitutable** for their base types without breaking expected behavior (pre/postconditions, invariants).
+
+### Signals You’re Violating LSP
+
+- A subtype **throws or ignores** base-type behaviors.
+- Methods **widen preconditions** or **weaken postconditions**.
+- “Square/Rectangle” style constraint conflicts; optional methods that make no sense for some implementations.
+
+### Guidelines
+
+- Specify **contracts** (doc/tests) for interfaces: inputs, outputs, side effects, error cases.
+- Ensure subtypes **do not strengthen preconditions** (require more) or **weaken guarantees**.
+- Prefer **composition** when certain operations don’t apply to some variants.
+
+### Minimal Example (Python)
+
+**Bad (violates LSP):**
+
+```py
+class Cache:
+    def get(self, k): ...
+    def set(self, k, v): ...
+
+class ReadOnlyCache(Cache):
+    def set(self, k, v):
+        raise NotImplementedError  # violates client expectation
+```
+
+**Better (compose/read-only view):**
+
+```py
+class ReadOnlyCache:
+    def __init__(self, inner: Cache): self._inner = inner
+    def get(self, k): return self._inner.get(k)
+```
+
+**Tests:** Any test written against the base type must pass for subtypes.
+
+**Guardrail:** If an operation is not universally meaningful, **don’t put it in the base interface**.
+
+---
+
+## I — Interface Segregation Principle (ISP)
+
+> Prefer **many small, specific interfaces** to one fat interface.
+
+### Signals You’re Violating ISP
+
+- Clients implement **methods they don’t use**.
+- Mocks/stubs with **no-op** or **throwing** methods.
+- Version churn in big interfaces breaks unrelated clients.
+
+### Guidelines
+
+- Split interfaces by **client usage** (e.g., `Reader`, `Writer`, `Closer`).
+- Keep **input-only vs. output-only** concerns separate.
+- Favor **role interfaces** (capabilities) over **laundry lists**.
+
+### Minimal Example (Go)
+
+**Before:**
+
+```go
+type FileStore interface {
+    Save([]byte) error
+    Load(string) ([]byte, error)
+    Delete(string) error
+    List() ([]string, error)
+}
+```
+
+**After (segregated):**
+
+```go
+type Saver interface { Save([]byte) error }
+type Loader interface { Load(string) ([]byte, error) }
+type Deleter interface { Delete(string) error }
+type Lister interface { List() ([]string, error) }
+```
+
+Clients depend only on capabilities they use.
+
+**Guardrail:** Don’t split to the point that simple operations require **excessive wiring**. Merge when two methods are **always** consumed together.
+
+---
+
+## D — Dependency Inversion Principle (DIP)
+
+> High-level modules should **not depend on** low-level modules; **both** depend on **abstractions**. Abstractions shouldn’t depend on details.
+
+### Signals You’re Violating DIP
+
+- Business logic instantiates concrete dependencies directly (`new` scattered).
+- Hardwired I/O (filesystem, HTTP clients) inside domain services.
+- Difficult to test without real infrastructure.
+
+### Guidelines
+
+- Depend on **interfaces/ports**; provide **adapters** for concrete tech (DB, HTTP, queues).
+- Use **constructor injection** (or equivalent) for required dependencies.
+- Keep **composition root** (wiring) near boundaries (main, DI container).
+
+### Minimal Example (TypeScript)
+
+**Before:**
+
+```ts
+class UserService {
+  private db = new RealPgClient();
+  find(id: string) {
+    return this.db.query(/*...*/);
+  }
+}
+```
+
+**After:**
+
+```ts
+interface UserRepo {
+  find(id: string): Promise<User>;
+}
+
+class UserService {
+  constructor(private repo: UserRepo) {}
+  find(id: string) {
+    return this.repo.find(id);
+  }
+}
+// Adapter elsewhere:
+class PgUserRepo implements UserRepo {
+  /* uses RealPgClient */
+}
+```
+
+**Tests:** Provide a fake `UserRepo` to test `UserService` in isolation.
+
+**Guardrail:** Don’t add interfaces for **leaf** classes used only once. Invert dependencies where it **improves testability or variation**.
+
+---
+
+## Cross-Cutting Practices
+
+### Refactoring Playbook
+
+1. **Identify smell** → state the violated principle.
+2. **Define contract** → document expected behavior and invariants.
+3. **Extract/segregate** responsibilities or interfaces.
+4. **Introduce abstraction/strategy** when there’s real variation.
+5. **Move wiring to composition root**.
+6. **Add/adjust tests** to lock behavior.
+7. **Measure impact** (LOC changed, complexity, test coverage).
+
+### Testing Guidance
+
+- Unit tests around **contracts and extension points**.
+- Golden tests for **polymorphic behavior** (same suite over multiple implementations).
+- Characterization tests before risky refactors; keep behavior stable.
+
+### Documentation (Lightweight)
+
+- For each abstraction, include a **one-sentence purpose** and **who depends on it**.
+- Note **reasons to change**; this justifies the boundaries (SRP).
+- For extension points, list **known implementations** and registration mechanism.
+
+---
+
+## When to Bend SOLID (explicit, minimal)
+
+- **Performance-critical paths** where indirection measurably harms throughput/latency; justify with a benchmark and keep a comment.
+- **Simple apps/scripts** with short lifespan; prefer clarity over abstraction.
+- **Stable domains** with low variance; avoid speculative extensibility.
+
+Always state the deviation and why it’s acceptable.
+
+---
+
+## Quick Heuristics
+
+- **SRP:** “If this class changed because of X and also because of Y, split.”
+- **OCP:** “If adding a variant edits existing code, create an extension point.”
+- **LSP:** “If substituting a subtype surprises clients, fix the contract or composition.”
+- **ISP:** “If a client ignores methods, shrink the interface.”
+- **DIP:** “If core logic knows concrete tech, invert with an interface/port.”
+
+---
+
+## Anti-Patterns to Avoid
+
+- God objects / manager-of-everything classes.
+- Boolean parameter explosions (hidden variants).
+- Feature flags driving complex conditionals instead of strategies.
+- Fat interfaces requiring `throw new UnsupportedOperationException`.
+- Newing infrastructure inside domain code; static singletons hidden as “helpers”.
+
+---
+
+## Minimal Example Bringing It Together (Kotlin)
+
+```kotlin
+// Ports (DIP + ISP)
+interface PaymentMethod { fun charge(amount: Money): Receipt }
+interface ReceiptPrinter { fun print(r: Receipt): String } // ISP: printing separate
+
+// Strategies (OCP)
+class CardPayment(...) : PaymentMethod { override fun charge(a: Money) = /*...*/ }
+class WalletPayment(...) : PaymentMethod { override fun charge(a: Money) = /*...*/ }
+
+// High-level policy depends on abstractions (DIP)
+class Checkout(private val pay: PaymentMethod, private val printer: ReceiptPrinter) {
+    // SRP: does checkout orchestration only
+    fun run(items: List<Item>): String {
+        val total = items.sumOf { it.price }              // SRP: pricing separated if needed
+        val receipt = pay.charge(total)
+        return printer.print(receipt)
+    }
+}
+```
+
+Tests reuse the same `Checkout` tests across `CardPayment` and `WalletPayment` (LSP). Adding `CryptoPayment` extends via a new class (OCP). `ReceiptPrinter` is independent for GUI vs. text clients (ISP). `Checkout` takes interfaces via constructor (DIP). Responsibilities are kept narrow (SRP).
+
+---
+
+Keep it lean, justify abstractions, and let tests enforce contracts.

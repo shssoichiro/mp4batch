@@ -1,0 +1,331 @@
+---
+description: Use this ruleset when writing or reviewing Rust code.
+alwaysApply: false
+---
+
+# Rust Development Ruleset for LLMs
+
+> Concise, opinionated guidance for generating and reviewing Rust code with an emphasis on **safety**, **performance**, and **maintainability**. Prefer clarity over cleverness. Where trade-offs exist, state them explicitly.
+
+---
+
+## 0) Operating Mode
+
+- **Clarify when needed:** If requirements are ambiguous or missing (types, error behavior, I/O format, async runtime, MSRV), enumerate assumptions up front and proceed with safe defaults. Mark with `// TODO: confirm`.
+- **Never fabricate APIs or versions.** If an external crate API is uncertain, write an interface sketch and add `// TODO: verify crate API`.
+- **Token discipline:** Output only files or diffs that change. Omit generated lockfiles, build logs, or boilerplate when not essential.
+- **Project context:** Respect existing style (edition, MSRV, toolchain, workspace layout, lint config). Don’t reformat policy without being asked.
+
+---
+
+## 1) Project Setup & Baselines
+
+- Use the current Rust edition specified by the project (`Cargo.toml` → `edition = "20XX"`). If starting fresh: `2024` or newer.
+- Add a baseline crate config for binaries:
+
+  ```toml
+  # Cargo.toml (bin crate)
+  [package]
+  edition = "2024"
+
+  [dependencies]
+  anyhow = "1"
+  thiserror = "1"
+  tracing = "0.1"
+  tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+  ```
+
+- Add a baseline crate config for libraries:
+
+  ```toml
+  # Cargo.toml (lib crate)
+  [package]
+  edition = "2024"
+
+  [dependencies]
+  thiserror = "1"
+  ```
+
+- Include CI-friendly checks:
+
+  - `rustfmt.toml` present; run `cargo fmt --check`.
+  - Clippy in CI: `cargo clippy --all-targets --all-features -D warnings`.
+  - Tests: `cargo test --all`.
+
+- Set MSRV explicitly in `Cargo.toml` (e.g., `rust-version = "1.75"`). Don’t use features requiring a higher compiler than declared.
+
+---
+
+## 2) Lints, Style, and Layout
+
+- At crate root:
+
+  ```rust
+  #![forbid(unsafe_code)]
+  #![deny(rust_2018_idioms)]
+  #![warn(missing_docs)]
+  ```
+
+  Use `forbid(unsafe_code)` unless `unsafe` is strictly required.
+
+- Always run `rustfmt`. Keep functions short and names descriptive. Avoid overly generic names like `do_work`, `handle`.
+- Organize modules by responsibility. Avoid deep module nesting for small crates.
+
+---
+
+## 3) Safety First
+
+- **Default to safe Rust.** If `unsafe` is needed:
+
+  - Isolate it in a tiny, well-named module.
+  - Provide a **safety contract** comment explaining preconditions and invariants.
+  - Add tests that exercise edges relevant to the safety claim.
+
+- Avoid `unwrap()`/`expect()` in libraries. In binaries, allow `expect()` only with clear, user-actionable messages.
+- Treat all external input as untrusted. Validate sizes, encodings, ranges, and formats. Prefer `&[u8]` + explicit parsing over lossy conversions.
+- For FFI:
+
+  - Use `repr(C)` for shared structs.
+  - Prefer `cxx` or `ffi-support` style patterns when possible.
+  - Document ownership and threading expectations at the boundary.
+
+---
+
+## 4) Error Handling
+
+- **Libraries:** use custom error enums with `thiserror`. Expose meaningful variants; don’t erase types to strings.
+- **Binaries/tools:** use `anyhow` for ergonomic composition; map to user-friendly messages at the edge.
+- Avoid error logs in libraries; return errors. Log at the application boundary.
+- Preserve context (`with_context` from `anyhow`, or custom variants) to aid debugging.
+- Don’t conflate “not found” with “error”. Model sentinel states explicitly (`Option`, custom variants).
+
+**Example (library error):**
+
+```rust
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum StoreError {
+    #[error("invalid key: {0}")]
+    InvalidKey(String),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+```
+
+---
+
+## 5) Concurrency & Async
+
+- Choose **one** async runtime (e.g., `tokio`) per binary. Don’t block within async contexts (`std::thread::sleep`, heavy CPU). For CPU-bound work, offload to `spawn_blocking`/threadpool.
+- Use `Send + Sync` bounds when crossing thread boundaries. Avoid `Rc`/`RefCell` in multithreaded code; prefer `Arc` and `Mutex/RwLock` as needed.
+- Prefer channels or structured concurrency over ad-hoc shared state. Cancel tasks cleanly; join handles or use `tokio::task::AbortHandle`.
+- Timeouts and retries: make them explicit and configurable.
+- Avoid `static mut`. For singletons, use `once_cell`/`LazyLock` with `Arc`.
+
+---
+
+## 6) Performance Guidelines
+
+- **Measure before optimizing.** Use `criterion` for micro-benchmarks; `cargo flamegraph`/`pprof-rs` for profiling.
+- Minimize allocations and copies:
+
+  - Prefer `&str`/`&[T]` to owning `String`/`Vec<T>` when possible.
+  - Avoid `clone()` by default; borrow or restructure lifetimes.
+  - Reserve capacity for maps/vecs when size is known (`with_capacity`).
+
+- Use iterators and slices; avoid intermediate `collect()` unless necessary.
+- Data structures:
+
+  - `Vec` beats linked lists for most cases.
+  - `HashMap` default is fine; set capacity when predictable.
+
+- I/O:
+
+  - Buffer reads/writes (`BufReader`, `BufWriter`).
+  - Stream large data; don’t slurp entire files unless needed.
+
+- Hot paths:
+
+  - Avoid dynamic dispatch if monomorphization is cheap and hot.
+  - Consider `#[inline]` sparingly; let the compiler decide unless profiling proves otherwise.
+
+---
+
+## 7) API Design & Maintainability
+
+- **Small, sharp APIs.** Keep public surface minimal. Hide implementation details; expose traits only when extension points are intended.
+- Prefer **newtypes** over raw primitives for domain safety:
+
+  ```rust
+  struct UserId(u64); // clearer than bare u64
+  ```
+
+- Use trait bounds at the **narrowest** site. Avoid leaking complex generics into public types unless necessary.
+- Document all public items with **purpose, inputs, outputs, errors, and examples**. Provide runnable examples (`/// # Examples` + doctests).
+- Keep **SemVer**: don’t break public APIs in patch/minor versions. Use feature flags to gate experimental APIs (`doc(cfg(feature = "…"))`).
+- Avoid macros unless they reduce real duplication. Prefer functions/traits for clarity.
+
+---
+
+## 8) Dependencies & Features
+
+- Minimize dependencies. Each crate adds compile time, potential CVEs, and transitive bloat.
+- Gate heavy/optional functionality behind additive **feature flags**. Keep default features lean.
+- Prefer well-maintained crates with recent releases and security posture. Avoid unmaintained forks.
+- No custom patches or git dependencies unless justified and documented (`[patch.crates-io]` with rationale).
+- Record licenses; don’t introduce license conflicts.
+
+---
+
+## 9) Testing, Property Checks & Fuzzing
+
+- Write **unit tests** near the code and **integration tests** under `tests/`.
+- Favor deterministic tests. Seed randomness or use fixed inputs.
+- Use **property-based tests** (`proptest`) for parsers, serializers, and invariants.
+- Add **fuzzing** targets (e.g., with `cargo-fuzz`) for untrusted input handlers.
+- Test error paths, not just happy paths. Assert error variants/contexts where stable.
+- Doctests should compile and run; keep them brief.
+
+**Property example:**
+
+```rust
+proptest! {
+    #[test]
+    fn roundtrip(data: Vec<u8>) {
+        let enc = encode(&data);
+        let dec = decode(&enc).unwrap();
+        prop_assert_eq!(dec, data);
+    }
+}
+```
+
+---
+
+## 10) Logging, Metrics, and Observability
+
+- Use `tracing` for structured logs. Don’t `println!` in libraries.
+- Add spans for major operations; include identifiers (user_id, request_id) as fields.
+- Make log level configurable via env (`RUST_LOG` or `EnvFilter`).
+- Expose metrics behind a feature flag when appropriate (e.g., `metrics` crate).
+
+**Example:**
+
+```rust
+#[tracing::instrument(skip(store), fields(user_id = %uid))]
+async fn load_user(store: &Store, uid: UserId) -> Result<User, StoreError> {
+    store.fetch(uid).await
+}
+```
+
+---
+
+## 11) Data Formats & (De)Serialization
+
+- Prefer `serde` for JSON/TOML/YAML; define explicit schemas. Validate before trusting.
+- For binary formats, specify endianness and versioning. Include magic numbers/version fields.
+- Don’t accept `serde` defaults that weaken validation (e.g., silently ignoring unknown fields) unless explicitly desired; if strictness is required use `deny_unknown_fields`.
+
+---
+
+## 12) Unsafe, FFI, and `no_std` (When Applicable)
+
+- If `unsafe` is unavoidable:
+
+  - Wrap in safe APIs that enforce preconditions at compile time where possible.
+  - Document invariants and aliasing rules. Add Miri tests when feasible.
+
+- For FFI, prefer owning copies at boundary or clearly document lifetimes when borrowing across language lines.
+- `no_std`: gate with a feature; avoid accidental `alloc` use when targeting embedded.
+
+---
+
+## 13) Build Profiles & Releases
+
+- Set sensible release profile:
+
+  ```toml
+  [profile.release]
+  lto = "thin"
+  codegen-units = 1
+  panic = "abort" # binaries only, if compatible
+  ```
+
+- Keep reproducible builds in mind; pin toolchain in `rust-toolchain.toml` if needed.
+
+---
+
+## 14) Security Notes
+
+- Never roll your own crypto. Use vetted crates; surface key material as opaque types.
+- Zeroize secrets where relevant (`zeroize` crate). Avoid logging sensitive data.
+- Validate untrusted input sizes before allocation to prevent DoS.
+- Consider threat models; document trust boundaries.
+
+---
+
+## 15) Minimal Examples (Good vs. Risky)
+
+**Borrow, don’t clone:**
+
+```rust
+// Prefer
+fn greet(name: &str) -> String {
+    format!("hello, {name}")
+}
+
+// Avoid unnecessary ownership
+fn greet_bad(name: String) -> String {
+    format!("hello, {name}")
+}
+```
+
+**Avoid panics in libraries:**
+
+```rust
+// Prefer
+pub fn index(slice: &[u8], i: usize) -> Option<u8> {
+    slice.get(i).copied()
+}
+
+// Risky in a lib (panic on out-of-bounds)
+pub fn index_bad(slice: &[u8], i: usize) -> u8 {
+    slice[i]
+}
+```
+
+**Async: don’t block:**
+
+```rust
+// Prefer
+tokio::task::spawn_blocking(move || heavy_cpu());
+
+// Risky: blocks the reactor
+std::thread::sleep(std::time::Duration::from_millis(50));
+```
+
+---
+
+## 16) Change Review Checklist (for PRs or Generated Patches)
+
+- [ ] Compiles on stated MSRV and stable.
+- [ ] `cargo fmt`, `clippy -D warnings`, tests pass.
+- [ ] Public API documented; examples compile.
+- [ ] No `unwrap()`/`expect()` in library paths.
+- [ ] No `unsafe` (or justified, documented, and tested).
+- [ ] Reasonable allocation behavior; no obvious clones/copies.
+- [ ] Error types meaningful; context preserved.
+- [ ] Feature flags remain additive; defaults minimal.
+- [ ] Logging uses `tracing`; no stray prints.
+- [ ] Dependencies audited; no surprise git/patch deps.
+- [ ] Benchmarks/profiling notes added for hot changes (if applicable).
+
+---
+
+## 17) When You’re Not Sure
+
+State uncertainty explicitly, propose a small, testable design, and include `// TODO` markers for verification points (APIs, crate features, perf assumptions). Default to the safest behavior that won’t paint the project into a corner.
+
+---
+
+**Use this as the baseline. Adapt to the project’s explicit policies when they exist; do not silently override them.**

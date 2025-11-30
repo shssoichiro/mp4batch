@@ -1,0 +1,264 @@
+---
+description: Use this ruleset when writing or reviewing code tests.
+alwaysApply: false
+---
+
+# LLM Ruleset: Language-Agnostic Code Testing
+
+A compact, opinionated guide for generating and reviewing tests. Keep tests behavior-focused, deterministic, and fast. Do not invent API details or dependencies.
+
+---
+
+## 1) Scope & Intent
+
+- Produce tests for any language or framework without relying on framework-specific magic.
+- Default to unit tests; add integration and end-to-end (E2E) sparingly and intentionally.
+- Prioritize correctness and maintainability over cleverness.
+
+---
+
+## 2) Core Principles
+
+- **Behavior over implementation:** Assert externally observable outcomes, not private internals.
+- **Determinism:** No time-, order-, or environment-dependent flakiness.
+- **Isolation:** One reason to fail per test. No shared mutable state across tests.
+- **Minimalism:** Small inputs, minimal fixtures, only necessary assertions.
+- **Readability:** Clear names, Arrange-Act-Assert (AAA) structure, helpful failure messages.
+
+---
+
+## 3) Test Taxonomy & When to Use
+
+- **Unit:** Pure logic, in-process, no I/O. Fast and parallelizable. Default choice.
+- **Integration:** Validates collaboration with real implementations (e.g., DB driver, serializer) behind a controlled boundary. Use when mocks would miss contract issues.
+- **E2E/System:** Full stack with real interfaces. Use only for critical paths; keep few and stable.
+
+Budget guideline (by count): Unit >> Integration > E2E.
+
+---
+
+## 4) Handling Ambiguity (Prompt Discipline)
+
+When required behavior is underspecified:
+
+- Ask **targeted** questions limited to behavior, inputs/outputs, error cases, and side effects.
+- If you must proceed without answers, state assumptions at the top of the test file as comments and design tests so they’re easy to update.
+
+---
+
+## 5) Structure & Naming
+
+- **File/Module naming:** mirror the code under test.
+- **Test names:** `functionName_condition_expectedOutcome`.
+- **AAA pattern:**
+
+  ```txt
+  TEST "sum_negativeAndPositive_returnsNet" {
+    // Arrange
+    // Act
+    // Assert
+  }
+  ```
+
+- One logical assertion per test; if multiple, they should describe one behavior.
+
+---
+
+## 6) Assertions
+
+- Prefer precise assertions (equality, membership, approximate equality with tolerance).
+- For collections/JSON, assert only relevant fields; avoid brittle deep equality unless that’s the behavior.
+- Include **why** in messages: `assertEqual(total, 42, "loyalty points after 3 purchases")`.
+- Use `assertThrows`/`assertError` for negative paths and verify error type/message contract.
+
+---
+
+## 7) Fixtures & Test Data
+
+- Inline small fixtures for readability; extract shared builders for repeated patterns.
+- Avoid global fixtures. Prefer factory/builders:
+
+  ```txt
+  user = buildUser().withRole("admin").withActive(true)
+  ```
+
+- Use realistic but minimal data; avoid giant JSON blobs. Replace irrelevant fields with placeholders.
+
+---
+
+## 8) Test Doubles (Mocks, Stubs, Spies, Fakes)
+
+- **Stub:** returns canned values for queries.
+- **Mock:** verifies interactions/expectations; use sparingly.
+- **Spy:** records calls; assert after the fact.
+- **Fake:** lightweight working implementation (e.g., in-mem DB) for integration realism.
+  Decision rule: prefer fakes > stubs > spies > mocks.
+
+---
+
+## 9) External Effects & Environment
+
+- **Time:** freeze/override clock; assert timestamps relative to fixed instant.
+- **Randomness:** seed RNG; assert distribution-independent properties or fixed outputs with seed.
+- **Files/Network:** default to in-memory or local temp resources; never require the internet.
+- **Concurrency:** use deterministic synchronization or virtual time. Assert on outcomes, not timing.
+
+---
+
+## 10) Edge-Case Catalog (consider these)
+
+- Empty input, singleton, max/min boundaries, off-by-one.
+- Null/undefined/None and optional fields.
+- Duplicate elements, unsorted inputs.
+- Unicode/locale, encoding, normalization.
+- Large inputs/streaming, backpressure.
+- Time zones, DST boundaries, leap seconds/days.
+- Retries, idempotency, partial failure.
+- Permissions/roles/tenancy boundaries.
+- Canceled/timeout operations.
+- Serialization/deserialization round-trips.
+
+---
+
+## 11) Property-Based & Invariants
+
+Use property-based tests for algorithmic code:
+
+- Define generators with constraints (e.g., non-empty, sorted).
+- Write invariants: idempotency, commutativity, monotonicity, round-trip (`decode(encode(x)) == x`), conservation (sum preserved), error bounds.
+
+---
+
+## 12) Performance & Resource Tests
+
+- Add only for hot paths or strict SLAs.
+- Warm up before measuring. Assert on time bands or complexity hints, not brittle absolute times.
+- Track memory/handles; ensure cleanup.
+
+---
+
+## 13) Security-Relevant Checks
+
+- Input validation and rejection of dangerous payloads.
+- Constant-time behavior for secrets where applicable.
+- No secrets in logs/errors. Sanitize user-visible messages.
+
+---
+
+## 14) Coverage & Risk
+
+- Aim for **risk-weighted coverage**, not a magic number. Cover public API, critical branches, and every bug fix with a regression test.
+- If reporting coverage, exclude generated code and trivial getters to reduce noise.
+
+---
+
+## 15) Flake Prevention
+
+- No sleeps except in E2E with polling + timeout.
+- Randomized ports/resources must be unique per test.
+- Reset global state and environment variables after each test.
+- Make tests parallel-safe by default.
+
+---
+
+## 16) CI Expectations
+
+- Tests must run headless, offline, and in parallel.
+- Avoid OS-specific paths/assumptions.
+- Provide seed/flags to reproduce failures (`SEED=12345`).
+
+---
+
+## 17) Integration Example with a Fake
+
+```txt
+# tests/userRepo_integration_test.txt
+SUITE "UserRepo" {
+  SETUP {
+    clock.freeze("2025-01-01T00:00:00Z")
+    db = InMemoryDb()
+    repo = UserRepo(db, clock)
+  }
+
+  TEST "create_persistsAndStamps" {
+    id = repo.create({name:"Ava"})
+    got = db.query("select * from users where id=?", id)
+    assertEqual(got.name, "Ava")
+    assertEqual(got.createdAt, "2025-01-01T00:00:00Z")
+  }
+}
+# Run: test-runner --tags integration
+```
+
+---
+
+## 18) Concurrency Example
+
+```txt
+SUITE "Counter" {
+  TEST "increment_isThreadSafe" {
+    counter = Counter()
+    runConcurrently(n=1000) { counter.increment() }
+    assertEqual(counter.value(), 1000)
+  }
+}
+# Use deterministic concurrency helpers; fail the test if any race is detected.
+```
+
+---
+
+## 19) Negative & Error Handling Example
+
+```txt
+SUITE "Parser" {
+  TEST "invalidHeader_throws" {
+    input = "BAD / HTTP/1.1\r\n\r\n"
+    err = assertThrows(() => parseRequest(input))
+    assertEqual(err.type, "ParseError")
+    assertContains(err.message, "request line")
+  }
+}
+```
+
+---
+
+## 20) Refusals & Guardrails for the LLM
+
+- Do **not** fabricate library APIs, filesystem paths, or environment variables. If unknown, ask or provide an adapter interface in the test.
+- Do **not** hit real networks, cloud services, or production databases. Use fakes/stubs/mocks.
+- Do **not** include secrets or sensitive real data in examples.
+- Do **not** generate flaky constructs (sleep-based waits, order-dependent assertions, real time).
+- If the target framework is unspecified, emit portable pseudo-tests and mark the framework placeholder clearly.
+
+---
+
+## 21) Regression Tests
+
+For every reported bug:
+
+- Add a test that reproduces the failing input first.
+- Assert the correct behavior, referencing the bug ID in the test name/comment.
+- Keep the test even after the fix.
+
+---
+
+## 22) Pre-Submit Checklist (for the LLM)
+
+- Names describe behavior; AAA structure present.
+- Deterministic: seeded RNG, frozen time, no real I/O.
+- Minimal fixtures; no global state leaks; parallel-safe.
+- Edge cases covered (empty, null/None, boundaries, errors).
+- Clear run instructions; assumptions documented.
+- No invented dependencies; contracts match provided APIs.
+
+---
+
+## 23) Token/Context Hygiene
+
+- Prefer small, focused tests over sprawling suites.
+- Inline tiny fixtures; elide large, irrelevant fields with placeholders.
+- Omit duplicate code; factor helpers only when reused ≥3 times in the same file.
+
+---
+
+Adopt this as the default testing playbook. Next step: layer in your project’s specific runner, assertion library, and fixtures so this becomes an on-ramp rather than a speed bump.
