@@ -281,17 +281,16 @@ pub fn convert_video_xav(
             "{} {} {} {}",
             "[Warning]".yellow().bold(),
             "Width".yellow(),
-            dimensions.width.to_string().yellow(),
-            "is not divisble by 8".yellow()
+            dimensions.width.to_string().yellow().bold(),
+            "is not divisble by 8, falling back to av1an".yellow()
         );
-    }
-    if !dimensions.height.is_multiple_of(8) {
-        eprintln!(
-            "{} {} {} {}",
-            "[Warning]".yellow().bold(),
-            "Height".yellow(),
-            dimensions.height.to_string().yellow(),
-            "is not divisble by 8".yellow()
+        return convert_video_av1an(
+            input,
+            output,
+            encoder,
+            dimensions,
+            force_keyframes,
+            colorimetry,
         );
     }
 
@@ -358,25 +357,6 @@ pub fn convert_video_av1an(
     force_keyframes: Option<&str>,
     colorimetry: Colorimetry,
 ) -> Result<()> {
-    if !dimensions.width.is_multiple_of(8) {
-        eprintln!(
-            "{} {} {} {}",
-            "[Warning]".yellow().bold(),
-            "Width".yellow(),
-            dimensions.width.to_string().yellow(),
-            "is not divisble by 8".yellow()
-        );
-    }
-    if !dimensions.height.is_multiple_of(8) {
-        eprintln!(
-            "{} {} {} {}",
-            "[Warning]".yellow().bold(),
-            "Height".yellow(),
-            dimensions.height.to_string().yellow(),
-            "is not divisble by 8".yellow()
-        );
-    }
-
     if output.exists() && get_video_frame_count(output).unwrap_or(0) == dimensions.frames {
         eprintln!("Video output already exists, reusing");
         return Ok(());
